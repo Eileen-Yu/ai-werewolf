@@ -46,7 +46,7 @@
 | `game/` | 规则：发身份、谁能看到什么、计票、胜负。纯函数，不依赖 Dapr |
 | `brain/` | 玩家怎么想：`random`（随机，免费）和 `llm`（Dapr Conversation API） |
 | `werewolf/` | 主持人 workflow。每轮一次执行，用 continue-as-new 进入下一轮 |
-| `internal/engine/` | 本地 workflow 引擎（durabletask + SQLite），不装 Dapr 也能玩 |
+| `internal/engine/` | 本地 workflow 引擎（durabletask + SQLite），只在本地玩和跑测试时用；在 Catalyst 上玩不需要它 |
 | `cmd/werewolf/` | 命令行：`engine`、`gm`、`start` |
 
 信息隔离由主持人负责：每个玩家每次只收到 `State.VisibleTo(自己)` 的那部分记录。上帝视角的直播会把所有人的私下想法也打出来（标成"内心"），可以看到每个人嘴上说的和心里想的有什么不同。
@@ -70,6 +70,8 @@ go run ./cmd/werewolf start -engine localhost:4001    # 开一局，等结果
 本地引擎只能用 `random` 大脑，因为 LLM 大脑要调用 Dapr 的 Conversation API。
 
 ## 在 Catalyst 上玩
+
+在 Catalyst 上玩不需要本地引擎，也不用运行 `werewolf engine`：Catalyst 托管的 workflow 就是引擎，只需要跑 `gm` 这一个进程。
 
 `gm` 不加 `-engine` 时连 Dapr。`diagrid dev run` 会把 Catalyst 的 `DAPR_GRPC_ENDPOINT` 和 `DAPR_API_TOKEN` 注入给它，这时 workflow 状态和执行历史都存在 Catalyst 里。
 
