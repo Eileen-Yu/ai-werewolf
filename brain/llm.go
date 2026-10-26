@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync/atomic"
 
 	dapr "github.com/dapr/go-sdk/client"
 
@@ -20,13 +21,18 @@ import (
 type LLM struct {
 	Client    dapr.Client
 	Component string
+
+	// defaultTemperature is set once the model has refused a temperature
+	// other than its own default, as some reasoning models do. From then on
+	// no temperature is sent.
+	defaultTemperature atomic.Bool
 }
 
 // attempts is how many times a player is asked before an invalid answer is
 // given up on: the first ask plus re-asks that quote the mistake back.
 const attempts = 3
 
-func (l LLM) Act(ctx context.Context, t Turn) (Action, error) {
+func (l *LLM) Act(ctx context.Context, t Turn) (Action, error) {
 	tx := t.text()
 	system, user := prompt(t)
 	msgs := []*dapr.ConversationMessageAlpha2{
@@ -338,11 +344,13 @@ func temperatureFor(k TurnKind) float64 {
 	return 0.9
 }
 
-func (l LLM) converse(ctx context.Context, msgs []*dapr.ConversationMessageAlpha2, temperature float64) (string, error) {
-	resp, err := l.Client.ConverseAlpha2(ctx, dapr.ConversationRequestAlpha2{
-		Name:        l.Component,
-		Temperature: &temperature,
-		Inputs:      []*dapr.ConversationInputAlpha2{{Messages: msgs}},
+func (l *LLM) converse(ctx context.Context, msgs []*dapr.ConversationMessageAlpha2, temperature float64) (string, error) {
+	resp, err := l.send(temperature, func(t *float64) (*dapr.ConversationResponseAlpha2, error) {
+		return l.Client.ConverseAlpha2(ctx, dapr.ConversationRequestAlpha2{
+			Name:        l.Component,
+			Temperature: t,
+			Inputs:      []*dapr.ConversationInputAlpha2{{Messages: msgs}},
+		})
 	})
 	if err != nil {
 		return "", fmt.Errorf("conversation %s: %w", l.Component, err)
@@ -355,6 +363,22 @@ func (l LLM) converse(ctx context.Context, msgs []*dapr.ConversationMessageAlpha
 		}
 	}
 	return "", errors.New("conversation returned no text")
+}
+
+// send makes a request with temperature, unless the model is known to refuse
+// one. A model that refuses it is asked again without, and never sent one
+// again.
+func (l *LLM) send(temperature float64, request func(*float64) (*dapr.ConversationResponseAlpha2, error)) (*dapr.ConversationResponseAlpha2, error) {
+	if l.defaultTemperature.Load() {
+		return request(nil)
+	}
+	resp, err := request(&temperature)
+	if err == nil || !strings.Contains(err.Error(), "temperature") {
+		return resp, err
+	}
+	l.defaultTemperature.Store(true)
+	log.Printf("%s refused a temperature of %v; sending none from now on: %v", l.Component, temperature, err)
+	return request(nil)
 }
 
 func content(s string) []*dapr.ConversationMessageContentAlpha2 {

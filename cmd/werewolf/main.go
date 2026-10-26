@@ -99,7 +99,7 @@ func runGM(ctx context.Context, args []string) error {
 		if daprClient == nil {
 			return errors.New("-brain llm needs Dapr for the conversation API; drop -engine")
 		}
-		werewolf.SetBrain(brain.LLM{Client: daprClient, Component: *component})
+		werewolf.SetBrain(&brain.LLM{Client: daprClient, Component: *component})
 	default:
 		return fmt.Errorf("unknown brain %q", *brainName)
 	}

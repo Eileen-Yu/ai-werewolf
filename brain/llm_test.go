@@ -1,6 +1,7 @@
 package brain
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -9,8 +10,44 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	dapr "github.com/dapr/go-sdk/client"
+
 	"github.com/Eileen-Yu/ai-werewolf/game"
 )
+
+func TestAModelThatRefusesATemperatureIsSentNone(t *testing.T) {
+	var sent []*float64
+	refusing := func(temp *float64) (*dapr.ConversationResponseAlpha2, error) {
+		sent = append(sent, temp)
+		if temp != nil {
+			return nil, errors.New("400: Unsupported value: 'temperature' does not support 0.9 with this model")
+		}
+		return &dapr.ConversationResponseAlpha2{}, nil
+	}
+	l := &LLM{Component: "llm"}
+	_, err := l.send(0.9, refusing)
+	require.NoError(t, err)
+	_, err = l.send(0.3, refusing)
+	require.NoError(t, err)
+	require.Len(t, sent, 3)
+	assert.Equal(t, 0.9, *sent[0])
+	assert.Nil(t, sent[1], "asked again without a temperature")
+	assert.Nil(t, sent[2], "and never sent one again")
+
+	sent = nil
+	taking := func(temp *float64) (*dapr.ConversationResponseAlpha2, error) {
+		sent = append(sent, temp)
+		return &dapr.ConversationResponseAlpha2{}, nil
+	}
+	l = &LLM{Component: "llm"}
+	_, err = l.send(0.3, taking)
+	require.NoError(t, err)
+	require.Len(t, sent, 1)
+	assert.Equal(t, 0.3, *sent[0], "a model that takes a temperature keeps getting one")
+
+	_, err = l.send(0.3, func(*float64) (*dapr.ConversationResponseAlpha2, error) { return nil, errors.New("404: no such model") })
+	assert.ErrorContains(t, err, "404", "other errors are not retried")
+}
 
 func TestPromptSeparatesWhatThePlayerKnows(t *testing.T) {
 	turn := Turn{
