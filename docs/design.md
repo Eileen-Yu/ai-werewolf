@@ -22,7 +22,7 @@ The game master workflow holds the full `game.State`, which has the whole truth.
 
 The view has six parts:
 
-- **Seats and status**: who is alive. A dead player only shows the public account of how they left, such as "died on Night 2" or "voted out".
+- **Seats and status**: who is alive. A dead player only shows when they died, or that they were voted out: "died on Night 2", "died on Day 3", "voted out on Day 2". The host only ever states facts everyone at the table could see. Whether someone was killed by the wolves, poisoned, saved or shot by the hunter is never announced; only the player who used the power is told.
 - **Your secrets**: your own role, your fellow wolves, the wolves' night talk and plan, your check results, and what the witch knows about tonight's victim and her potions. These are the only facts that are certain.
 - **Your notes**: the player's own structured memory, holding what they believe about each player (`beliefs`: werewolf, good or unsure, with a list of evidence) and what they plan to do next (`strategy`). Every move hands back a complete new set of notes.
 - **Your recent private thoughts**: the `thinking` from the last 3 moves. Older reasoning should already be in the notes.
@@ -83,6 +83,7 @@ go test ./...
 
 - The witch is scripted to save the victim, and the night must pass with no death.
 - The game master worker is killed mid-game and a new one takes over, and the game must still finish.
+- In random games, where the witch saves and poisons and the hunter shoots at random, no public host line may mention a kill, a potion, a shot or a power role, and every seat must show only when its player died or that they were voted out.
 - The hunter always shoots, and no public line may name the hunter; the player shot must be shown dying like anyone else, and only the hunter is told who he shot.
 
 There is also a full English game that checks no player's seats, record or host lines contain any Chinese characters, and a full Chinese game that checks the stored roles, phases and winner are in English. `brain/llm_test.go` checks the English prompts and error messages for every kind of turn the same way, which catches any string left untranslated.

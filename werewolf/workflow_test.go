@@ -95,6 +95,37 @@ func (b *savingWitch) Act(ctx context.Context, t brain.Turn) (brain.Action, erro
 	return brain.Random{}.Act(ctx, t)
 }
 
+// The host only states what anyone at the table could see: who died and when,
+// and who was voted out. How someone died, who was saved and who holds a
+// power never reach the public record or the seats.
+func TestTheHostNeverSaysHowAnyoneDied(t *testing.T) {
+	client := startEngine(t)
+	startWorker(t, client)
+
+	causes := []string{"狼人杀", "被杀", "刀", "毒", "救", "解药", "猎人", "开枪", "女巫", "预言家"}
+	death := regexp.MustCompile(`^第\d+(夜死亡|天死亡|天被投票放逐)$`)
+	for i := range 8 {
+		b := &turnRecorder{}
+		SetBrain(b)
+		playGame(t, client, fmt.Sprintf("facts-%d", i))
+		for _, turn := range b.turns {
+			for _, e := range turn.Transcript {
+				if e.Speaker != "" || len(e.Audience) > 0 || strings.HasPrefix(e.Text, "欢迎") {
+					continue
+				}
+				for _, c := range causes {
+					assert.NotContains(t, e.Text, c, "a public host line gives away %q", c)
+				}
+			}
+			for _, s := range turn.Seats {
+				if s.Death != "" {
+					assert.Regexp(t, death, s.Death, "%s's seat", s.Name)
+				}
+			}
+		}
+	}
+}
+
 func TestTheHuntersShotIsNeverAnnounced(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)

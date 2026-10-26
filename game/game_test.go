@@ -47,10 +47,10 @@ func TestThoughtsAreOnlyVisibleToTheThinker(t *testing.T) {
 
 func TestRemoveRecordsHowAndWhen(t *testing.T) {
 	s := &State{Round: 2, Phase: Night, Players: []Player{{Name: "小红", Alive: true}}}
-	s.Remove("小红", "被狼人杀害")
+	s.Remove("小红", "死亡")
 
 	assert.False(t, s.Player("小红").Alive)
-	assert.Equal(t, "第2夜被狼人杀害", s.Player("小红").Death)
+	assert.Equal(t, "第2夜死亡", s.Player("小红").Death)
 }
 
 func TestVoteCandidatesKeepWolvesOffEachOther(t *testing.T) {

@@ -19,7 +19,7 @@ func TestPromptSeparatesWhatThePlayerKnows(t *testing.T) {
 		Phase: game.Day,
 		Me:    game.Player{Name: "老王", Role: game.Werewolf, Persona: "推理小说迷"},
 		Seats: []Seat{
-			{Name: "老王"}, {Name: "小红", Death: "第1夜被狼人杀害（一定是好人）"}, {Name: "阿杰"}, {Name: "美玲"},
+			{Name: "老王"}, {Name: "小红", Death: "第1夜死亡"}, {Name: "阿杰"}, {Name: "美玲"},
 		},
 		Transcript: []game.Event{
 			{Round: 1, Phase: game.Night, Text: "你们是狼人同伴：老王、阿杰。", Audience: []string{"老王", "阿杰"}},
@@ -47,7 +47,7 @@ func TestPromptSeparatesWhatThePlayerKnows(t *testing.T) {
 	assert.Contains(t, system, "配置："+game.Chinese.LineupSummary())
 	assert.Contains(t, system, chineseText.strategies[game.Werewolf])
 	assert.Contains(t, user, "- 老王（你）：存活")
-	assert.Contains(t, user, "- 小红：第1夜被狼人杀害（一定是好人）")
+	assert.Contains(t, user, "- 小红：第1夜死亡")
 	assert.Contains(t, user, "都是确定的事实（狼同伴的夜聊也在这里）\n[第1夜] 主持人：你们是狼人同伴：老王、阿杰。\n[第1夜] 阿杰：明天我悍跳预言家。\n")
 	assert.Contains(t, user, "【你最近的私下想法】只有你知道\n[第1夜] 美玲最像预言家。\n")
 	assert.Contains(t, user, "【】里是主持人记下的表态\n[第2天] 美玲：我是预言家，查了阿杰是狼。【声称预言家，阿杰：狼人，怀疑阿杰】\n")
