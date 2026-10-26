@@ -12,11 +12,11 @@ import (
 type Role string
 
 const (
-	Werewolf Role = "狼人"
-	Seer     Role = "预言家"
-	Witch    Role = "女巫"
-	Hunter   Role = "猎人"
-	Villager Role = "村民"
+	Werewolf Role = "werewolf"
+	Seer     Role = "seer"
+	Witch    Role = "witch"
+	Hunter   Role = "hunter"
+	Villager Role = "villager"
 )
 
 // Gods are the villager-side roles with a power. Wolves win by removing all
@@ -29,8 +29,8 @@ var Lineup = []Role{Werewolf, Werewolf, Werewolf, Seer, Witch, Hunter, Villager,
 // The sides: a seer's result is string(Werewolf) or Good, and a player's
 // belief about someone may also be Unsure.
 const (
-	Good   = "好人"
-	Unsure = "不确定"
+	Good   = "good"
+	Unsure = "unsure"
 )
 
 // Sides a belief may hold.
@@ -46,16 +46,16 @@ func Side(r Role) string {
 
 // Pass is the candidate a player picks to decline an optional power: the
 // witch's potions and the hunter's gun.
-const Pass = "放弃"
+const Pass = "pass"
 
 // Nobody is the suspect a player names when they suspect no one.
-const Nobody = "无"
+const Nobody = "nobody"
 
 type Phase string
 
 const (
-	Night Phase = "夜"
-	Day   Phase = "天"
+	Night Phase = "night"
+	Day   Phase = "day"
 )
 
 type Player struct {
@@ -64,7 +64,7 @@ type Player struct {
 	Role    Role   `json:"role,omitempty"`
 	Alive   bool   `json:"alive"`
 	// Death is what everyone knows about how the player left the game, e.g.
-	// "第1夜死亡" — at night only that they died, not who killed them.
+	// "died on Night 1": at night only that they died, not who killed them.
 	Death string `json:"death,omitempty"`
 }
 
@@ -124,14 +124,14 @@ type Event struct {
 }
 
 // Claim is what a player says they are and, optionally, what their power
-// told them: 预言家, 小红, 好人. It is only their word; wolves claim too.
+// told them: seer, Ruby, good. It is only their word; wolves claim too.
 type Claim struct {
 	Role   Role   `json:"role"`
 	Target string `json:"target,omitempty"`
 	Result string `json:"result,omitempty"`
 }
 
-// Describe is the claim as the record shows it: "预言家，小红：好人".
+// Describe is the claim as the record shows it: "seer, Ruby: good".
 func (c Claim) Describe(l Lang) string {
 	role := l.Say(string(c.Role))
 	switch {
@@ -140,7 +140,7 @@ func (c Claim) Describe(l Lang) string {
 	case l == English:
 		return fmt.Sprintf("%s, %s: %s", role, c.Target, l.Say(c.Result))
 	default:
-		return fmt.Sprintf("%s，%s：%s", role, c.Target, c.Result)
+		return fmt.Sprintf("%s，%s：%s", role, c.Target, l.Say(c.Result))
 	}
 }
 
@@ -153,7 +153,7 @@ func Stance(l Lang, suspect string, claim *Claim) string {
 		}
 		return s
 	}
-	s := "怀疑" + suspect
+	s := "怀疑" + l.Say(suspect)
 	if claim != nil {
 		s = "声称" + claim.Describe(l) + "，" + s
 	}
@@ -181,7 +181,7 @@ func (e Event) VisibleTo(name string) bool {
 	return len(e.Audience) == 0 || slices.Contains(e.Audience, name)
 }
 
-// When is the event's time on the game clock, e.g. "第2天".
+// When is the event's time on the game clock, e.g. "Day 2".
 func (e Event) When(l Lang) string {
 	return l.When(e.Round, e.Phase)
 }
@@ -248,7 +248,7 @@ func (s *State) Think(name, text string) Event {
 }
 
 // Remove takes a player out of the game; how is the public account, e.g.
-// "被投票放逐".
+// "voted out".
 func (s *State) Remove(name, how string) {
 	p := s.Player(name)
 	p.Alive = false

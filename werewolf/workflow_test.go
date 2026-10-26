@@ -34,7 +34,7 @@ func TestGamesPlayToAWinner(t *testing.T) {
 	for i := range 10 {
 		res := playGame(t, client, fmt.Sprintf("game-%d", i))
 
-		assert.Contains(t, []string{"狼人", "好人"}, res.Winner)
+		assert.Contains(t, []string{string(game.Werewolf), game.Good}, res.Winner)
 		assert.Positive(t, res.Rounds)
 		roles := map[game.Role]int{}
 		for _, p := range res.Players {
@@ -212,6 +212,28 @@ func TestAnEnglishGameIsAllEnglish(t *testing.T) {
 	}
 }
 
+func TestAChineseGameStoresTheGameWordsInEnglish(t *testing.T) {
+	b := &turnRecorder{}
+	SetBrain(b)
+	client := startEngine(t)
+	startWorker(t, client)
+
+	res := play(t, client, "chinese", newGame())
+
+	han := regexp.MustCompile(`\p{Han}`)
+	assert.False(t, han.MatchString(res.Winner), res.Winner)
+	for _, p := range res.Players {
+		assert.False(t, han.MatchString(string(p.Role)), "%s: %s", p.Name, p.Role)
+	}
+	require.NotEmpty(t, b.turns)
+	for _, turn := range b.turns {
+		assert.False(t, han.MatchString(string(turn.Phase)), turn.Phase)
+		for _, e := range turn.Transcript {
+			assert.False(t, han.MatchString(string(e.Phase)), e.Phase)
+		}
+	}
+}
+
 func TestAGameRefusesAnUnknownLanguage(t *testing.T) {
 	SetBrain(brain.Random{})
 	client := startEngine(t)
@@ -296,7 +318,7 @@ func TestGameSurvivesTheGameMasterDying(t *testing.T) {
 	SetBrain(brain.Random{})
 	startWorker(t, client)
 	res := waitForGame(t, client, id)
-	assert.Contains(t, []string{"狼人", "好人"}, res.Winner)
+	assert.Contains(t, []string{string(game.Werewolf), game.Good}, res.Winner)
 }
 
 // killAfter plays randomly and calls kill once it has taken n turns.

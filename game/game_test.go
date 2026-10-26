@@ -83,10 +83,10 @@ func TestWinner(t *testing.T) {
 		want  string
 	}{
 		{"game still on", map[string]bool{"w1": true, "w2": true, "s": true, "h": true, "v1": true, "v2": true}, ""},
-		{"wolves all dead", map[string]bool{"s": true, "v1": true}, "好人"},
-		{"every god dead", map[string]bool{"w1": true, "v1": true, "v2": true, "v3": true}, "狼人"},
-		{"every villager dead", map[string]bool{"w1": true, "s": true, "x": true, "h": true}, "狼人"},
-		{"wolves equal the rest", map[string]bool{"w1": true, "w2": true, "s": true, "v1": true}, "狼人"},
+		{"wolves all dead", map[string]bool{"s": true, "v1": true}, Good},
+		{"every god dead", map[string]bool{"w1": true, "v1": true, "v2": true, "v3": true}, string(Werewolf)},
+		{"every villager dead", map[string]bool{"w1": true, "s": true, "x": true, "h": true}, string(Werewolf)},
+		{"wolves equal the rest", map[string]bool{"w1": true, "w2": true, "s": true, "v1": true}, string(Werewolf)},
 		{"one wolf against a god and a villager", map[string]bool{"w1": true, "h": true, "v1": true}, ""},
 	}
 	for _, tt := range tests {
@@ -144,6 +144,16 @@ func TestEnglish(t *testing.T) {
 	assert.Equal(t, Good, Read("GOOD"))
 	assert.Equal(t, Good, Read(Good), "the game's own words read as themselves")
 	assert.Equal(t, "Walter", Read("Walter"))
+
+	c := Chinese
+	assert.Equal(t, "3狼人、1预言家、1女巫、1猎人、3村民", c.LineupSummary())
+	assert.Equal(t, "第1夜", c.When(1, Night))
+	assert.Equal(t, "放弃", c.Say(Pass))
+	assert.Equal(t, "声称预言家，小红：狼人，怀疑无", Stance(c, Nobody, &Claim{Role: Seer, Target: "小红", Result: string(Werewolf)}))
+	assert.Equal(t, string(Werewolf), Read("狼人"), "Chinese answers read as the game's own words")
+	assert.Equal(t, Unsure, Read("不确定"))
+	assert.Equal(t, Pass, Read("放弃"))
+	assert.Equal(t, Nobody, Read("无"))
 
 	_, err := ParseLang("fr")
 	assert.Error(t, err)

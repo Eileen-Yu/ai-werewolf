@@ -5,10 +5,10 @@ import (
 	"strings"
 )
 
-// Lang is the language a game is played in. The game's own words — roles,
-// sides, phases, passing — stay Chinese inside the state whatever the
-// language, so the rules compare the same values either way. Lang decides
-// what players and the audience read, and which words an answer may use.
+// Lang is the language a game is played in. The game's own words (roles,
+// sides, phases, passing) are stored in English whatever the language, so
+// the rules compare the same values either way. Lang decides what players and
+// the audience read, and which words an answer may use.
 type Lang string
 
 const (
@@ -27,19 +27,19 @@ func ParseLang(s string) (Lang, error) {
 	return "", fmt.Errorf("unknown language %q: want zh or en", s)
 }
 
-// english is the English for each of the game's own words.
-var english = map[string]string{
-	string(Werewolf): "werewolf",
-	string(Seer):     "seer",
-	string(Witch):    "witch",
-	string(Hunter):   "hunter",
-	string(Villager): "villager",
-	Good:             "good",
-	Unsure:           "unsure",
-	string(Night):    "night",
-	string(Day):      "day",
-	Pass:             "pass",
-	Nobody:           "nobody",
+// chinese is the Chinese for each of the game's own words.
+var chinese = map[string]string{
+	string(Werewolf): "狼人",
+	string(Seer):     "预言家",
+	string(Witch):    "女巫",
+	string(Hunter):   "猎人",
+	string(Villager): "村民",
+	Good:             "好人",
+	Unsure:           "不确定",
+	string(Night):    "夜",
+	string(Day):      "天",
+	Pass:             "放弃",
+	Nobody:           "无",
 }
 
 // aliases are other ways a player writes one of the game's words.
@@ -48,6 +48,7 @@ var aliases = map[string]string{
 	"wolves":      string(Werewolf),
 	"werewolves":  string(Werewolf),
 	"bad":         string(Werewolf),
+	"狼":           string(Werewolf),
 	"uncertain":   Unsure,
 	"unknown":     Unsure,
 	"none":        Nobody,
@@ -60,9 +61,9 @@ var aliases = map[string]string{
 // Say is a game word as players of this language read it. Anything else,
 // such as a player's name, comes back unchanged.
 func (l Lang) Say(word string) string {
-	if l == English {
-		if en, ok := english[word]; ok {
-			return en
+	if l != English {
+		if zh, ok := chinese[word]; ok {
+			return zh
 		}
 	}
 	return word
@@ -81,11 +82,8 @@ func (l Lang) SayAll(words []string) []string {
 // the game's own word. Anything else comes back trimmed but unchanged.
 func Read(word string) string {
 	word = strings.TrimSpace(word)
-	if _, ok := english[word]; ok {
-		return word
-	}
-	for own, en := range english {
-		if strings.EqualFold(word, en) {
+	for own, zh := range chinese {
+		if strings.EqualFold(word, own) || word == zh {
 			return own
 		}
 	}
@@ -105,16 +103,16 @@ func (l Lang) List(names []string) string {
 	return strings.Join(names, "、")
 }
 
-// When is a time on the game clock: "第2天", or "Day 2".
+// When is a time on the game clock, such as "Day 2", in this language.
 func (l Lang) When(round int, p Phase) string {
 	if l == English {
 		s := l.Say(string(p))
 		return fmt.Sprintf("%s%s %d", strings.ToUpper(s[:1]), s[1:], round)
 	}
-	return fmt.Sprintf("第%d%s", round, p)
+	return fmt.Sprintf("第%d%s", round, l.Say(string(p)))
 }
 
-// Death is how a player left, as everyone knows it: "第1夜死亡", or "died on
+// Death is how a player left, as everyone knows it, such as "died on
 // Night 1".
 func (l Lang) Death(when, how string) string {
 	if l == English {
@@ -123,7 +121,7 @@ func (l Lang) Death(when, how string) string {
 	return when + how
 }
 
-// LineupSummary describes Lineup: "3狼人、1预言家、1女巫、1猎人、3村民", or
+// LineupSummary describes Lineup in this language, such as
 // "3 werewolves, 1 seer, …".
 func (l Lang) LineupSummary() string {
 	counts := map[Role]int{}
@@ -136,7 +134,7 @@ func (l Lang) LineupSummary() string {
 		switch {
 		case n == 0:
 		case l != English:
-			parts = append(parts, fmt.Sprintf("%d%s", n, r))
+			parts = append(parts, fmt.Sprintf("%d%s", n, l.Say(string(r))))
 		case n == 1:
 			parts = append(parts, fmt.Sprintf("1 %s", l.Say(string(r))))
 		case r == Werewolf:

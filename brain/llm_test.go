@@ -27,13 +27,13 @@ func TestPromptSeparatesWhatThePlayerKnows(t *testing.T) {
 			{Round: 1, Phase: game.Night, Speaker: "老王", Text: "美玲最像预言家。", Audience: []string{"老王"}, Thought: true},
 			{
 				Round: 2, Phase: game.Day, Speaker: "美玲", Text: "我是预言家，查了阿杰是狼。",
-				Suspect: "阿杰", Claim: &game.Claim{Role: game.Seer, Target: "阿杰", Result: "狼人"},
+				Suspect: "阿杰", Claim: &game.Claim{Role: game.Seer, Target: "阿杰", Result: string(game.Werewolf)},
 			},
 		},
 		Notes: game.Notes{
 			Beliefs: map[string]game.Belief{
-				"美玲": {Side: "好人", Evidence: []string{"第2天美玲声称查验阿杰是狼人，说中了"}},
-				"外人": {Side: "狼人"},
+				"美玲": {Side: game.Good, Evidence: []string{"第2天美玲声称查验阿杰是狼人，说中了"}},
+				"外人": {Side: string(game.Werewolf)},
 			},
 			Strategy: "悍跳预言家",
 		},
@@ -113,7 +113,7 @@ func TestParseAction(t *testing.T) {
 		{"bare JSON", `{"thinking":"他在跟风","target":"小红"}`, Action{Thinking: "他在跟风", Target: "小红"}, false},
 		{
 			"claim and notes", `{"speech":"我是预言家","suspect":"阿杰","claim":{"role":" 预言家 ","target":"小红","result":"好人"},"notes":{"strategy":"带队"}}`,
-			Action{Speech: "我是预言家", Suspect: "阿杰", Claim: &game.Claim{Role: game.Seer, Target: "小红", Result: "好人"}, Notes: &game.Notes{Strategy: "带队"}},
+			Action{Speech: "我是预言家", Suspect: "阿杰", Claim: &game.Claim{Role: "预言家", Target: "小红", Result: "好人"}, Notes: &game.Notes{Strategy: "带队"}},
 			false,
 		},
 		{"empty claim is no claim", `{"speech":"过","suspect":"无","claim":{"role":""}}`, Action{Speech: "过", Suspect: "无"}, false},
@@ -314,7 +314,7 @@ func TestCheckHoldsTheWolfPlanToTheGame(t *testing.T) {
 		Seats: []Seat{{Name: "小宇"}, {Name: "老王"}}, Suspects: []string{"老王", game.Nobody},
 		Plan: &game.Plan{Round: 2, Faker: "小宇", Focus: "老王"},
 	}
-	seer := &game.Claim{Role: game.Seer, Target: "老王", Result: "狼人"}
+	seer := &game.Claim{Role: game.Seer, Target: "老王", Result: string(game.Werewolf)}
 	assert.ErrorContains(t, day.Check(Action{Speech: "我是村民", Suspect: "老王"}), "悍跳预言家")
 	assert.NoError(t, day.Check(Action{Speech: "我是预言家，老王是狼", Suspect: "老王", Claim: seer}))
 
@@ -332,18 +332,18 @@ func TestCheckRejectsWhatIsNotOnTheRecord(t *testing.T) {
 		Spoken:     []string{"老王"}, Waiting: []string{"大刘"},
 	}
 	ok := Action{Speech: "老王说过他是村民，我不信", Suspect: "老王"}
-	seer := &game.Claim{Role: game.Seer, Target: "老王", Result: "狼人"}
+	seer := &game.Claim{Role: game.Seer, Target: "老王", Result: string(game.Werewolf)}
 
 	assert.NoError(t, turn.Check(ok))
 	assert.NoError(t, turn.Check(Action{Speech: "我是预言家", Suspect: "老王", Claim: seer}))
 	assert.ErrorContains(t, turn.Check(Action{Speech: "大刘说过他是好人", Suspect: "老王"}), "大刘还没有公开发过言")
 	assert.ErrorContains(t, turn.Check(Action{Speech: "我是狼人", Suspect: "老王", Claim: &game.Claim{Role: game.Werewolf}}), "claim.role")
-	assert.ErrorContains(t, turn.Check(Action{Speech: "我查了小李", Suspect: "老王", Claim: &game.Claim{Role: game.Seer, Target: "小李", Result: "好人"}}), "小李")
+	assert.ErrorContains(t, turn.Check(Action{Speech: "我查了小李", Suspect: "老王", Claim: &game.Claim{Role: game.Seer, Target: "小李", Result: game.Good}}), "小李")
 	assert.ErrorContains(t, turn.Check(Action{Speech: "我查了老王", Suspect: "老王", Claim: &game.Claim{Role: game.Seer, Target: "老王", Result: "可疑"}}), "好人或狼人")
-	assert.ErrorContains(t, turn.Check(Action{Speech: "嗯", Suspect: "老王", Notes: &game.Notes{Beliefs: map[string]game.Belief{"小李": {Side: "狼人"}}}}), `"小李"`)
-	assert.ErrorContains(t, turn.Check(Action{Speech: "嗯", Suspect: "老王", Notes: &game.Notes{Beliefs: map[string]game.Belief{"小红": {Side: "好人"}}}}), `"小红"`, "no belief about yourself")
+	assert.ErrorContains(t, turn.Check(Action{Speech: "嗯", Suspect: "老王", Notes: &game.Notes{Beliefs: map[string]game.Belief{"小李": {Side: string(game.Werewolf)}}}}), `"小李"`)
+	assert.ErrorContains(t, turn.Check(Action{Speech: "嗯", Suspect: "老王", Notes: &game.Notes{Beliefs: map[string]game.Belief{"小红": {Side: game.Good}}}}), `"小红"`, "no belief about yourself")
 	assert.ErrorContains(t, turn.Check(Action{Speech: "嗯", Suspect: "老王", Notes: &game.Notes{Beliefs: map[string]game.Belief{"老王": {Side: "可疑"}}}}), "side 只能是")
-	assert.NoError(t, turn.Check(Action{Speech: "嗯", Suspect: "老王", Notes: &game.Notes{Beliefs: map[string]game.Belief{"老王": {Side: "不确定"}}}}))
+	assert.NoError(t, turn.Check(Action{Speech: "嗯", Suspect: "老王", Notes: &game.Notes{Beliefs: map[string]game.Belief{"老王": {Side: game.Unsure}}}}))
 
 	later := turn
 	later.Round = 2

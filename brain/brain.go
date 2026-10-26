@@ -250,10 +250,11 @@ func (t Turn) BadBeliefs(n *game.Notes) []string {
 }
 
 // Normalize repairs near misses before a move is checked, none of which is
-// worth asking again over: a pick written as "小红（她最可疑）" becomes 小红,
-// "不开枪" or "pass" becomes game.Pass where passing is allowed, and words
-// written in either language are read as the game's own. A claim of no role
-// ("null", "无") is no claim, and one about nobody ("empty") is about no
+// worth asking again over: a pick written as "Ruby (the most suspicious)"
+// becomes Ruby, "no shot" or "pass" becomes game.Pass where passing is
+// allowed, and words written in either language are read as the game's own,
+// which are English. A claim of no role
+// ("null", "none") is no claim, and one about nobody ("empty") is about no
 // one in particular. Beliefs about themselves, or that are not one of
 // game.Sides, are dropped: they are private notes, and only a name that is
 // not at the table is worth asking again over.
