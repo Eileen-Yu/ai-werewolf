@@ -174,11 +174,12 @@ func (t *table) night() error {
 // wolvesHunt has the wolves plot, then the first of them settles the plan:
 // tonight's victim and how the pack plays the day. The plan is written down
 // for every wolf, so tomorrow's speeches and votes have one thing to follow.
-// It returns "" if the wolves pick nobody.
+// Wolves may pick one of their own, to fool the witch into spending her
+// antidote. It returns "" if the wolves pick nobody.
 func (t *table) wolvesHunt() (string, error) {
 	s := t.s
 	wolves := s.Living(game.Werewolf)
-	targets := game.Without(s.Living(), wolves...)
+	targets := s.Living()
 	if len(wolves) > 1 { // a lone wolf has nobody to plot with
 		if _, err := t.goRound(brain.WolfChat, wolves, targets, wolves...); err != nil {
 			return "", err
