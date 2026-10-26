@@ -70,15 +70,23 @@ func TestACharacterNamesOnlyRivalsSureToBeAtTheTable(t *testing.T) {
 	for _, p := range everyone {
 		assert.NotEmpty(t, p.Habit, "%s has a way of deciding", p.Name)
 		for _, other := range everyone {
+			assert.NotContains(t, p.Persona+p.Habit, other.Name,
+				"%s's way of talking or deciding names %s: only the rivalry may name anyone", p.Name, other.Name)
 			if !slices.Contains(seatedWith[p.Name], other.Name) {
-				assert.NotContains(t, p.Persona+p.Habit, other.Name,
-					"%s's character names %s, who may not be at the table, or makes them say their own name", p.Name, other.Name)
+				assert.NotContains(t, p.Rivalry, other.Name,
+					"%s's rivalry names %s, who may not be at the table, or makes them say their own name", p.Name, other.Name)
 			}
 		}
 	}
+	for _, p := range englishCast {
+		assert.NotEmpty(t, p.Rivalry, "%s has a rival", p.Name)
+	}
 	for _, pair := range chineseRivals {
-		assert.Contains(t, pair[0].Habit, pair[1].Name, "rivals know each other")
-		assert.Contains(t, pair[1].Habit, pair[0].Name, "rivals know each other")
+		assert.Contains(t, pair[0].Rivalry, pair[1].Name, "rivals know each other")
+		assert.Contains(t, pair[1].Rivalry, pair[0].Name, "rivals know each other")
+	}
+	for _, p := range chineseLoners {
+		assert.Empty(t, p.Rivalry, "%s has no rival sure to be at the table", p.Name)
 	}
 }
 

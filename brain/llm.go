@@ -182,16 +182,22 @@ func prompt(t Turn) (system, user string) {
 			dead = append(dead, s.Name)
 		}
 	}
-	var habit string
+	var character string
 	if t.Me.Habit != "" {
-		habit = fmt.Sprintf(tx.habit, t.Me.Habit)
+		character = fmt.Sprintf(tx.habit, t.Me.Habit)
+	}
+	if t.Me.Rivalry != "" {
+		character += fmt.Sprintf(tx.rivalry, t.Me.Rivalry)
+		if mates := rivalTeammates(t); len(mates) > 0 {
+			character += fmt.Sprintf(tx.rivalTeammate, l.List(mates))
+		}
 	}
 	strategy := tx.strategies[t.Me.Role]
 	if t.Me.Role == game.Werewolf {
 		strategy += tx.tactics[t.Tactic] + tx.adapt
 	}
 	system = fmt.Sprintf(tx.rules, len(names), len(names), l.List(names), l.LineupSummary(),
-		t.Me.Name, l.Say(string(t.Me.Role)), t.Me.Persona, habit, strategy)
+		t.Me.Name, l.Say(string(t.Me.Role)), t.Me.Persona, character, strategy)
 
 	var seats, secrets, public, claims, known strings.Builder
 	var thoughts []string
@@ -310,6 +316,17 @@ func prompt(t Turn) (system, user string) {
 	}
 	b.WriteString(tx.notesLine)
 	return system, b.String()
+}
+
+// rivalTeammates is, for a wolf, the fellow wolves their rivalry names.
+func rivalTeammates(t Turn) []string {
+	var mates []string
+	for _, wolf := range t.Pack {
+		if wolf != t.Me.Name && strings.Contains(t.Me.Rivalry, wolf) {
+			mates = append(mates, wolf)
+		}
+	}
+	return mates
 }
 
 // recentThoughts is how many of a player's past thoughts go into the prompt.

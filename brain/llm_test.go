@@ -287,6 +287,27 @@ func TestAPlayersHabitIsInTheirPrompt(t *testing.T) {
 	assert.Contains(t, system, "Your personality: emotional.\nHow you decide. Judge, change your mind and vote this way; it matters more than how you talk: holds a grudge.\nStrategy: ")
 }
 
+func TestARivalryOnTheSameTeamIsBanterNotSabotage(t *testing.T) {
+	karen := game.Player{Name: "Karen", Persona: "loud", Habit: "revenge-votes", Rivalry: "Discord Mod acts like the manager"}
+	turn := Turn{Lang: game.English, Kind: WolfChat, Round: 1, Phase: game.Night}
+
+	turn.Me = karen
+	turn.Me.Role = game.Villager
+	system, _ := prompt(turn)
+	assert.Contains(t, system, "Your rivalries: Discord Mod acts like the manager. A rivalry shapes how you talk", "everyone hears what the rivalry is for")
+	assert.NotContains(t, system, "is also a werewolf", "a villager is not told anyone's side")
+
+	turn.Me.Role = game.Werewolf
+	turn.Pack = []string{"Karen", "Gym Bro"}
+	system, _ = prompt(turn)
+	assert.NotContains(t, system, "is also a werewolf", "her rival is not in the pack")
+
+	turn.Pack = []string{"Karen", "Discord Mod"}
+	system, _ = prompt(turn)
+	assert.Contains(t, system, "Your rival Discord Mod is also a werewolf, on your team.")
+	assert.Contains(t, system, "never sabotage them, vote for them or give them away because you dislike them")
+}
+
 func TestEnglishPromptsAreAllEnglish(t *testing.T) {
 	han := regexp.MustCompile(`\p{Han}`)
 	base := Turn{

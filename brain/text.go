@@ -8,9 +8,11 @@ type text struct {
 	// rules is the system prompt: table size twice, names, lineup, then the
 	// player's name, role, persona, habit line and strategy.
 	rules string
-	// habit is the line for how the player decides, left out if they have none.
-	habit      string
-	strategies map[game.Role]string
+	// habit is the line for how the player decides, and rivalry the line for
+	// who they clash with; each is left out if the player has none.
+	// rivalTeammate is added for a wolf whose rival is a fellow wolf.
+	habit, rivalry, rivalTeammate string
+	strategies                    map[game.Role]string
 	// tactics is, for a wolf, how the pack plays this game.
 	tactics map[game.Tactic]string
 	// adapt lets the pack drop its tactic after the first night.
@@ -178,15 +180,18 @@ var chineseText = text{
 	noJSON:         "没有找到JSON对象",
 	badJSON:        "JSON格式不对：%v",
 
-	seats:        "【座位和状态】\n",
-	secrets:      "\n【你的秘密信息】只有你知道，都是确定的事实（狼同伴的夜聊也在这里）\n",
-	notes:        "\n【你的笔记】你上一次写下的判断和打算，只有你知道\n",
-	thoughts:     "\n【你最近的私下想法】只有你知道\n",
-	claims:       "\n【场上的身份声明】都是本人的一面之词，没有验证，可能是假的\n",
-	public:       "\n【公开记录】所有人都看到的，这是唯一可以引用的历史。【】里是主持人记下的表态\n",
-	alive:        "存活",
-	you:          "（你）",
-	habit:        "决策习惯，判断、改主意和投票都照这个来，这比说话风格更重要：%s。\n",
+	seats:    "【座位和状态】\n",
+	secrets:  "\n【你的秘密信息】只有你知道，都是确定的事实（狼同伴的夜聊也在这里）\n",
+	notes:    "\n【你的笔记】你上一次写下的判断和打算，只有你知道\n",
+	thoughts: "\n【你最近的私下想法】只有你知道\n",
+	claims:   "\n【场上的身份声明】都是本人的一面之词，没有验证，可能是假的\n",
+	public:   "\n【公开记录】所有人都看到的，这是唯一可以引用的历史。【】里是主持人记下的表态\n",
+	alive:    "存活",
+	you:      "（你）",
+	habit:    "决策习惯，判断、改主意和投票都照这个来，这比说话风格更重要：%s。\n",
+	rivalry:  "宿敌：%s。宿敌只决定你们怎么互动（拌嘴、抬杠、抢话语权），不决定你认为谁是哪一边：怀疑宿敌也要有真实发生的依据，和怀疑别人一样。\n",
+	rivalTeammate: "你的宿敌%s也是狼人，是你的同伴。宿敌照当：夜里可以质疑他的指挥、和他争计划，白天可以公开互怼、和他保持距离，装作不是一伙的。" +
+		"但吵归吵，夜里最后要定下一个能执行的计划，白天以狼队获胜为先：不要因为讨厌他就拆台、投他或暴露他。只有本局打法或局势真的需要时，才能牺牲他。\n",
 	host:         "主持人",
 	none:         "（无）\n",
 	beliefLine:   "- %s：%s。证据：%s\n",
@@ -366,15 +371,18 @@ Write everything in English.`,
 	noJSON:         "no JSON object found",
 	badJSON:        "malformed JSON: %v",
 
-	seats:        "[Seats]\n",
-	secrets:      "\n[Your secrets] Only you know these, and they are certain (your pack's night chat is here too)\n",
-	notes:        "\n[Your notes] What you last wrote down about the others and your plans; only you see them\n",
-	thoughts:     "\n[Your recent private thoughts] Only you see these\n",
-	claims:       "\n[Role claims at the table] Each is only that player's word, unverified, and may be a lie\n",
-	public:       "\n[Public record] What everyone has seen; the only history you may refer to. [...] is the stance the host recorded\n",
-	alive:        "alive",
-	you:          " (you)",
-	habit:        "How you decide. Judge, change your mind and vote this way; it matters more than how you talk: %s.\n",
+	seats:    "[Seats]\n",
+	secrets:  "\n[Your secrets] Only you know these, and they are certain (your pack's night chat is here too)\n",
+	notes:    "\n[Your notes] What you last wrote down about the others and your plans; only you see them\n",
+	thoughts: "\n[Your recent private thoughts] Only you see these\n",
+	claims:   "\n[Role claims at the table] Each is only that player's word, unverified, and may be a lie\n",
+	public:   "\n[Public record] What everyone has seen; the only history you may refer to. [...] is the stance the host recorded\n",
+	alive:    "alive",
+	you:      " (you)",
+	habit:    "How you decide. Judge, change your mind and vote this way; it matters more than how you talk: %s.\n",
+	rivalry:  "Your rivalries: %s. A rivalry shapes how you talk to each other (banter, arguments, fights over who leads), never which side you think anyone is on: suspecting a rival takes real evidence, like suspecting anyone else.\n",
+	rivalTeammate: "Your rival %s is also a werewolf, on your team. Keep the rivalry going: at night challenge their lead and fight over the plan; by day bicker in public and keep your distance so you do not look like a team. " +
+		"But however much you argue, the night must end with a plan you can carry out, and by day the pack winning comes first: never sabotage them, vote for them or give them away because you dislike them. Sacrifice them only when this game's play or the state of the game truly calls for it.\n",
 	host:         "Host",
 	none:         "(none)\n",
 	beliefLine:   "- %s: %s. Evidence: %s\n",
