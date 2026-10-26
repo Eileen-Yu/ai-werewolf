@@ -114,7 +114,7 @@ func (t *table) setup() error {
 	}
 	t.s.Players = dealt
 
-	t.add("", "欢迎来到狼人杀！本局6人：2狼人、1预言家、3村民。")
+	t.add("", fmt.Sprintf("欢迎来到狼人杀！本局%d人：%s。", len(t.s.Players), game.LineupSummary()))
 	wolves := t.s.Living(game.Werewolf)
 	for _, p := range t.s.Players {
 		t.add("", fmt.Sprintf("你的身份是%s。", p.Role), p.Name)
@@ -123,21 +123,67 @@ func (t *table) setup() error {
 	return nil
 }
 
+// night runs the wolves, then the witch, then the seer, and at dawn
+// announces who died without saying how.
 func (t *table) night() error {
 	s := t.s
 	s.Phase = game.Night
 	t.add("", fmt.Sprintf("第%d夜，天黑请闭眼。", s.Round))
 
+	victim, err := t.wolvesHunt()
+	if err != nil {
+		return err
+	}
+	saved, poisoned, err := t.witchActs(victim)
+	if err != nil {
+		return err
+	}
+	if err := t.seerChecks(); err != nil {
+		return err
+	}
+	if err := t.pause(); err != nil {
+		return err
+	}
+
+	s.Phase = game.Day
+	var dead []string
+	for _, p := range s.Players { // table order, so the list gives away nothing
+		if (p.Name == victim && !saved) || p.Name == poisoned {
+			dead = append(dead, p.Name)
+		}
+	}
+	if len(dead) == 0 {
+		t.add("", "天亮了，昨晚是平安夜。")
+		return nil
+	}
+	for _, d := range dead {
+		s.Remove(d, "死亡")
+	}
+	t.add("", fmt.Sprintf("天亮了，昨晚死亡的是：%s。", strings.Join(dead, "、")))
+	for _, d := range dead {
+		if s.Player(d).Role == game.Hunter && d != poisoned {
+			if err := t.hunterShoots(d); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// wolvesHunt has the wolves plot and pick a victim, returning "" if they
+// pick nobody.
+func (t *table) wolvesHunt() (string, error) {
+	s := t.s
 	wolves := s.Living(game.Werewolf)
 	targets := game.Without(s.Living(), wolves...)
 	if len(wolves) > 1 { // a lone wolf has nobody to plot with
 		if err := t.goRound(brain.WolfChat, wolves, targets, wolves...); err != nil {
-			return err
+			return "", err
 		}
 	}
 	kills, err := t.chooseAll(brain.Kill, wolves, func(string) []string { return targets })
 	if err != nil {
-		return err
+		return "", err
 	}
 	victim, ok := game.Tally(kills)
 	if !ok && len(kills) > 0 {
@@ -146,31 +192,86 @@ func (t *table) night() error {
 	if victim != "" {
 		t.add("", fmt.Sprintf("狼人决定今晚杀%s。", victim), wolves...)
 	}
+	return victim, nil
+}
 
-	if seers := s.Living(game.Seer); len(seers) > 0 {
-		checks, err := t.chooseAll(brain.Inspect, seers, func(me string) []string { return game.Without(s.Living(), me) })
-		if err != nil {
-			return err
-		}
-		if target := checks[0].Target; target != "" {
-			side := "好人"
-			if s.Player(target).Role == game.Werewolf {
-				side = "狼人"
-			}
-			t.add("", fmt.Sprintf("你查验了%s，结果是%s。", target, side), seers[0])
-		}
+// witchActs lets the witch, told tonight's victim, use at most one potion.
+func (t *table) witchActs(victim string) (saved bool, poisoned string, err error) {
+	s := t.s
+	witches := s.Living(game.Witch)
+	if len(witches) == 0 {
+		return false, "", nil
 	}
-	if err := t.pause(); err != nil {
-		return err
-	}
-
-	s.Phase = game.Day
+	w := witches[0]
 	if victim == "" {
-		t.add("", "天亮了，昨晚是平安夜。")
+		t.add("", "今晚狼人没有杀人。", w)
+	} else {
+		t.add("", fmt.Sprintf("今晚被狼人杀的是%s。", victim), w)
+	}
+	var left []string
+	if !s.AntidoteUsed {
+		left = append(left, "解药")
+	}
+	if !s.PoisonUsed {
+		left = append(left, "毒药")
+	}
+	if len(left) == 0 {
+		t.add("", "你的药都用完了。", w)
+		return false, "", nil
+	}
+	t.add("", fmt.Sprintf("你还剩：%s。", strings.Join(left, "、")), w)
+
+	switch {
+	case s.AntidoteUsed || victim == "":
+	case victim == w:
+		t.add("", "被杀的是你自己，女巫不能自救。", w)
+	default:
+		pick, err := t.choose(brain.Save, w, []string{victim, brain.Pass})
+		if err != nil {
+			return false, "", err
+		}
+		if pick == victim {
+			s.AntidoteUsed = true
+			t.add("", fmt.Sprintf("你用解药救了%s。", victim), w)
+			return true, "", nil // one potion a night
+		}
+	}
+
+	if s.PoisonUsed {
+		return false, "", nil
+	}
+	pick, err := t.choose(brain.Poison, w, append(game.Without(s.Living(), w), brain.Pass))
+	if err != nil || pick == "" || pick == brain.Pass {
+		return false, "", err
+	}
+	s.PoisonUsed = true
+	t.add("", fmt.Sprintf("你用毒药毒了%s。", pick), w)
+	return false, pick, nil
+}
+
+func (t *table) seerChecks() error {
+	s := t.s
+	seers := s.Living(game.Seer)
+	if len(seers) == 0 {
 		return nil
 	}
-	s.Remove(victim, "被狼人杀害（狼人不会杀同伴，所以一定是好人）")
-	t.add("", fmt.Sprintf("天亮了，昨晚%s死了。", victim))
+	target, err := t.choose(brain.Inspect, seers[0], game.Without(s.Living(), seers[0]))
+	if err != nil || target == "" {
+		return err
+	}
+	t.add("", fmt.Sprintf("你查验了%s，结果是%s。", target, game.Side(s.Player(target).Role)), seers[0])
+	return nil
+}
+
+// hunterShoots gives a hunter who has just gone out the chance to take
+// someone with them. Passing stays private, so the hunter is not exposed.
+func (t *table) hunterShoots(hunter string) error {
+	target, err := t.choose(brain.Shoot, hunter, append(game.Without(t.s.Living(), hunter), brain.Pass))
+	if err != nil || target == "" || target == brain.Pass {
+		return err
+	}
+	t.s.Remove(target, "被猎人开枪带走")
+	t.add("", fmt.Sprintf("%s是猎人，开枪带走了%s。", hunter, target))
 	return nil
 }
 
@@ -210,6 +311,11 @@ func (t *table) day() error {
 	t.add("", fmt.Sprintf("%s被放逐了。", out))
 	if err := t.speak(t.turn(brain.LastWords, out, nil)); err != nil {
 		return err
+	}
+	if s.Player(out).Role == game.Hunter {
+		if err := t.hunterShoots(out); err != nil {
+			return err
+		}
 	}
 	return t.pause()
 }
@@ -263,6 +369,15 @@ func (t *table) speak(turn brain.Turn, audience ...string) error {
 	t.think(turn.Me.Name, a.Thinking)
 	t.add(turn.Me.Name, a.Speech, audience...)
 	return nil
+}
+
+// choose asks one player to pick from candidates; "" means they abstained.
+func (t *table) choose(kind brain.TurnKind, name string, candidates []string) (string, error) {
+	votes, err := t.chooseAll(kind, []string{name}, func(string) []string { return candidates })
+	if err != nil {
+		return "", err
+	}
+	return votes[0].Target, nil
 }
 
 // chooseAll asks every voter at once and waits for them all, so votes are

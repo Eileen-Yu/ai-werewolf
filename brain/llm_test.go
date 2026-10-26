@@ -30,7 +30,8 @@ func TestPromptSeparatesWhatThePlayerKnows(t *testing.T) {
 
 	system, user := prompt(turn)
 
-	assert.Contains(t, system, "桌上只有这6个人：老王、小红、阿杰、美玲")
+	assert.Contains(t, system, "一局4人狼人杀，桌上只有这4个人：老王、小红、阿杰、美玲")
+	assert.Contains(t, system, "配置："+game.LineupSummary())
 	assert.Contains(t, system, strategies[game.Werewolf])
 	assert.Contains(t, user, "- 老王（你）：存活")
 	assert.Contains(t, user, "- 小红：第1夜被狼人杀害（一定是好人）")
@@ -58,6 +59,15 @@ func TestPromptForAChoiceAsksForATarget(t *testing.T) {
 	assert.Contains(t, user, `"target"`)
 	assert.Contains(t, user, "target 只能是这些名字之一：老王、小红。")
 	assert.NotContains(t, user, "你是这一轮第")
+}
+
+func TestPromptForAnOptionalPowerOffersPass(t *testing.T) {
+	turn := Turn{Kind: Save, Round: 1, Phase: game.Night, Me: game.Player{Name: "阿芳", Role: game.Witch}, Candidates: []string{"小红", Pass}}
+
+	system, user := prompt(turn)
+
+	assert.Contains(t, system, strategies[game.Witch])
+	assert.Contains(t, user, "target 只能是这些名字之一：小红、放弃。")
 }
 
 func TestParseAction(t *testing.T) {

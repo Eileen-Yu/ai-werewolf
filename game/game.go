@@ -1,4 +1,4 @@
-// Package game holds the rules of a six-player werewolf game. Nothing here
+// Package game holds the rules of a nine-player werewolf game. Nothing here
 // talks to Dapr: the workflow drives it, and everything random is passed in
 // so the workflow can keep it inside activities.
 package game
@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"slices"
+	"strings"
 )
 
 type Role string
@@ -14,11 +15,40 @@ type Role string
 const (
 	Werewolf Role = "狼人"
 	Seer     Role = "预言家"
+	Witch    Role = "女巫"
+	Hunter   Role = "猎人"
 	Villager Role = "村民"
 )
 
-// Lineup is the role mix for a six-player game.
-var Lineup = []Role{Werewolf, Werewolf, Seer, Villager, Villager, Villager}
+// Gods are the villager-side roles with a power. Wolves win by removing all
+// of them or all of the plain villagers.
+var Gods = []Role{Seer, Witch, Hunter}
+
+// Lineup is the standard nine-player mix.
+var Lineup = []Role{Werewolf, Werewolf, Werewolf, Seer, Witch, Hunter, Villager, Villager, Villager}
+
+// LineupSummary describes Lineup, e.g. "3狼人、1预言家、1女巫、1猎人、3村民".
+func LineupSummary() string {
+	counts := map[Role]int{}
+	for _, r := range Lineup {
+		counts[r]++
+	}
+	var parts []string
+	for _, r := range []Role{Werewolf, Seer, Witch, Hunter, Villager} {
+		if counts[r] > 0 {
+			parts = append(parts, fmt.Sprintf("%d%s", counts[r], r))
+		}
+	}
+	return strings.Join(parts, "、")
+}
+
+// Side is what a seer learns about a role.
+func Side(r Role) string {
+	if r == Werewolf {
+		return "狼人"
+	}
+	return "好人"
+}
 
 type Phase string
 
@@ -32,7 +62,8 @@ type Player struct {
 	Persona string `json:"persona"`
 	Role    Role   `json:"role,omitempty"`
 	Alive   bool   `json:"alive"`
-	// Death says how the player left the game, e.g. "第1夜被狼人杀害".
+	// Death is what everyone knows about how the player left the game, e.g.
+	// "第1夜死亡" — at night only that they died, not who killed them.
 	Death string `json:"death,omitempty"`
 }
 
@@ -45,6 +76,9 @@ func DefaultPlayers() []Player {
 		{Name: "美玲", Persona: "冷静的律师，善于抓别人发言里的矛盾"},
 		{Name: "大刘", Persona: "老实憨厚的卡车司机，说话直来直去"},
 		{Name: "小宇", Persona: "大学新生，第一次玩，有点紧张但很认真"},
+		{Name: "阿芳", Persona: "中学老师，喜欢总结归纳，爱讲道理"},
+		{Name: "老陈", Persona: "圆滑的生意人，擅长察言观色，说话留余地"},
+		{Name: "小林", Persona: "电竞选手，反应快，说话冲，喜欢带节奏"},
 	}
 }
 
@@ -86,6 +120,9 @@ type State struct {
 	Phase   Phase    `json:"phase"`
 	Players []Player `json:"players"`
 	Log     []Event  `json:"log"`
+	// The witch's potions, each usable once.
+	AntidoteUsed bool `json:"antidoteUsed,omitempty"`
+	PoisonUsed   bool `json:"poisonUsed,omitempty"`
 }
 
 // Add appends an event to the transcript and returns it.
@@ -102,7 +139,8 @@ func (s *State) Think(name, text string) Event {
 	return e
 }
 
-// Remove takes a player out of the game; how is e.g. "被狼人杀害".
+// Remove takes a player out of the game; how is the public account, e.g.
+// "被投票放逐".
 func (s *State) Remove(name, how string) {
 	p := s.Player(name)
 	p.Alive = false
@@ -141,14 +179,17 @@ func (s *State) Living(roles ...Role) []string {
 	return out
 }
 
-// Winner is "狼人" or "好人" once the game is decided, and "" before.
+// Winner is "狼人" or "好人" once the game is decided, and "" before. Wolves
+// win by clearing a side (all gods or all villagers), or once they are as many
+// as everyone else and so control every vote.
 func (s *State) Winner() string {
 	wolves := len(s.Living(Werewolf))
-	others := len(s.Living(Seer, Villager))
+	gods := len(s.Living(Gods...))
+	villagers := len(s.Living(Villager))
 	switch {
 	case wolves == 0:
 		return "好人"
-	case wolves >= others:
+	case gods == 0, villagers == 0, wolves >= gods+villagers:
 		return "狼人"
 	default:
 		return ""

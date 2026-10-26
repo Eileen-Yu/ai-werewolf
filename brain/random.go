@@ -31,9 +31,10 @@ func (Random) Act(_ context.Context, t Turn) (Action, error) {
 			others = append(others, s.Name)
 		}
 	}
-	switch t.Kind {
-	case Vote, Kill, Inspect:
+	if t.Kind.IsChoice() {
 		return Action{Target: pick(t.Candidates)}, nil
+	}
+	switch t.Kind {
 	case LastWords:
 		return Action{Speech: "我是好人，你们一定要找出狼人！"}, nil
 	case WolfChat:

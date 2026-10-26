@@ -2,6 +2,7 @@ package werewolf
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -20,20 +21,70 @@ import (
 	"github.com/eileenyu/catalyst-werewolf/internal/engine"
 )
 
-func TestGamePlaysToAWinner(t *testing.T) {
+// Random players wander into most branches — potions used or not, hunters
+// shot at night or voted out — so a handful of games covers them.
+func TestGamesPlayToAWinner(t *testing.T) {
 	SetBrain(brain.Random{})
 	client := startEngine(t)
 	startWorker(t, client)
 
-	res := playGame(t, client, "full-game")
+	for i := range 10 {
+		res := playGame(t, client, fmt.Sprintf("game-%d", i))
 
-	assert.Contains(t, []string{"狼人", "好人"}, res.Winner)
-	assert.Positive(t, res.Rounds)
-	roles := map[game.Role]int{}
-	for _, p := range res.Players {
-		roles[p.Role]++
+		assert.Contains(t, []string{"狼人", "好人"}, res.Winner)
+		assert.Positive(t, res.Rounds)
+		roles := map[game.Role]int{}
+		for _, p := range res.Players {
+			roles[p.Role]++
+		}
+		assert.Equal(t, map[game.Role]int{game.Werewolf: 3, game.Seer: 1, game.Witch: 1, game.Hunter: 1, game.Villager: 3}, roles)
 	}
-	assert.Equal(t, map[game.Role]int{game.Werewolf: 2, game.Seer: 1, game.Villager: 3}, roles)
+}
+
+func TestWitchSavingTheVictimMakesAPeacefulNight(t *testing.T) {
+	b := &savingWitch{}
+	SetBrain(b)
+	client := startEngine(t)
+	startWorker(t, client)
+
+	playGame(t, client, "saved")
+
+	assert.Contains(t, b.firstDawn, "天亮了，昨晚是平安夜。")
+	assert.Equal(t, 1, b.kinds[brain.Save])
+	assert.Zero(t, b.kinds[brain.Poison], "the witch who saved has no second potion that night")
+}
+
+// savingWitch plays randomly except that the witch always saves and never
+// poisons. It records what the first day's first speaker heard at dawn.
+type savingWitch struct {
+	mu        sync.Mutex
+	kinds     map[brain.TurnKind]int
+	firstDawn string
+}
+
+func (b *savingWitch) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.kinds == nil {
+		b.kinds = map[brain.TurnKind]int{}
+	}
+	if t.Round == 1 {
+		b.kinds[t.Kind]++
+		if t.Kind == brain.Speech && len(t.Spoken) == 0 {
+			for _, e := range t.Transcript {
+				if e.Phase == game.Day && e.Speaker == "" {
+					b.firstDawn += e.Text
+				}
+			}
+		}
+	}
+	switch t.Kind {
+	case brain.Save:
+		return brain.Action{Target: t.Candidates[0]}, nil
+	case brain.Poison:
+		return brain.Action{Target: brain.Pass}, nil
+	}
+	return brain.Random{}.Act(ctx, t)
 }
 
 func TestGameSurvivesTheGameMasterDying(t *testing.T) {

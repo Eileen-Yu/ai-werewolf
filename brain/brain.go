@@ -22,11 +22,22 @@ const (
 	Vote      TurnKind = "vote"       // daytime vote
 	Kill      TurnKind = "kill"       // wolves pick tonight's victim
 	Inspect   TurnKind = "inspect"    // seer picks who to check
+	Save      TurnKind = "save"       // witch decides whether to save tonight's victim
+	Poison    TurnKind = "poison"     // witch decides whether to poison someone
+	Shoot     TurnKind = "shoot"      // hunter, on the way out, decides whether to shoot
 )
+
+// Pass is the candidate a player picks to decline an optional power: the
+// witch's potions and the hunter's gun.
+const Pass = "放弃"
 
 // IsChoice reports whether the turn asks for a Target rather than a Speech.
 func (k TurnKind) IsChoice() bool {
-	return k == Vote || k == Kill || k == Inspect
+	switch k {
+	case Vote, Kill, Inspect, Save, Poison, Shoot:
+		return true
+	}
+	return false
 }
 
 // Seat is what everyone knows about a player: their name and, once they are
