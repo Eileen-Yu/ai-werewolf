@@ -104,6 +104,41 @@ type Event struct {
 	Audience []string `json:"audience,omitempty"`
 	// Thought marks a player's private reasoning; its Audience is the player.
 	Thought bool `json:"thought,omitempty"`
+	// Suspect and Claim are the stance a daytime speech puts on the record.
+	Suspect string `json:"suspect,omitempty"`
+	Claim   *Claim `json:"claim,omitempty"`
+}
+
+// Claim is what a player says they are and, optionally, what their power
+// told them: 预言家, 小红, 好人. It is only their word; wolves claim too.
+type Claim struct {
+	Role   Role   `json:"role"`
+	Target string `json:"target,omitempty"`
+	Result string `json:"result,omitempty"`
+}
+
+func (c Claim) String() string {
+	if c.Target == "" {
+		return string(c.Role)
+	}
+	return fmt.Sprintf("%s，%s：%s", c.Role, c.Target, c.Result)
+}
+
+// Stance is a speech's claim and suspect as the record shows them.
+func Stance(suspect string, claim *Claim) string {
+	s := "怀疑" + suspect
+	if claim != nil {
+		s = "声称" + claim.String() + "，" + s
+	}
+	return s
+}
+
+// Said is the event's text with its stance, if it carries one.
+func (e Event) Said() string {
+	if e.Suspect == "" {
+		return e.Text
+	}
+	return e.Text + "【" + Stance(e.Suspect, e.Claim) + "】"
 }
 
 func (e Event) VisibleTo(name string) bool {
@@ -115,6 +150,13 @@ func (e Event) When() string {
 	return fmt.Sprintf("第%d%s", e.Round, e.Phase)
 }
 
+// Notes is a player's own running memory, rewritten every turn: what they
+// make of each other player, and what they mean to do next.
+type Notes struct {
+	Suspicions map[string]string `json:"suspicions,omitempty"`
+	Strategy   string            `json:"strategy,omitempty"`
+}
+
 type State struct {
 	Round   int      `json:"round"`
 	Phase   Phase    `json:"phase"`
@@ -123,11 +165,20 @@ type State struct {
 	// The witch's potions, each usable once.
 	AntidoteUsed bool `json:"antidoteUsed,omitempty"`
 	PoisonUsed   bool `json:"poisonUsed,omitempty"`
+	// Notes holds each player's latest notes, by name.
+	Notes map[string]Notes `json:"notes,omitempty"`
 }
 
 // Add appends an event to the transcript and returns it.
 func (s *State) Add(speaker, text string, audience ...string) Event {
 	e := Event{Round: s.Round, Phase: s.Phase, Speaker: speaker, Text: text, Audience: audience}
+	s.Log = append(s.Log, e)
+	return e
+}
+
+// Declare records a public daytime speech along with its stance.
+func (s *State) Declare(speaker, text, suspect string, claim *Claim) Event {
+	e := Event{Round: s.Round, Phase: s.Phase, Speaker: speaker, Text: text, Suspect: suspect, Claim: claim}
 	s.Log = append(s.Log, e)
 	return e
 }

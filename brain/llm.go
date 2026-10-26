@@ -39,11 +39,13 @@ const rules = `你在玩一局%d人狼人杀，桌上只有这%d个人：%s。�
 你是%s，身份是%s，性格：%s。
 策略：%s
 
-铁律，违反会让你当场露馅：
-1. 只能引用【公开记录】里真实出现过的话和事件。没发生过的事绝对不能编。
+铁律，违反会让你当场露馅，主持人也会驳回你的回答：
+1. 只能引用【公开记录】里真实出现过的话和事件。没发生过的事绝对不能编，不能提桌上没有的名字。
 2. 还没发言的人，不能评价他"说过什么"。第1天第一个发言的人之前，没有任何人发过言。夜里死了的人死因不明，不要当成已知事实。
-3. 【你的秘密信息】只有你知道。可以用它做判断，但要想清楚公开说出来的后果。
-4. 提到你自己之前的观点时，必须和【公开记录】里你真实说过的话一致。
+3. 公开发言不等于事实。别人声称的身份、查验结果、救了谁，都只是他的一面之词，狼人会假装。只有【你的秘密信息】是确定的。
+   说的时候要分清：不能说"小红是好人"，只能说"美玲说她查了小红是好人"，再说你信不信、为什么。
+4. 【你的秘密信息】只有你知道。可以用它做判断，但要想清楚公开说出来的后果。
+5. 提到你自己之前的观点时，必须和【公开记录】里你真实说过的话一致；改变看法要说出理由。
 
 说话风格：像真人玩家，口语化，符合你的性格。不要开场白和客套（不要说"大家好""我是某某"），直接说观点。
 必须点名：说清楚怀疑谁、相信谁、为什么。不超过120字。不要提到你是AI，不要写动作或旁白。
@@ -121,7 +123,13 @@ func parseAction(reply string) (Action, error) {
 	a.Target = strings.TrimSpace(a.Target)
 	a.Speech = strings.TrimSpace(a.Speech)
 	a.Suspect = strings.TrimSpace(a.Suspect)
-	a.Claim = strings.TrimSpace(a.Claim)
+	if c := a.Claim; c != nil {
+		c.Role = game.Role(strings.TrimSpace(string(c.Role)))
+		c.Target, c.Result = strings.TrimSpace(c.Target), strings.TrimSpace(c.Result)
+		if c.Role == "" {
+			a.Claim = nil
+		}
+	}
 	return a, nil
 }
 
@@ -134,7 +142,8 @@ func prompt(t Turn) (system, user string) {
 	system = fmt.Sprintf(rules, len(names), len(names), strings.Join(names, "、"), game.LineupSummary(),
 		t.Me.Name, t.Me.Role, t.Me.Persona, strategies[t.Me.Role])
 
-	var seats, secrets, thoughts, public strings.Builder
+	var seats, secrets, public, claims strings.Builder
+	var thoughts []string
 	for _, s := range t.Seats {
 		who, status := s.Name, "存活"
 		if s.Name == t.Me.Name {
@@ -146,40 +155,85 @@ func prompt(t Turn) (system, user string) {
 		fmt.Fprintf(&seats, "- %s：%s\n", who, status)
 	}
 	for _, e := range t.Transcript {
-		line := fmt.Sprintf("[%s] %s：%s\n", e.When(), speaker(e, t.Me.Name), e.Text)
+		line := fmt.Sprintf("[%s] %s：%s\n", e.When(), speaker(e, t.Me.Name), e.Said())
 		switch {
 		case e.Thought:
-			fmt.Fprintf(&thoughts, "[%s] %s\n", e.When(), e.Text)
+			thoughts = append(thoughts, fmt.Sprintf("[%s] %s\n", e.When(), e.Text))
 		case len(e.Audience) > 0:
 			secrets.WriteString(line)
 		default:
 			public.WriteString(line)
 		}
+		if e.Claim != nil {
+			fmt.Fprintf(&claims, "- [%s] %s声称：%s（未验证）\n", e.When(), speaker(e, t.Me.Name), e.Claim)
+		}
+	}
+	if len(thoughts) > recentThoughts {
+		thoughts = thoughts[len(thoughts)-recentThoughts:]
 	}
 
 	var b strings.Builder
 	b.WriteString("【座位和状态】\n" + seats.String())
-	b.WriteString("\n【你的秘密信息】只有你知道（狼同伴的夜聊也在这里）\n" + orNone(secrets.String()))
-	b.WriteString("\n【你之前的私下想法】只有你知道\n" + orNone(thoughts.String()))
-	b.WriteString("\n【公开记录】所有人都看到的，这是唯一可以引用的历史\n" + orNone(public.String()))
+	b.WriteString("\n【你的秘密信息】只有你知道，都是确定的事实（狼同伴的夜聊也在这里）\n" + orNone(secrets.String()))
+	b.WriteString("\n【你的笔记】你上一次写下的判断和打算，只有你知道\n" + orNone(notes(t)))
+	b.WriteString("\n【你最近的私下想法】只有你知道\n" + orNone(strings.Join(thoughts, "")))
+	b.WriteString("\n【场上的身份声明】都是本人的一面之词，没有验证，可能是假的\n" + orNone(claims.String()))
+	b.WriteString("\n【公开记录】所有人都看到的，这是唯一可以引用的历史。【】里是主持人记下的表态\n" + orNone(public.String()))
 
 	fmt.Fprintf(&b, "\n【现在】第%d%s。%s\n", t.Round, t.Phase, instructions[t.Kind])
 	if t.Kind == Speech || t.Kind == Rebuttal {
 		fmt.Fprintf(&b, "你是这一轮第%d个发言。已经发言：%s。还没发言：%s。\n", len(t.Spoken)+1, orNobody(t.Spoken), orNobody(t.Waiting))
 	}
-	b.WriteString("只回复一个JSON对象，不要任何其他内容：")
+	if t.Kind.Speaks() {
+		b.WriteString(selfCheck)
+	}
+
+	fields := []string{`"thinking": "你的私下分析，只有你自己看得到"`}
 	switch {
 	case t.Kind == WolfPlan:
-		fmt.Fprintf(&b, `{"thinking": "你的私下分析，只有你自己看得到", "target": "今晚杀的人", "speech": "白天的打法"}。target 只能是这些名字之一：%s。`, strings.Join(t.Candidates, "、"))
+		fields = append(fields, `"target": "今晚杀的人"`, `"speech": "白天的打法"`)
 	case t.Kind.IsChoice():
-		fmt.Fprintf(&b, `{"thinking": "你的私下分析和选择理由，只有你自己看得到", "target": "名字"}。target 只能是这些名字之一：%s。`, strings.Join(t.Candidates, "、"))
+		fields = append(fields, `"target": "名字"`)
 	case t.Kind.Declares():
-		fmt.Fprintf(&b, `{"thinking": "你的私下分析，只有你自己看得到", "speech": "你要说出口的话", "suspect": "你现在最怀疑的人", "claim": "你公开声明的身份和信息，比如\"预言家，第1夜查验小红是好人\"；不声明身份就留空"}。`+
-			`suspect 只能是这些之一：%s。suspect 和 claim 会由主持人公开记录，必须和你的 speech 一致。`, strings.Join(t.Suspects, "、"))
+		fields = append(fields, `"speech": "你要说出口的话"`, `"suspect": "你现在最怀疑的人"`,
+			`"claim": {"role": "你声称的身份：预言家、女巫、猎人或村民", "target": "和这个身份相关的人，没有就留空", "result": "查验结果（好人或狼人），或者救了、毒了，没有就留空"}`)
 	default:
-		b.WriteString(`{"thinking": "你的私下分析，只有你自己看得到", "speech": "你要说出口的话"}`)
+		fields = append(fields, `"speech": "你要说出口的话"`)
 	}
+	fields = append(fields, `"notes": {"suspicions": {"玩家名字": "你对他的最新判断"}, "strategy": "你接下来的打算"}`)
+	b.WriteString("\n只回复一个JSON对象，不要任何其他内容：{" + strings.Join(fields, ", ") + "}\n")
+	if t.Kind.IsChoice() {
+		fmt.Fprintf(&b, "target 只能是这些名字之一：%s。\n", strings.Join(t.Candidates, "、"))
+	}
+	if t.Kind.Declares() {
+		fmt.Fprintf(&b, "suspect 只能是这些之一：%s。claim 是你这次公开声明的身份；不声明身份就写 null。suspect 和 claim 会由主持人公开记录，必须和你的 speech 一致。\n", strings.Join(t.Suspects, "、"))
+	}
+	b.WriteString("notes 是你完整的新笔记，会替换旧笔记：把你对其他玩家的判断都写上，名字只能是桌上的人。")
 	return system, b.String()
+}
+
+// recentThoughts is how many of a player's past thoughts go into the prompt.
+// Older reasoning lives on in their notes.
+const recentThoughts = 3
+
+const selfCheck = `【回答前自检】
+- 我提到的每件事都在【公开记录】或【你的秘密信息】里出现过吗？
+- 我有没有评价还没发言的人？
+- 我有没有把别人声称的身份或查验结果当成事实来说？
+- 我说的和我之前公开说过的一致吗？和我的身份策略一致吗？
+`
+
+func notes(t Turn) string {
+	var b strings.Builder
+	for _, s := range t.Seats {
+		if v, ok := t.Notes.Suspicions[s.Name]; ok {
+			fmt.Fprintf(&b, "- %s：%s\n", s.Name, v)
+		}
+	}
+	if t.Notes.Strategy != "" {
+		fmt.Fprintf(&b, "打算：%s\n", t.Notes.Strategy)
+	}
+	return b.String()
 }
 
 func speaker(e game.Event, me string) string {

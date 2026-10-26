@@ -107,7 +107,7 @@ func TestVotersSeeStancesAndOnlyWolvesSeeThePlan(t *testing.T) {
 		var plan, stances, summary bool
 		for _, e := range events {
 			plan = plan || strings.HasPrefix(e.Text, "狼队计划")
-			stances = stances || (e.Phase == game.Day && e.Speaker != "" && strings.Contains(e.Text, "【怀疑"))
+			stances = stances || (e.Phase == game.Day && e.Speaker != "" && strings.Contains(e.Said(), "【怀疑"))
 			summary = summary || strings.HasPrefix(e.Text, "投票前，各人的最新表态")
 		}
 		wolf := slices.ContainsFunc(res.Players, func(p game.Player) bool { return p.Name == name && p.Role == game.Werewolf })
@@ -137,6 +137,45 @@ func (b *firstVotes) Act(ctx context.Context, t brain.Turn) (brain.Action, error
 		b.heard[t.Me.Name] = t.Transcript
 	}
 	return brain.Random{}.Act(ctx, t)
+}
+
+func TestPlayersGetBackTheNotesTheyLastWrote(t *testing.T) {
+	b := &noteTaker{last: map[string]string{}}
+	SetBrain(b)
+	client := startEngine(t)
+	startWorker(t, client)
+
+	playGame(t, client, "notes")
+
+	assert.Positive(t, b.checked)
+	assert.Empty(t, b.mismatches)
+}
+
+// noteTaker plays randomly, writes a fresh strategy every turn, and checks
+// that each turn hands back the strategy that player wrote last.
+type noteTaker struct {
+	mu         sync.Mutex
+	n          int
+	last       map[string]string
+	checked    int
+	mismatches []string
+}
+
+func (b *noteTaker) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if want, ok := b.last[t.Me.Name]; ok {
+		b.checked++
+		if t.Notes.Strategy != want {
+			b.mismatches = append(b.mismatches, fmt.Sprintf("%s got %q, wrote %q", t.Me.Name, t.Notes.Strategy, want))
+		}
+	}
+	b.n++
+	strategy := fmt.Sprintf("plan %d", b.n)
+	b.last[t.Me.Name] = strategy
+	a, err := brain.Random{}.Act(ctx, t)
+	a.Notes = &game.Notes{Strategy: strategy}
+	return a, err
 }
 
 func TestGameSurvivesTheGameMasterDying(t *testing.T) {

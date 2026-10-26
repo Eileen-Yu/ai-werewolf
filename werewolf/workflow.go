@@ -189,7 +189,7 @@ func (t *table) wolvesHunt() (string, error) {
 	if err := t.act(t.turn(brain.WolfPlan, leader, targets)).Await(&plan); err != nil {
 		return "", err
 	}
-	t.think(leader, plan.Thinking)
+	t.remember(leader, plan)
 	if plan.Target == "" {
 		return "", nil
 	}
@@ -292,7 +292,7 @@ func (t *table) day() error {
 	}
 	summary := make([]string, len(order))
 	for i, name := range order {
-		summary[i] = name + "：" + stance(stances[i])
+		summary[i] = name + "：" + game.Stance(stances[i].Suspect, stances[i].Claim)
 	}
 	t.add("", "投票前，各人的最新表态："+strings.Join(summary, "；")+"。")
 
@@ -344,15 +344,6 @@ func (t *table) goRound(kind brain.TurnKind, order, candidates []string, audienc
 	return actions, nil
 }
 
-// stance is a declaring speech's claim and suspect, as the record shows them.
-func stance(a brain.Action) string {
-	s := "怀疑" + a.Suspect
-	if a.Claim != "" {
-		s = "声明" + a.Claim + "，" + s
-	}
-	return s
-}
-
 var retry = workflow.WithActivityRetryPolicy(&workflow.RetryPolicy{
 	MaxAttempts:          3,
 	InitialRetryInterval: time.Second,
@@ -371,6 +362,7 @@ func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brai
 		Me:         *t.s.Player(name),
 		Seats:      seats,
 		Transcript: t.s.VisibleTo(name),
+		Notes:      t.s.Notes[name],
 		Candidates: candidates,
 	}
 	if kind.Declares() {
@@ -391,12 +383,12 @@ func (t *table) speak(turn brain.Turn, audience ...string) (brain.Action, error)
 	if err := t.act(turn).Await(&a); err != nil {
 		return a, err
 	}
-	t.think(turn.Me.Name, a.Thinking)
-	said := a.Speech
+	t.remember(turn.Me.Name, a)
 	if turn.Kind.Declares() {
-		said += "【" + stance(a) + "】"
+		t.narrate(t.s.Declare(turn.Me.Name, a.Speech, a.Suspect, a.Claim))
+	} else {
+		t.add(turn.Me.Name, a.Speech, audience...)
 	}
-	t.add(turn.Me.Name, said, audience...)
 	return a, nil
 }
 
@@ -422,7 +414,7 @@ func (t *table) chooseAll(kind brain.TurnKind, voters []string, candidates func(
 		if err := task.Await(&a); err != nil {
 			return nil, err
 		}
-		t.think(voters[i], a.Thinking)
+		t.remember(voters[i], a)
 		votes[i] = game.Vote{Voter: voters[i], Target: a.Target}
 	}
 	return votes, nil
@@ -440,9 +432,16 @@ func (t *table) add(speaker, text string, audience ...string) {
 	t.narrate(t.s.Add(speaker, text, audience...))
 }
 
-func (t *table) think(name, text string) {
-	if text != "" {
-		t.narrate(t.s.Think(name, text))
+// remember keeps a player's thinking and, if they wrote any, their new notes.
+func (t *table) remember(name string, a brain.Action) {
+	if a.Thinking != "" {
+		t.narrate(t.s.Think(name, a.Thinking))
+	}
+	if a.Notes != nil {
+		if t.s.Notes == nil {
+			t.s.Notes = map[string]game.Notes{}
+		}
+		t.s.Notes[name] = *a.Notes
 	}
 }
 
@@ -462,7 +461,7 @@ func (t *table) narrate(e game.Event) {
 	case len(e.Audience) > 0:
 		fmt.Printf("[%s] %s：%s   〔仅%s可见〕\n", e.When(), who, e.Text, strings.Join(e.Audience, "、"))
 	default:
-		fmt.Printf("[%s] %s：%s\n", e.When(), who, e.Text)
+		fmt.Printf("[%s] %s：%s\n", e.When(), who, e.Said())
 	}
 }
 
@@ -476,8 +475,10 @@ func AssignRolesActivity(ctx workflow.ActivityContext) (any, error) {
 
 // ActActivity asks a player for their move. A move that is still invalid
 // after the brain's own re-asking is not allowed to stall the game: a bad
-// pick counts as abstaining, an empty speech as silence and a bad suspect as
-// suspecting nobody.
+// pick counts as abstaining, an empty speech as silence, a bad suspect as
+// suspecting nobody; a bad claim is dropped, and so are notes on people who
+// are not at the table. A speech that quotes someone yet to speak is let
+// through: it is a slip, not a broken move.
 func ActActivity(ctx workflow.ActivityContext) (any, error) {
 	var t brain.Turn
 	if err := ctx.GetInput(&t); err != nil {
@@ -498,6 +499,12 @@ func ActActivity(ctx workflow.ActivityContext) (any, error) {
 	}
 	if t.Kind.Declares() && !slices.Contains(t.Suspects, a.Suspect) {
 		a.Suspect = brain.Nobody
+	}
+	if a.Claim != nil && (!t.Kind.Declares() || len(t.ClaimProblems(*a.Claim)) > 0) {
+		a.Claim = nil
+	}
+	for _, name := range t.UnknownNames(a.Notes) {
+		delete(a.Notes.Suspicions, name)
 	}
 	return a, nil
 }

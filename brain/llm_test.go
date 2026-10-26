@@ -1,6 +1,7 @@
 package brain
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,8 +23,12 @@ func TestPromptSeparatesWhatThePlayerKnows(t *testing.T) {
 			{Round: 1, Phase: game.Night, Text: "你们是狼人同伴：老王、阿杰。", Audience: []string{"老王", "阿杰"}},
 			{Round: 1, Phase: game.Night, Speaker: "阿杰", Text: "明天我悍跳预言家。", Audience: []string{"老王", "阿杰"}},
 			{Round: 1, Phase: game.Night, Speaker: "老王", Text: "美玲最像预言家。", Audience: []string{"老王"}, Thought: true},
-			{Round: 2, Phase: game.Day, Speaker: "美玲", Text: "我是预言家，查了阿杰是狼。"},
+			{
+				Round: 2, Phase: game.Day, Speaker: "美玲", Text: "我是预言家，查了阿杰是狼。",
+				Suspect: "阿杰", Claim: &game.Claim{Role: game.Seer, Target: "阿杰", Result: "狼人"},
+			},
 		},
+		Notes:   game.Notes{Suspicions: map[string]string{"美玲": "真预言家，要对跳", "外人": "不在桌上，不显示"}, Strategy: "悍跳预言家"},
 		Spoken:  []string{"美玲"},
 		Waiting: []string{"阿杰"},
 	}
@@ -35,9 +40,12 @@ func TestPromptSeparatesWhatThePlayerKnows(t *testing.T) {
 	assert.Contains(t, system, strategies[game.Werewolf])
 	assert.Contains(t, user, "- 老王（你）：存活")
 	assert.Contains(t, user, "- 小红：第1夜被狼人杀害（一定是好人）")
-	assert.Contains(t, user, "【你的秘密信息】只有你知道（狼同伴的夜聊也在这里）\n[第1夜] 主持人：你们是狼人同伴：老王、阿杰。\n[第1夜] 阿杰：明天我悍跳预言家。\n")
-	assert.Contains(t, user, "【你之前的私下想法】只有你知道\n[第1夜] 美玲最像预言家。\n")
-	assert.Contains(t, user, "这是唯一可以引用的历史\n[第2天] 美玲：我是预言家，查了阿杰是狼。\n")
+	assert.Contains(t, user, "都是确定的事实（狼同伴的夜聊也在这里）\n[第1夜] 主持人：你们是狼人同伴：老王、阿杰。\n[第1夜] 阿杰：明天我悍跳预言家。\n")
+	assert.Contains(t, user, "【你最近的私下想法】只有你知道\n[第1夜] 美玲最像预言家。\n")
+	assert.Contains(t, user, "【】里是主持人记下的表态\n[第2天] 美玲：我是预言家，查了阿杰是狼。【声称预言家，阿杰：狼人，怀疑阿杰】\n")
+	assert.Contains(t, user, "可能是假的\n- [第2天] 美玲声称：预言家，阿杰：狼人（未验证）\n")
+	assert.Contains(t, user, "【你的笔记】你上一次写下的判断和打算，只有你知道\n- 美玲：真预言家，要对跳\n打算：悍跳预言家\n")
+	assert.Contains(t, user, "【回答前自检】")
 	assert.Contains(t, user, "你是这一轮第2个发言。已经发言：美玲。还没发言：阿杰。")
 	assert.Contains(t, user, `"speech"`)
 }
@@ -47,8 +55,21 @@ func TestPromptForTheFirstSpeakerSaysNobodyHasSpoken(t *testing.T) {
 
 	_, user := prompt(turn)
 
-	assert.Contains(t, user, "【公开记录】所有人都看到的，这是唯一可以引用的历史\n（无）")
+	assert.Contains(t, user, "【】里是主持人记下的表态\n（无）")
 	assert.Contains(t, user, "你是这一轮第1个发言。已经发言：无。还没发言：老王。")
+}
+
+func TestPromptKeepsOnlyRecentThoughts(t *testing.T) {
+	turn := Turn{Kind: Vote, Round: 3, Phase: game.Day, Me: game.Player{Name: "小红"}}
+	for i := range recentThoughts + 2 {
+		turn.Transcript = append(turn.Transcript, game.Event{Round: i + 1, Phase: game.Night, Speaker: "小红", Text: fmt.Sprintf("想法%d", i), Audience: []string{"小红"}, Thought: true})
+	}
+
+	_, user := prompt(turn)
+
+	assert.NotContains(t, user, "想法1")
+	assert.Contains(t, user, "想法2")
+	assert.Contains(t, user, fmt.Sprintf("想法%d", recentThoughts+1))
 }
 
 func TestPromptForAChoiceAsksForATarget(t *testing.T) {
@@ -78,6 +99,12 @@ func TestParseAction(t *testing.T) {
 		wantErr bool
 	}{
 		{"bare JSON", `{"thinking":"他在跟风","target":"小红"}`, Action{Thinking: "他在跟风", Target: "小红"}, false},
+		{
+			"claim and notes", `{"speech":"我是预言家","suspect":"阿杰","claim":{"role":" 预言家 ","target":"小红","result":"好人"},"notes":{"strategy":"带队"}}`,
+			Action{Speech: "我是预言家", Suspect: "阿杰", Claim: &game.Claim{Role: game.Seer, Target: "小红", Result: "好人"}, Notes: &game.Notes{Strategy: "带队"}},
+			false,
+		},
+		{"empty claim is no claim", `{"speech":"过","suspect":"无","claim":{"role":""}}`, Action{Speech: "过", Suspect: "无"}, false},
 		{"code fence", "```json\n{\"thinking\":\"t\",\"speech\":\" 我怀疑老王 \"}\n```", Action{Thinking: "t", Speech: "我怀疑老王"}, false},
 		{"no JSON", "我投小红", Action{}, true},
 		{"broken JSON", `{"target": "小红"`, Action{}, true},
@@ -130,4 +157,28 @@ func TestCheck(t *testing.T) {
 	assert.NoError(t, wolfChat.Check(Action{Speech: "今晚刀老王"}), "only daytime speeches declare a stance")
 	assert.NoError(t, plan.Check(Action{Target: "老王", Speech: "阿杰悍跳"}))
 	assert.ErrorContains(t, plan.Check(Action{Target: "老王"}), "speech", "a plan without a plan for the day")
+}
+
+func TestCheckRejectsWhatIsNotOnTheRecord(t *testing.T) {
+	turn := Turn{
+		Kind: Speech, Round: 1, Me: game.Player{Name: "小红"},
+		Seats:    []Seat{{Name: "小红"}, {Name: "老王"}, {Name: "大刘"}},
+		Suspects: []string{"老王", "大刘", Nobody},
+		Spoken:   []string{"老王"}, Waiting: []string{"大刘"},
+	}
+	ok := Action{Speech: "老王说过他是村民，我不信", Suspect: "老王"}
+	seer := &game.Claim{Role: game.Seer, Target: "老王", Result: "狼人"}
+
+	assert.NoError(t, turn.Check(ok))
+	assert.NoError(t, turn.Check(Action{Speech: "我是预言家", Suspect: "老王", Claim: seer}))
+	assert.ErrorContains(t, turn.Check(Action{Speech: "大刘说过他是好人", Suspect: "老王"}), "大刘今天还没发言")
+	assert.ErrorContains(t, turn.Check(Action{Speech: "我是狼人", Suspect: "老王", Claim: &game.Claim{Role: game.Werewolf}}), "claim.role")
+	assert.ErrorContains(t, turn.Check(Action{Speech: "我查了小李", Suspect: "老王", Claim: &game.Claim{Role: game.Seer, Target: "小李", Result: "好人"}}), "小李")
+	assert.ErrorContains(t, turn.Check(Action{Speech: "我查了老王", Suspect: "老王", Claim: &game.Claim{Role: game.Seer, Target: "老王", Result: "可疑"}}), "好人或狼人")
+	assert.ErrorContains(t, turn.Check(Action{Speech: "嗯", Suspect: "老王", Notes: &game.Notes{Suspicions: map[string]string{"小李": "可疑", "小红": "我自己"}}}), `"小李"`)
+
+	later := turn
+	later.Round = 2
+	assert.NoError(t, later.Check(Action{Speech: "大刘说过他是好人，昨天的事", Suspect: "老王"}), "on day 2 anyone may have spoken before")
+	assert.ErrorContains(t, later.Check(Action{Speech: "大刘刚才很可疑", Suspect: "老王"}), "大刘今天还没发言")
 }
