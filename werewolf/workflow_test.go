@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -89,7 +90,7 @@ func (b *savingWitch) Act(ctx context.Context, t brain.Turn) (brain.Action, erro
 	case brain.Save:
 		return brain.Action{Target: t.Candidates[0]}, nil
 	case brain.Poison:
-		return brain.Action{Target: brain.Pass}, nil
+		return brain.Action{Target: game.Pass}, nil
 	}
 	return brain.Random{}.Act(ctx, t)
 }
@@ -107,7 +108,7 @@ func TestVotersSeeStancesAndOnlyWolvesSeeThePlan(t *testing.T) {
 		var plan, stances, summary bool
 		for _, e := range events {
 			plan = plan || strings.HasPrefix(e.Text, "狼队计划")
-			stances = stances || (e.Phase == game.Day && e.Speaker != "" && strings.Contains(e.Said(), "【怀疑"))
+			stances = stances || (e.Phase == game.Day && e.Speaker != "" && strings.Contains(e.Said(game.Chinese), "【怀疑"))
 			summary = summary || strings.HasPrefix(e.Text, "投票前，各人的最新表态")
 		}
 		wolf := slices.ContainsFunc(res.Players, func(p game.Player) bool { return p.Name == name && p.Role == game.Werewolf })
@@ -132,7 +133,7 @@ func (b *firstVotes) Act(ctx context.Context, t brain.Turn) (brain.Action, error
 	case t.Kind == brain.Save:
 		return brain.Action{Target: t.Candidates[0]}, nil
 	case t.Kind == brain.Poison:
-		return brain.Action{Target: brain.Pass}, nil
+		return brain.Action{Target: game.Pass}, nil
 	case t.Kind == brain.Vote && t.Round == 1:
 		b.heard[t.Me.Name] = t.Transcript
 	}
@@ -177,6 +178,62 @@ func (b *planWatcher) Act(ctx context.Context, t brain.Turn) (brain.Action, erro
 	if t.Kind.Declares() {
 		b.turns = append(b.turns, t)
 	}
+	return brain.Random{}.Act(ctx, t)
+}
+
+// TestAnEnglishGameIsAllEnglish plays a whole game in English and finds no
+// Chinese in anything a player was told: their seat, the record, the host.
+func TestAnEnglishGameIsAllEnglish(t *testing.T) {
+	b := &turnRecorder{}
+	SetBrain(b)
+	client := startEngine(t)
+	startWorker(t, client)
+
+	g := newGame()
+	g.Lang = game.English
+	res := play(t, client, "english", g)
+
+	han := regexp.MustCompile(`\p{Han}`)
+	assert.Contains(t, []string{string(game.Werewolf), game.Good}, res.Winner)
+	assert.False(t, han.MatchString(res.Summary(game.English)), res.Summary(game.English))
+	require.NotEmpty(t, b.turns)
+	for _, turn := range b.turns {
+		assert.Equal(t, game.English, turn.Lang)
+		assert.False(t, han.MatchString(turn.Me.Name+turn.Me.Persona), "%s: %s", turn.Me.Name, turn.Me.Persona)
+		for _, s := range turn.Seats {
+			assert.False(t, han.MatchString(s.Death), "%s: %s", s.Name, s.Death)
+		}
+		for _, e := range turn.Transcript {
+			assert.False(t, han.MatchString(e.Said(game.English)), "[%s] %s", e.When(game.English), e.Said(game.English))
+		}
+	}
+}
+
+func TestAGameRefusesAnUnknownLanguage(t *testing.T) {
+	SetBrain(brain.Random{})
+	client := startEngine(t)
+	startWorker(t, client)
+
+	g := newGame()
+	g.Lang = "fr"
+	_, err := client.ScheduleWorkflow(t.Context(), "GameWorkflow", workflow.WithInstanceID("fr"), workflow.WithInput(g))
+	require.NoError(t, err)
+	meta, err := client.WaitForWorkflowCompletion(t.Context(), "fr")
+	require.NoError(t, err)
+	_, err = ReadResult(meta)
+	assert.ErrorContains(t, err, "unknown language")
+}
+
+// turnRecorder plays randomly and records every turn it is given.
+type turnRecorder struct {
+	mu    sync.Mutex
+	turns []brain.Turn
+}
+
+func (b *turnRecorder) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.turns = append(b.turns, t)
 	return brain.Random{}.Act(ctx, t)
 }
 
@@ -260,7 +317,12 @@ func newGame() Game {
 
 func playGame(t *testing.T, client *workflow.Client, id string) Result {
 	t.Helper()
-	_, err := client.ScheduleWorkflow(t.Context(), "GameWorkflow", workflow.WithInstanceID(id), workflow.WithInput(newGame()))
+	return play(t, client, id, newGame())
+}
+
+func play(t *testing.T, client *workflow.Client, id string, g Game) Result {
+	t.Helper()
+	_, err := client.ScheduleWorkflow(t.Context(), "GameWorkflow", workflow.WithInstanceID(id), workflow.WithInput(g))
 	require.NoError(t, err)
 	return waitForGame(t, client, id)
 }

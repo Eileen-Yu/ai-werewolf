@@ -32,6 +32,9 @@ func SetBrain(b brain.Brain) { players = b }
 // game.DefaultPlayers, so `{}` is enough to start a game.
 type Game struct {
 	State game.State `json:"state"`
+	// Lang is what the game is played in: "zh" (the default) or "en". It
+	// only takes effect when the game is dealt.
+	Lang game.Lang `json:"lang,omitempty"`
 	// PhaseDelay is a durable timer between phases, so people watching can
 	// keep up and have time to kill something.
 	PhaseDelay time.Duration `json:"phaseDelay"`
@@ -41,6 +44,11 @@ type Result struct {
 	Winner  string        `json:"winner"`
 	Rounds  int           `json:"rounds"`
 	Players []game.Player `json:"players"`
+}
+
+// Summary is the result in a line, for the person who started the game.
+func (r Result) Summary(l game.Lang) string {
+	return fmt.Sprintf(hostFor(l).result, l.Say(r.Winner), r.Rounds)
 }
 
 // ReadResult decodes a finished game's result.
@@ -68,7 +76,14 @@ func GameWorkflow(ctx *workflow.WorkflowContext) (any, error) {
 	if err := ctx.GetInput(&g); err != nil {
 		return nil, err
 	}
-	t := &table{ctx: ctx, s: &g.State, delay: g.PhaseDelay}
+	if g.State.Round == 0 {
+		lang, err := game.ParseLang(string(g.Lang))
+		if err != nil {
+			return nil, err
+		}
+		g.State.Lang = lang
+	}
+	t := &table{ctx: ctx, s: &g.State, h: hostFor(g.State.Lang), delay: g.PhaseDelay}
 
 	if g.State.Round == 0 {
 		if err := t.setup(); err != nil {
@@ -87,9 +102,9 @@ func GameWorkflow(ctx *workflow.WorkflowContext) (any, error) {
 	if winner := g.State.Winner(); winner != "" {
 		var roles []string
 		for _, p := range g.State.Players {
-			roles = append(roles, p.Name+"="+string(p.Role))
+			roles = append(roles, fmt.Sprintf(t.h.revealed, p.Name, t.say(string(p.Role))))
 		}
-		t.add("", fmt.Sprintf("游戏结束，%s胜利！身份公开：%s", winner, strings.Join(roles, "，")))
+		t.add("", fmt.Sprintf(t.h.gameOver, t.say(winner), strings.Join(roles, t.h.comma)))
 		return Result{Winner: winner, Rounds: g.State.Round, Players: g.State.Players}, nil
 	}
 
@@ -101,13 +116,17 @@ func GameWorkflow(ctx *workflow.WorkflowContext) (any, error) {
 type table struct {
 	ctx   *workflow.WorkflowContext
 	s     *game.State
+	h     *host
 	delay time.Duration
 }
+
+func (t *table) say(word string) string     { return t.s.Lang.Say(word) }
+func (t *table) list(names []string) string { return t.s.Lang.List(names) }
 
 func (t *table) setup() error {
 	t.s.Round, t.s.Phase = 1, game.Night
 	if len(t.s.Players) == 0 {
-		t.s.Players = game.DefaultPlayers()
+		t.s.Players = game.DefaultPlayers(t.s.Lang)
 	}
 	var dealt []game.Player
 	if err := t.ctx.CallActivity(AssignRolesActivity, workflow.WithActivityInput(t.s.Players)).Await(&dealt); err != nil {
@@ -115,12 +134,12 @@ func (t *table) setup() error {
 	}
 	t.s.Players = dealt
 
-	t.add("", fmt.Sprintf("欢迎来到狼人杀！本局%d人：%s。", len(t.s.Players), game.LineupSummary()))
+	t.add("", fmt.Sprintf(t.h.welcome, len(t.s.Players), t.s.Lang.LineupSummary()))
 	wolves := t.s.Living(game.Werewolf)
 	for _, p := range t.s.Players {
-		t.add("", fmt.Sprintf("你的身份是%s。", p.Role), p.Name)
+		t.add("", fmt.Sprintf(t.h.yourRole, t.say(string(p.Role))), p.Name)
 	}
-	t.add("", fmt.Sprintf("你们是狼人同伴：%s。", strings.Join(wolves, "、")), wolves...)
+	t.add("", fmt.Sprintf(t.h.pack, t.list(wolves)), wolves...)
 	return nil
 }
 
@@ -129,7 +148,7 @@ func (t *table) setup() error {
 func (t *table) night() error {
 	s := t.s
 	s.Phase = game.Night
-	t.add("", fmt.Sprintf("第%d夜，天黑请闭眼。", s.Round))
+	t.add("", fmt.Sprintf(t.h.nightFalls, s.Lang.When(s.Round, game.Night)))
 
 	victim, err := t.wolvesHunt()
 	if err != nil {
@@ -154,13 +173,13 @@ func (t *table) night() error {
 		}
 	}
 	if len(dead) == 0 {
-		t.add("", "天亮了，昨晚是平安夜。")
+		t.add("", t.h.peaceful)
 		return nil
 	}
 	for _, d := range dead {
-		s.Remove(d, "死亡")
+		s.Remove(d, t.h.died)
 	}
-	t.add("", fmt.Sprintf("天亮了，昨晚死亡的是：%s。", strings.Join(dead, "、")))
+	t.add("", fmt.Sprintf(t.h.dawnDead, t.list(dead)))
 	for _, d := range dead {
 		if s.Player(d).Role == game.Hunter && d != poisoned {
 			if err := t.hunterShoots(d); err != nil {
@@ -197,21 +216,18 @@ func (t *table) wolvesHunt() (string, error) {
 		return "", nil
 	}
 	plan := &game.Plan{Round: s.Round, Victim: a.Target, Focus: a.Focus, Notes: a.Speech}
-	faker := "不悍跳"
-	if a.Faker != brain.Nobody && a.Faker != "" {
+	faker := t.h.noFaker
+	if a.Faker != game.Nobody && a.Faker != "" {
 		plan.Faker = a.Faker
-		faker = a.Faker + "悍跳预言家"
+		faker = fmt.Sprintf(t.h.faker, a.Faker)
 	}
 	s.Plan = plan
-	t.add("", fmt.Sprintf("狼队计划（%s定）：今晚杀%s；明天%s，票投%s。打法：%s", leader, plan.Victim, faker, orNone(plan.Focus), plan.Notes), wolves...)
-	return plan.Victim, nil
-}
-
-func orNone(s string) string {
-	if s == "" {
-		return "未定"
+	focus := plan.Focus
+	if focus == "" {
+		focus = t.h.undecided
 	}
-	return s
+	t.add("", fmt.Sprintf(t.h.plan, leader, plan.Victim, faker, focus, plan.Notes), wolves...)
+	return plan.Victim, nil
 }
 
 // witchActs lets the witch, told tonight's victim, use at most one potion.
@@ -223,35 +239,35 @@ func (t *table) witchActs(victim string) (saved bool, poisoned string, err error
 	}
 	w := witches[0]
 	if victim == "" {
-		t.add("", "今晚狼人没有杀人。", w)
+		t.add("", t.h.noKill, w)
 	} else {
-		t.add("", fmt.Sprintf("今晚被狼人杀的是%s。", victim), w)
+		t.add("", fmt.Sprintf(t.h.victim, victim), w)
 	}
 	var left []string
 	if !s.AntidoteUsed {
-		left = append(left, "解药")
+		left = append(left, t.h.antidote)
 	}
 	if !s.PoisonUsed {
-		left = append(left, "毒药")
+		left = append(left, t.h.poison)
 	}
 	if len(left) == 0 {
-		t.add("", "你的药都用完了。", w)
+		t.add("", t.h.noPotions, w)
 		return false, "", nil
 	}
-	t.add("", fmt.Sprintf("你还剩：%s。", strings.Join(left, "、")), w)
+	t.add("", fmt.Sprintf(t.h.potionsLeft, t.list(left)), w)
 
 	switch {
 	case s.AntidoteUsed || victim == "":
 	case victim == w:
-		t.add("", "被杀的是你自己，女巫不能自救。", w)
+		t.add("", t.h.selfVictim, w)
 	default:
-		pick, err := t.choose(brain.Save, w, []string{victim, brain.Pass})
+		pick, err := t.choose(brain.Save, w, []string{victim, game.Pass})
 		if err != nil {
 			return false, "", err
 		}
 		if pick == victim {
 			s.AntidoteUsed = true
-			t.add("", fmt.Sprintf("你用解药救了%s。", victim), w)
+			t.add("", fmt.Sprintf(t.h.saved, victim), w)
 			return true, "", nil // one potion a night
 		}
 	}
@@ -259,12 +275,12 @@ func (t *table) witchActs(victim string) (saved bool, poisoned string, err error
 	if s.PoisonUsed {
 		return false, "", nil
 	}
-	pick, err := t.choose(brain.Poison, w, append(game.Without(s.Living(), w), brain.Pass))
-	if err != nil || pick == "" || pick == brain.Pass {
+	pick, err := t.choose(brain.Poison, w, append(game.Without(s.Living(), w), game.Pass))
+	if err != nil || pick == "" || pick == game.Pass {
 		return false, "", err
 	}
 	s.PoisonUsed = true
-	t.add("", fmt.Sprintf("你用毒药毒了%s。", pick), w)
+	t.add("", fmt.Sprintf(t.h.poisoned, pick), w)
 	return false, pick, nil
 }
 
@@ -278,19 +294,19 @@ func (t *table) seerChecks() error {
 	if err != nil || target == "" {
 		return err
 	}
-	t.add("", fmt.Sprintf("你查验了%s，结果是%s。", target, game.Side(s.Player(target).Role)), seers[0])
+	t.add("", fmt.Sprintf(t.h.inspected, target, t.say(game.Side(s.Player(target).Role))), seers[0])
 	return nil
 }
 
 // hunterShoots gives a hunter who has just gone out the chance to take
 // someone with them. Passing stays private, so the hunter is not exposed.
 func (t *table) hunterShoots(hunter string) error {
-	target, err := t.choose(brain.Shoot, hunter, append(game.Without(t.s.Living(), hunter), brain.Pass))
-	if err != nil || target == "" || target == brain.Pass {
+	target, err := t.choose(brain.Shoot, hunter, append(game.Without(t.s.Living(), hunter), game.Pass))
+	if err != nil || target == "" || target == game.Pass {
 		return err
 	}
-	t.s.Remove(target, "被猎人开枪带走")
-	t.add("", fmt.Sprintf("%s是猎人，开枪带走了%s。", hunter, target))
+	t.s.Remove(target, t.h.shotHow)
+	t.add("", fmt.Sprintf(t.h.shot, hunter, target))
 	return nil
 }
 
@@ -298,20 +314,20 @@ func (t *table) day() error {
 	s := t.s
 	alive := s.Living()
 	order := game.Rotate(alive, s.Round-1)
-	t.add("", fmt.Sprintf("今天的发言顺序：%s。", strings.Join(order, "、")))
+	t.add("", fmt.Sprintf(t.h.order, t.list(order)))
 	if _, err := t.goRound(brain.Speech, order, nil); err != nil {
 		return err
 	}
-	t.add("", "回应环节：每人再说一次，可以回应怀疑或者质疑别人。")
+	t.add("", t.h.rebuttals)
 	stances, err := t.goRound(brain.Rebuttal, order, nil)
 	if err != nil {
 		return err
 	}
 	summary := make([]string, len(order))
 	for i, name := range order {
-		summary[i] = name + "：" + game.Stance(stances[i].Suspect, stances[i].Claim)
+		summary[i] = fmt.Sprintf(t.h.stance, name, game.Stance(s.Lang, stances[i].Suspect, stances[i].Claim))
 	}
-	t.add("", "投票前，各人的最新表态："+strings.Join(summary, "；")+"。")
+	t.add("", fmt.Sprintf(t.h.stances, strings.Join(summary, t.h.semicolon)))
 
 	votes, err := t.chooseAll(brain.Vote, alive, s.VoteCandidates)
 	if err != nil {
@@ -321,19 +337,19 @@ func (t *table) day() error {
 	for _, v := range votes {
 		target := v.Target
 		if target == "" {
-			target = "弃票"
+			target = t.h.abstain
 		}
-		tally = append(tally, v.Voter+"→"+target)
+		tally = append(tally, fmt.Sprintf(t.h.vote, v.Voter, target))
 	}
-	t.add("", "投票结果："+strings.Join(tally, "，"))
+	t.add("", fmt.Sprintf(t.h.votes, strings.Join(tally, t.h.comma)))
 
 	out, ok := game.Tally(votes)
 	if !ok {
-		t.add("", "平票，今天无人出局。")
+		t.add("", t.h.tie)
 		return t.pause()
 	}
-	s.Remove(out, "被投票放逐")
-	t.add("", fmt.Sprintf("%s被放逐了。", out))
+	s.Remove(out, t.h.votedOut)
+	t.add("", fmt.Sprintf(t.h.exiled, out))
 	if _, err := t.speak(t.turn(brain.LastWords, out, nil)); err != nil {
 		return err
 	}
@@ -373,6 +389,7 @@ func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brai
 		seats[i] = brain.Seat{Name: p.Name, Death: p.Death}
 	}
 	turn := brain.Turn{
+		Lang:       t.s.Lang,
 		Kind:       kind,
 		Round:      t.s.Round,
 		Phase:      t.s.Phase,
@@ -383,7 +400,7 @@ func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brai
 		Candidates: candidates,
 	}
 	if kind.Declares() {
-		turn.Suspects = append(t.s.VoteCandidates(name), brain.Nobody)
+		turn.Suspects = append(t.s.VoteCandidates(name), game.Nobody)
 	}
 	if turn.Me.Role == game.Werewolf {
 		turn.Pack = t.s.Living(game.Werewolf)
@@ -459,7 +476,7 @@ func (t *table) add(speaker, text string, audience ...string) {
 // What they observed and how their beliefs moved is shown to the audience
 // but not recorded: the notes already carry it forward.
 func (t *table) remember(name string, a brain.Action) {
-	t.aside(name, "观察", strings.Join(a.Observations, "；"))
+	t.aside(name, t.h.observed, strings.Join(a.Observations, t.h.semicolon))
 	if a.Thinking != "" {
 		t.narrate(t.s.Think(name, a.Thinking))
 	}
@@ -470,11 +487,11 @@ func (t *table) remember(name string, a brain.Action) {
 	for _, p := range t.s.Players {
 		b, ok := a.Notes.Beliefs[p.Name]
 		if was, had := old[p.Name]; ok && (!had || was.Side != b.Side) {
-			from := "无"
+			from := t.h.fromNothing
 			if had {
-				from = was.Side
+				from = t.say(was.Side)
 			}
-			t.aside(name, "改判", fmt.Sprintf("%s %s→%s，依据：%s", p.Name, from, b.Side, strings.Join(b.Evidence, "；")))
+			t.aside(name, t.h.rejudged, fmt.Sprintf(t.h.judged, p.Name, from, t.say(b.Side), strings.Join(b.Evidence, t.h.semicolon)))
 		}
 	}
 	if t.s.Notes == nil {
@@ -488,14 +505,14 @@ func (t *table) aside(name, label, text string) {
 	if text == "" || t.ctx.IsReplaying() {
 		return
 	}
-	fmt.Printf("[第%d%s]   %s %s：%s\n", t.s.Round, t.s.Phase, t.who(name), label, text)
+	fmt.Printf("[%s]   %s %s: %s\n", t.s.Lang.When(t.s.Round, t.s.Phase), t.who(name), label, text)
 }
 
 func (t *table) who(name string) string {
 	if p := t.s.Player(name); p != nil {
-		return fmt.Sprintf("%s(%s)", p.Name, p.Role)
+		return fmt.Sprintf("%s(%s)", p.Name, t.say(string(p.Role)))
 	}
-	return "主持人"
+	return t.h.narrator
 }
 
 // narrate prints an event. It is skipped on replay so a resumed game does not
@@ -504,14 +521,14 @@ func (t *table) narrate(e game.Event) {
 	if t.ctx.IsReplaying() {
 		return
 	}
-	who := t.who(e.Speaker)
+	l, who := t.s.Lang, t.who(e.Speaker)
 	switch {
 	case e.Thought:
-		fmt.Printf("[%s]   %s 内心：%s\n", e.When(), who, e.Text)
+		fmt.Printf("[%s]   %s %s: %s\n", e.When(l), who, t.h.thinks, e.Text)
 	case len(e.Audience) > 0:
-		fmt.Printf("[%s] %s：%s   〔仅%s可见〕\n", e.When(), who, e.Text, strings.Join(e.Audience, "、"))
+		fmt.Printf("[%s] %s: %s   (%s)\n", e.When(l), who, e.Text, fmt.Sprintf(t.h.onlyFor, t.list(e.Audience)))
 	default:
-		fmt.Printf("[%s] %s：%s\n", e.When(), who, e.Said())
+		fmt.Printf("[%s] %s: %s\n", e.When(l), who, e.Said(l))
 	}
 }
 
@@ -546,10 +563,10 @@ func ActActivity(ctx workflow.ActivityContext) (any, error) {
 		a.Target = ""
 	}
 	if t.Kind.Speaks() && a.Speech == "" {
-		a.Speech = "（沉默）"
+		a.Speech = hostFor(t.Lang).silence
 	}
 	if t.Kind.Declares() && !slices.Contains(t.Suspects, a.Suspect) {
-		a.Suspect = brain.Nobody
+		a.Suspect = game.Nobody
 	}
 	if a.Claim != nil && (!t.Kind.Declares() || len(t.ClaimProblems(*a.Claim)) > 0) {
 		a.Claim = nil
@@ -559,7 +576,7 @@ func ActActivity(ctx workflow.ActivityContext) (any, error) {
 	}
 	if t.Kind == brain.WolfPlan {
 		if !slices.Contains(t.Pack, a.Faker) {
-			a.Faker = brain.Nobody
+			a.Faker = game.Nobody
 		}
 		if !slices.Contains(t.Suspects, a.Focus) || a.Focus == a.Target {
 			a.Focus = ""

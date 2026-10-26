@@ -9,7 +9,7 @@ import (
 )
 
 func TestAssignRolesDealsTheLineup(t *testing.T) {
-	players := AssignRoles(DefaultPlayers(), rand.New(rand.NewPCG(1, 2)))
+	players := AssignRoles(DefaultPlayers(Chinese), rand.New(rand.NewPCG(1, 2)))
 	require.Len(t, players, len(Lineup))
 
 	counts := map[Role]int{}
@@ -21,7 +21,7 @@ func TestAssignRolesDealsTheLineup(t *testing.T) {
 }
 
 func TestLineupSummary(t *testing.T) {
-	assert.Equal(t, "3狼人、1预言家、1女巫、1猎人、3村民", LineupSummary())
+	assert.Equal(t, "3狼人、1预言家、1女巫、1猎人、3村民", Chinese.LineupSummary())
 }
 
 func TestVisibleToHidesOtherPlayersSecrets(t *testing.T) {
@@ -41,7 +41,7 @@ func TestThoughtsAreOnlyVisibleToTheThinker(t *testing.T) {
 
 	require.Len(t, s.VisibleTo("老王"), 1)
 	assert.True(t, s.VisibleTo("老王")[0].Thought)
-	assert.Equal(t, "第1天", s.VisibleTo("老王")[0].When())
+	assert.Equal(t, "第1天", s.VisibleTo("老王")[0].When(Chinese))
 	assert.Empty(t, s.VisibleTo("美玲"))
 }
 
@@ -129,4 +129,25 @@ func TestTally(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestEnglish(t *testing.T) {
+	l := English
+	assert.Equal(t, "3 werewolves, 1 seer, 1 witch, 1 hunter, 3 villagers", l.LineupSummary())
+	assert.Equal(t, "Night 1", l.When(1, Night))
+	assert.Equal(t, "voted out on Day 2", l.Death(l.When(2, Day), "voted out"))
+	assert.Equal(t, "pass", l.Say(Pass))
+	assert.Equal(t, "Walter", l.Say("Walter"), "names are not words to translate")
+	assert.Equal(t, "claims seer, Ruby: werewolf, suspects nobody", Stance(l, Nobody, &Claim{Role: Seer, Target: "Ruby", Result: string(Werewolf)}))
+
+	assert.Equal(t, string(Werewolf), Read(" Wolf "))
+	assert.Equal(t, Good, Read("GOOD"))
+	assert.Equal(t, Good, Read(Good), "the game's own words read as themselves")
+	assert.Equal(t, "Walter", Read("Walter"))
+
+	_, err := ParseLang("fr")
+	assert.Error(t, err)
+	got, err := ParseLang("")
+	require.NoError(t, err)
+	assert.Equal(t, Chinese, got)
 }

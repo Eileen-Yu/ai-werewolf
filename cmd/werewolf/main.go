@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/eileenyu/catalyst-werewolf/brain"
+	"github.com/eileenyu/catalyst-werewolf/game"
 	"github.com/eileenyu/catalyst-werewolf/internal/engine"
 	"github.com/eileenyu/catalyst-werewolf/werewolf"
 )
@@ -120,7 +121,12 @@ func runStart(ctx context.Context, args []string) error {
 	engineAddr := fs.String("engine", "", "local engine address; empty means Dapr")
 	delay := fs.Duration("delay", 2*time.Second, "pause between phases")
 	id := fs.String("id", fmt.Sprintf("werewolf-%d", time.Now().Unix()), "game instance ID")
+	langName := fs.String("lang", "zh", "language the game is played in: zh or en")
 	_ = fs.Parse(args)
+	lang, err := game.ParseLang(*langName)
+	if err != nil {
+		return err
+	}
 
 	conn, _, closeConn, err := connect(ctx, *engineAddr)
 	if err != nil {
@@ -129,7 +135,7 @@ func runStart(ctx context.Context, args []string) error {
 	defer closeConn()
 
 	client := workflow.NewClient(conn)
-	input := werewolf.Game{PhaseDelay: *delay}
+	input := werewolf.Game{PhaseDelay: *delay, Lang: lang}
 	if _, err := client.ScheduleWorkflow(ctx, "GameWorkflow", workflow.WithInstanceID(*id), workflow.WithInput(input)); err != nil {
 		return fmt.Errorf("start game: %w", err)
 	}
@@ -143,7 +149,7 @@ func runStart(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s胜利，共%d轮\n", res.Winner, res.Rounds)
+	fmt.Println(res.Summary(lang))
 	return nil
 }
 

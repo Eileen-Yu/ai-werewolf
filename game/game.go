@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"slices"
-	"strings"
 )
 
 type Role string
@@ -27,28 +26,30 @@ var Gods = []Role{Seer, Witch, Hunter}
 // Lineup is the standard nine-player mix.
 var Lineup = []Role{Werewolf, Werewolf, Werewolf, Seer, Witch, Hunter, Villager, Villager, Villager}
 
-// LineupSummary describes Lineup, e.g. "3狼人、1预言家、1女巫、1猎人、3村民".
-func LineupSummary() string {
-	counts := map[Role]int{}
-	for _, r := range Lineup {
-		counts[r]++
-	}
-	var parts []string
-	for _, r := range []Role{Werewolf, Seer, Witch, Hunter, Villager} {
-		if counts[r] > 0 {
-			parts = append(parts, fmt.Sprintf("%d%s", counts[r], r))
-		}
-	}
-	return strings.Join(parts, "、")
-}
+// The sides: a seer's result is string(Werewolf) or Good, and a player's
+// belief about someone may also be Unsure.
+const (
+	Good   = "好人"
+	Unsure = "不确定"
+)
+
+// Sides a belief may hold.
+var Sides = []string{string(Werewolf), Good, Unsure}
 
 // Side is what a seer learns about a role.
 func Side(r Role) string {
 	if r == Werewolf {
-		return "狼人"
+		return string(Werewolf)
 	}
-	return "好人"
+	return Good
 }
+
+// Pass is the candidate a player picks to decline an optional power: the
+// witch's potions and the hunter's gun.
+const Pass = "放弃"
+
+// Nobody is the suspect a player names when they suspect no one.
+const Nobody = "无"
 
 type Phase string
 
@@ -68,7 +69,20 @@ type Player struct {
 }
 
 // DefaultPlayers is the cast used when a game is started without one.
-func DefaultPlayers() []Player {
+func DefaultPlayers(l Lang) []Player {
+	if l == English {
+		return []Player{
+			{Name: "Walter", Persona: "a retired mystery-novel fan who loves logic and speaks slowly and carefully"},
+			{Name: "Ruby", Persona: "plays on instinct, emotional and quick to get worked up"},
+			{Name: "Jake", Persona: "a chatty programmer who argues with data and odds"},
+			{Name: "Mia", Persona: "a calm lawyer who is good at catching contradictions in what people say"},
+			{Name: "Dave", Persona: "an honest, easygoing truck driver who says things straight"},
+			{Name: "Kai", Persona: "a college freshman playing for the first time, a little nervous but very earnest"},
+			{Name: "Fiona", Persona: "a high-school teacher who likes to sum things up and make a case"},
+			{Name: "Carl", Persona: "a smooth businessman who reads people well and never commits fully"},
+			{Name: "Leo", Persona: "an esports player, quick, blunt, and likes to steer the table"},
+		}
+	}
 	return []Player{
 		{Name: "老王", Persona: "退休的推理小说迷，喜欢逻辑分析，说话慢条斯理"},
 		{Name: "小红", Persona: "直觉型选手，情绪丰富，容易激动"},
@@ -117,28 +131,45 @@ type Claim struct {
 	Result string `json:"result,omitempty"`
 }
 
-func (c Claim) String() string {
-	if c.Target == "" {
-		return string(c.Role)
+// Describe is the claim as the record shows it: "预言家，小红：好人".
+func (c Claim) Describe(l Lang) string {
+	role := l.Say(string(c.Role))
+	switch {
+	case c.Target == "":
+		return role
+	case l == English:
+		return fmt.Sprintf("%s, %s: %s", role, c.Target, l.Say(c.Result))
+	default:
+		return fmt.Sprintf("%s，%s：%s", role, c.Target, c.Result)
 	}
-	return fmt.Sprintf("%s，%s：%s", c.Role, c.Target, c.Result)
 }
 
 // Stance is a speech's claim and suspect as the record shows them.
-func Stance(suspect string, claim *Claim) string {
+func Stance(l Lang, suspect string, claim *Claim) string {
+	if l == English {
+		s := "suspects " + l.Say(suspect)
+		if claim != nil {
+			s = "claims " + claim.Describe(l) + ", " + s
+		}
+		return s
+	}
 	s := "怀疑" + suspect
 	if claim != nil {
-		s = "声称" + claim.String() + "，" + s
+		s = "声称" + claim.Describe(l) + "，" + s
 	}
 	return s
 }
 
 // Said is the event's text with its stance, if it carries one.
-func (e Event) Said() string {
-	if e.Suspect == "" {
+func (e Event) Said(l Lang) string {
+	switch {
+	case e.Suspect == "":
 		return e.Text
+	case l == English:
+		return e.Text + " [" + Stance(l, e.Suspect, e.Claim) + "]"
+	default:
+		return e.Text + "【" + Stance(l, e.Suspect, e.Claim) + "】"
 	}
-	return e.Text + "【" + Stance(e.Suspect, e.Claim) + "】"
 }
 
 // IsPublicSpeech reports whether a player said this for everyone to hear.
@@ -151,8 +182,8 @@ func (e Event) VisibleTo(name string) bool {
 }
 
 // When is the event's time on the game clock, e.g. "第2天".
-func (e Event) When() string {
-	return fmt.Sprintf("第%d%s", e.Round, e.Phase)
+func (e Event) When(l Lang) string {
+	return l.When(e.Round, e.Phase)
 }
 
 // Notes is a player's own running memory, rewritten every turn: what they
@@ -169,9 +200,6 @@ type Belief struct {
 	Evidence []string `json:"evidence,omitempty"`
 }
 
-// Sides a belief may hold.
-var Sides = []string{"狼人", "好人", "不确定"}
-
 // Plan is the wolves' plan for a night and the day after it.
 type Plan struct {
 	Round  int    `json:"round"`
@@ -184,6 +212,7 @@ type Plan struct {
 }
 
 type State struct {
+	Lang    Lang     `json:"lang,omitempty"`
 	Round   int      `json:"round"`
 	Phase   Phase    `json:"phase"`
 	Players []Player `json:"players"`
@@ -223,7 +252,7 @@ func (s *State) Think(name, text string) Event {
 func (s *State) Remove(name, how string) {
 	p := s.Player(name)
 	p.Alive = false
-	p.Death = fmt.Sprintf("第%d%s%s", s.Round, s.Phase, how)
+	p.Death = s.Lang.Death(s.Lang.When(s.Round, s.Phase), how)
 }
 
 // VisibleTo is the part of the transcript the named player is allowed to see.
@@ -272,7 +301,8 @@ func (s *State) Pack(name string) []string {
 	return []string{name}
 }
 
-// Winner is "狼人" or "好人" once the game is decided, and "" before. Wolves
+// Winner is the winning side, string(Werewolf) or Good, once the game is
+// decided, and "" before. Wolves
 // win by clearing a side (all gods or all villagers), or once they are as many
 // as everyone else and so control every vote.
 func (s *State) Winner() string {
@@ -281,9 +311,9 @@ func (s *State) Winner() string {
 	villagers := len(s.Living(Villager))
 	switch {
 	case wolves == 0:
-		return "好人"
+		return Good
 	case gods == 0, villagers == 0, wolves >= gods+villagers:
-		return "狼人"
+		return string(Werewolf)
 	default:
 		return ""
 	}

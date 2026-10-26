@@ -28,13 +28,6 @@ const (
 	Shoot     TurnKind = "shoot"      // hunter, on the way out, decides whether to shoot
 )
 
-// Pass is the candidate a player picks to decline an optional power: the
-// witch's potions and the hunter's gun.
-const Pass = "放弃"
-
-// Nobody is the suspect a player names when they suspect no one.
-const Nobody = "无"
-
 // IsChoice reports whether the turn asks for a Target.
 func (k TurnKind) IsChoice() bool {
 	switch k {
@@ -66,6 +59,7 @@ type Seat struct {
 // Turn is everything a player is told when it is their turn. Transcript is
 // already filtered to what this player may see.
 type Turn struct {
+	Lang       game.Lang    `json:"lang,omitempty"`
 	Kind       TurnKind     `json:"kind"`
 	Round      int          `json:"round"`
 	Phase      game.Phase   `json:"phase"`
@@ -74,7 +68,7 @@ type Turn struct {
 	Transcript []game.Event `json:"transcript"`
 	Notes      game.Notes   `json:"notes"`
 	Candidates []string     `json:"candidates,omitempty"`
-	// Suspects is who may be named as the suspect on a declaring turn, Nobody
+	// Suspects is who may be named as the suspect on a declaring turn, game.Nobody
 	// included, or as the focus of a wolf plan.
 	Suspects []string `json:"suspects,omitempty"`
 	// Spoken and Waiting are, for a speaking turn, who has already spoken in
@@ -112,22 +106,19 @@ type Action struct {
 // Claimable is what a player may claim to be. A wolf claims one of these too.
 var Claimable = []game.Role{game.Seer, game.Witch, game.Hunter, game.Villager}
 
-// quoteCues are ways of quoting what someone said, which cannot follow the
-// name of someone who has not said anything in public yet.
-var quoteCues = []string{"说过", "说的", "提到", "的发言", "发言里", "发言中", "的观点", "的说法"}
-
 // Check reports everything wrong with an action for this turn, in words
 // that can be handed back to the player.
 func (t Turn) Check(a Action) error {
+	tx, l := t.text(), t.Lang
 	var problems []string
 	if t.Kind.IsChoice() && !slices.Contains(t.Candidates, a.Target) {
-		problems = append(problems, fmt.Sprintf("target 必须是这些名字之一：%s，你给的是 %q", strings.Join(t.Candidates, "、"), a.Target))
+		problems = append(problems, fmt.Sprintf(tx.badTarget, l.List(l.SayAll(t.Candidates)), a.Target))
 	}
 	if t.Kind.Speaks() && a.Speech == "" {
-		problems = append(problems, "speech 不能为空")
+		problems = append(problems, tx.emptySpeech)
 	}
 	if t.Kind.Declares() && !slices.Contains(t.Suspects, a.Suspect) {
-		problems = append(problems, fmt.Sprintf("suspect 必须是这些之一：%s，你给的是 %q", strings.Join(t.Suspects, "、"), a.Suspect))
+		problems = append(problems, fmt.Sprintf(tx.badSuspect, l.List(l.SayAll(t.Suspects)), a.Suspect))
 	}
 	if t.Kind.Declares() && a.Claim != nil {
 		problems = append(problems, t.ClaimProblems(*a.Claim)...)
@@ -136,31 +127,32 @@ func (t Turn) Check(a Action) error {
 		problems = append(problems, t.planProblems(a)...)
 	}
 	if t.Kind == Speech && t.MustFakeSeer() && (a.Claim == nil || a.Claim.Role != game.Seer) {
-		problems = append(problems, "狼队计划要你今天悍跳预言家：claim.role 必须是预言家，并报一个查验结果")
+		problems = append(problems, tx.mustFake)
 	}
 	if t.Kind.Speaks() {
 		problems = append(problems, t.unspokenProblems(a.Speech)...)
 	}
 	for _, name := range t.BadBeliefs(a.Notes) {
-		problems = append(problems, fmt.Sprintf("notes.beliefs 里的 %q 有问题：名字必须是桌上的其他玩家，side 只能是%s", name, strings.Join(game.Sides, "、")))
+		problems = append(problems, fmt.Sprintf(tx.badBelief, name, l.List(l.SayAll(game.Sides))))
 	}
 	if len(problems) > 0 {
-		return errors.New(strings.Join(problems, "；"))
+		return errors.New(strings.Join(problems, tx.sep))
 	}
 	return nil
 }
 
 // ClaimProblems lists what is wrong with a claim, for a turn that declares.
 func (t Turn) ClaimProblems(c game.Claim) []string {
+	tx, l := t.text(), t.Lang
 	var problems []string
 	if !slices.Contains(Claimable, c.Role) {
-		problems = append(problems, fmt.Sprintf("claim.role 只能是预言家、女巫、猎人、村民之一，你给的是 %q", c.Role))
+		problems = append(problems, fmt.Sprintf(tx.badRole, l.Say(string(c.Role))))
 	}
 	if c.Target != "" && !slices.Contains(t.others(), c.Target) {
-		problems = append(problems, fmt.Sprintf("claim.target %q 不是桌上的其他玩家", c.Target))
+		problems = append(problems, fmt.Sprintf(tx.badClaimTarget, c.Target))
 	}
-	if c.Role == game.Seer && c.Target != "" && c.Result != "好人" && c.Result != "狼人" {
-		problems = append(problems, fmt.Sprintf("预言家的 claim.result 只能是好人或狼人，你给的是 %q", c.Result))
+	if c.Role == game.Seer && c.Target != "" && c.Result != game.Good && c.Result != string(game.Werewolf) {
+		problems = append(problems, fmt.Sprintf(tx.badResult, l.Say(c.Result)))
 	}
 	return problems
 }
@@ -169,15 +161,16 @@ func (t Turn) ClaimProblems(c game.Claim) []string {
 // be a wolf, and the pack cannot push tomorrow's vote onto a teammate, or
 // onto tonight's victim, who will be dead by then.
 func (t Turn) planProblems(a Action) []string {
+	tx, l := t.text(), t.Lang
 	var problems []string
-	if a.Faker != Nobody && !slices.Contains(t.Pack, a.Faker) {
-		problems = append(problems, fmt.Sprintf("faker 只能是狼人之一（%s）或者\"%s\"，你给的是 %q", strings.Join(t.Pack, "、"), Nobody, a.Faker))
+	if a.Faker != game.Nobody && !slices.Contains(t.Pack, a.Faker) {
+		problems = append(problems, fmt.Sprintf(tx.badFaker, l.List(t.Pack), l.Say(game.Nobody), a.Faker))
 	}
 	if !slices.Contains(t.Suspects, a.Focus) {
-		problems = append(problems, fmt.Sprintf("focus 必须是这些好人阵营的候选之一：%s，你给的是 %q", strings.Join(t.Suspects, "、"), a.Focus))
+		problems = append(problems, fmt.Sprintf(tx.badFocus, l.List(l.SayAll(t.Suspects)), a.Focus))
 	}
 	if a.Focus != "" && a.Focus == a.Target {
-		problems = append(problems, fmt.Sprintf("%s今晚就会被杀，明天不可能再投票放逐他：focus 要换一个人", a.Focus))
+		problems = append(problems, fmt.Sprintf(tx.focusIsVictim, a.Focus))
 	}
 	return problems
 }
@@ -192,19 +185,20 @@ func (t Turn) MustFakeSeer() bool {
 // who has never said anything in public, and, during the day's speeches,
 // anyone still waiting for their turn today.
 func (t Turn) unspokenProblems(speech string) []string {
+	tx := t.text()
 	var problems []string
 	for _, name := range t.Silent() {
-		for _, cue := range quoteCues {
+		for _, cue := range tx.quoteCues {
 			if strings.Contains(speech, name+cue) {
-				problems = append(problems, fmt.Sprintf("%s还没有公开发过言，你不能说\"%s%s\"", name, name, cue))
+				problems = append(problems, fmt.Sprintf(tx.quoted, name, name, cue))
 				break
 			}
 		}
 	}
 	if t.Kind == Speech {
 		for _, w := range t.Waiting {
-			if strings.Contains(speech, w+"刚才") {
-				problems = append(problems, fmt.Sprintf("%s今天还没发言，你不能说\"%s刚才\"", w, w))
+			if strings.Contains(speech, w+tx.justNow) {
+				problems = append(problems, fmt.Sprintf(tx.notYet, w, w, tx.justNow))
 			}
 		}
 	}
@@ -244,9 +238,12 @@ func (t Turn) BadBeliefs(n *game.Notes) []string {
 	return bad
 }
 
-// Normalize repairs near misses before a move is checked: a pick written as
-// "小红（她最可疑）" becomes 小红, and "不开枪" becomes Pass where passing is
-// allowed.
+// Normalize repairs near misses before a move is checked, none of which is
+// worth asking again over: a pick written as "小红（她最可疑）" becomes 小红,
+// "不开枪" or "pass" becomes game.Pass where passing is allowed, and words
+// written in either language are read as the game's own. A claim of no role
+// ("null", "无") is no claim, and a player's belief about themselves is
+// dropped.
 func (t Turn) Normalize(a Action) Action {
 	if t.Kind.IsChoice() {
 		a.Target = closest(a.Target, t.Candidates)
@@ -256,21 +253,46 @@ func (t Turn) Normalize(a Action) Action {
 	}
 	if t.Kind == WolfPlan {
 		a.Focus = closest(a.Focus, t.Suspects)
-		a.Faker = closest(a.Faker, append(slices.Clone(t.Pack), Nobody))
+		a.Faker = closest(a.Faker, append(slices.Clone(t.Pack), game.Nobody))
+	}
+	if a.Claim != nil {
+		c := *a.Claim
+		c.Role, c.Result = game.Role(game.Read(string(c.Role))), game.Read(c.Result)
+		a.Claim = &c
+		if isDecline(string(c.Role)) {
+			a.Claim = nil
+		}
+	}
+	if a.Notes != nil && a.Notes.Beliefs != nil {
+		n := *a.Notes
+		n.Beliefs = map[string]game.Belief{}
+		for name, b := range a.Notes.Beliefs {
+			if name != t.Me.Name {
+				b.Side = game.Read(b.Side)
+				n.Beliefs[name] = b
+			}
+		}
+		a.Notes = &n
 	}
 	return a
 }
 
 // declines are words that, where no name was given, mean passing.
-var declines = []string{"不", "放弃", "无", "没有"}
+var declines = []string{"不", "放弃", "无", "没有", "null", "pass", "none", "nobody", "no one", "skip", "not ", "don't", "n/a"}
+
+func isDecline(s string) bool {
+	s = strings.ToLower(s)
+	return slices.ContainsFunc(declines, func(d string) bool { return strings.Contains(s, d) })
+}
 
 func closest(s string, options []string) string {
+	s = game.Read(s)
 	if s == "" || slices.Contains(options, s) {
 		return s
 	}
 	var named []string
 	for _, o := range options {
-		if o != Pass && o != Nobody && strings.Contains(s, o) {
+		if o != game.Pass && o != game.Nobody && strings.Contains(s, o) {
 			named = append(named, o)
 		}
 	}
@@ -280,8 +302,8 @@ func closest(s string, options []string) string {
 	if len(named) > 0 {
 		return s
 	}
-	for _, none := range []string{Pass, Nobody} {
-		if slices.Contains(options, none) && slices.ContainsFunc(declines, func(d string) bool { return strings.Contains(s, d) }) {
+	for _, none := range []string{game.Pass, game.Nobody} {
+		if slices.Contains(options, none) && isDecline(s) {
 			return none
 		}
 	}
