@@ -19,20 +19,25 @@ type text struct {
 	// is how a speech says someone has "just" spoken.
 	quoteCues []string
 	justNow   string
-	sep       string
-	invalid   string
-	noJSON    string
-	badJSON   string
+	// noProof are ways of saying a claim has no proof, which is true of
+	// every claim and so is no reason to suspect anyone.
+	noProof     []string
+	noProofUsed string
+	ownName     string
+	sep         string
+	invalid     string
+	noJSON      string
+	badJSON     string
 
 	// The user prompt.
-	seats, secrets, notes, thoughts, claims, public string
-	alive, you, host, none, beliefLine, intends     string
-	claimLine, now, order, planLine, noFaker        string
-	faker, mustFakeLine, nobodySpoke, silent        string
-	shootAlive, selfCheck, onlyJSON, seatLine       string
-	line                                            string
-	fields                                          fields
-	targetOnly, planOnly, declareOnly, notesLine    string
+	seats, secrets, notes, thoughts, claims, public  string
+	alive, you, host, none, beliefLine, intends      string
+	claimLine, now, order, planLine, noFaker         string
+	faker, mustFakeLine, nobodySpoke, silent         string
+	shootAlive, selfCheck, onlyJSON, seatLine, known string
+	line                                             string
+	fields                                           fields
+	targetOnly, planOnly, declareOnly, notesLine     string
 
 	// Random's lines.
 	speechLines, wolfLines []string
@@ -73,7 +78,7 @@ var chineseText = text{
 2. 还没发言的人，不能评价他"说过什么"。第1天第一个发言的人之前，没有任何人发过言。夜里死了的人死因不明，不要当成已知事实。
 3. 公开发言不等于事实。别人声称的身份、查验结果、救了谁，都只是他的一面之词，狼人会假装。只有【你的秘密信息】是确定的。
    说的时候要分清：不能说"小红是好人"，只能说"美玲说她查了小红是好人"，再说你信不信、为什么。
-4. 【你的秘密信息】只有你知道。可以用它做判断，但要想清楚公开说出来的后果。
+4. 【你的秘密信息】只有你知道，而且一定是真的：和任何人的说法冲突时，以它为准。比如你查验过某人是好人，就不要再怀疑他。要想清楚公开说出来的后果。
 5. 提到你自己之前的观点时，必须和【公开记录】里你真实说过的话一致；改变看法要说出理由。
 
 怎么思考，每次都按这个顺序：
@@ -94,9 +99,10 @@ var chineseText = text{
 - 猎人开枪带走的人不一定是狼人。被放逐的人不一定是狼人，翻不翻牌要看结果。
 - 第1夜还没有任何公开信息，没有人能看出谁是神职。
 
+说到自己时用"我"，不要用第三人称说自己的名字。
 说话风格：像真人玩家，口语化，符合你的性格。不要开场白和客套（不要说"大家好""我是某某"），直接说观点。
 必须点名：说清楚怀疑谁、相信谁、为什么。不超过120字。不要提到你是AI，不要写动作或旁白。
-不要说空话套话，比如"值得关注""转移注意力""大家要谨慎""再观察一下"。每个怀疑都要有具体依据：某人的原话、他的投票、他跳身份的时机，或者别人的声明之间的矛盾。`,
+不要说空话套话，比如"值得关注""转移注意力""大家要谨慎""再观察一下""缺乏证据"。每个怀疑都要有具体依据：某人的原话、他的投票、他跳身份的时机，或者别人的声明之间的矛盾。`,
 	strategies: map[game.Role]string{
 		game.Werewolf: "你和狼同伴要配合，白天按狼队计划执行：计划里要悍跳的人，当天第一次发言就跳；计划里要投的人，大家一起找他的破绽。" +
 			"你不能怀疑或投票给狼同伴，要帮悍跳的同伴说话。局势变了可以在夜里改计划，白天不要各打各的。" +
@@ -145,6 +151,9 @@ var chineseText = text{
 	badBelief:      "notes.beliefs 里的 %q 有问题：名字必须是桌上的其他玩家，side 只能是%s",
 	quoteCues:      []string{"说过", "说的", "提到", "的发言", "发言里", "发言中", "的观点", "的说法"},
 	justNow:        "刚才",
+	noProof:        []string{"缺乏证据", "没有证据", "缺乏实证", "没有实证", "缺乏实质证据", "没有任何证据", "证据支持", "缺乏足够的证据"},
+	noProofUsed:    "不能用\"%s\"当理由：身份声明本来就没法当场证实，这句话对谁都成立。换成具体的依据：谁的说法和哪件事对得上或对不上，谁的投票和发言不一致",
+	ownName:        "你就是%s。说到自己要用\"我\"，不要用第三人称说自己的名字",
 	sep:            "；",
 	invalid:        "你的回答无效：%s。请按要求重新回复一个JSON对象。",
 	noJSON:         "没有找到JSON对象",
@@ -169,6 +178,7 @@ var chineseText = text{
 	noFaker:      "没人悍跳",
 	faker:        "%s悍跳预言家",
 	mustFakeLine: "你就是要悍跳的人：这次发言必须跳预言家，claim.role 写预言家，并报一个查验结果。\n",
+	known:        "你确定知道的事，和任何人的说法冲突时以这些为准：\n",
 	nobodySpoke: "到现在为止还没有任何人公开发过言，也没有任何公开信息，谁是什么身份完全不知道。" +
 		"不能评价任何人的发言或观点，也不要编\"他像预言家\"这类没有依据的理由；需要选人时只能靠猜，就直说是猜的。\n",
 	silent:     "还没有公开发过言的人：%s。你不能评价他们说过什么。\n",
@@ -238,7 +248,7 @@ Hard rules. Break one and you give yourself away, and the host will reject your 
 2. Never comment on what someone "said" before they have spoken. Before the first speaker on Day 1, nobody has said anything. How someone died at night is unknown; do not treat it as fact.
 3. What people say is not fact. A claimed role, a check result, a claimed save: each is only that player's word, and werewolves lie. Only [Your secrets] is certain.
    Say it that way: not "Ruby is good", but "Mia says she checked Ruby and Ruby is good", then whether you believe her and why.
-4. Only you know [Your secrets]. Use them to reason, but think about what happens if you reveal them.
+4. Only you know [Your secrets], and they are always true: where anyone's word contradicts them, they win. If you checked someone as good, do not suspect them. Think about what happens if you reveal them.
 5. When you refer to your own earlier view, it must match what you actually said in [Public record]; if you change your mind, say why.
 
 How to think, in this order every time:
@@ -259,9 +269,10 @@ Reasoning points people often get wrong:
 - Whoever the hunter shoots is not necessarily a werewolf. Whoever is exiled is not necessarily a werewolf either.
 - On Night 1 there is no public information at all; nobody can tell who holds a power role.
 
+Refer to yourself as "I", never by your own name.
 Speak like a real player: casual, in character. No openers or pleasantries ("Hi everyone", "I'm so-and-so"); go straight to your point.
 Name names: say clearly who you suspect, who you trust, and why. At most 60 words. Never mention being an AI, and no stage directions or narration.
-No empty filler such as "worth watching", "deflecting", "let's be careful", "let's see more". Every suspicion needs a concrete basis: what someone actually said, how they voted, when they claimed a role, or a contradiction between claims.
+No empty filler such as "worth watching", "deflecting", "let's be careful", "let's see more", "no proof". Every suspicion needs a concrete basis: what someone actually said, how they voted, when they claimed a role, or a contradiction between claims.
 Write everything in English.`,
 	strategies: map[game.Role]string{
 		game.Werewolf: "Work with your fellow werewolves and follow the pack's plan by day: whoever the plan says claims seer does it in their very first speech, and everyone goes after the person the plan says to vote out. " +
@@ -311,6 +322,9 @@ Write everything in English.`,
 	badBelief:      "%q in notes.beliefs is wrong: names must be other players at the table, and side one of %s",
 	quoteCues:      []string{" said", " says", " mentioned", "'s speech", "'s point", "'s argument", " argued", " claimed"},
 	justNow:        " just",
+	noProof:        []string{"no proof", "no evidence", "lack of evidence", "lacks evidence", "without evidence", "without proof", "no real evidence", "no solid evidence"},
+	noProofUsed:    "do not use \"%s\" as a reason: no role claim can be proven on the spot, so it is true of everyone. Use something concrete instead: whose story fits or contradicts which event, whose vote does not match their words",
+	ownName:        "you are %s. Refer to yourself as \"I\", never by your own name",
 	sep:            "; ",
 	invalid:        "Your answer is invalid: %s. Reply again with a single JSON object as asked.",
 	noJSON:         "no JSON object found",
@@ -335,6 +349,7 @@ Write everything in English.`,
 	noFaker:      "nobody claims seer",
 	faker:        "%s claims seer",
 	mustFakeLine: "You are the one claiming seer: this speech must claim seer, with claim.role seer and a check result.\n",
+	known:        "What you know for certain; where anyone's word contradicts it, this wins:\n",
 	nobodySpoke: "Nobody has said anything in public yet and there is no public information at all; nobody knows anyone's role. " +
 		"Do not comment on anyone's speech or views, and do not invent reasons like \"he seems like the seer\"; if you have to pick someone, it is a guess, so say so.\n",
 	silent:     "Players who have not said anything in public yet: %s. You cannot comment on what they said.\n",
@@ -358,7 +373,7 @@ Write everything in English.`,
 		target:       `"target": "a name"`,
 		speech:       `"speech": "what you say out loud"`,
 		suspect:      `"suspect": "who you suspect most right now"`,
-		claim:        `"claim": {"role": "the role you claim: seer, witch, hunter or villager", "target": "the player it concerns, or empty", "result": "the check result (good or werewolf), or saved / poisoned, or empty"}`,
+		claim:        `"claim": {"role": "the role you claim: seer, witch, hunter or villager", "target": "the player it concerns, or \"\"", "result": "the check result (good or werewolf), or saved / poisoned, or \"\""}`,
 	},
 	onlyJSON:    "Reply with a single JSON object and nothing else: ",
 	seatLine:    "- %s: %s\n",

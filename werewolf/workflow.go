@@ -165,19 +165,17 @@ func (t *table) night() error {
 		return err
 	}
 
-	s.Phase = game.Day
 	var dead []string
 	for _, p := range s.Players { // table order, so the list gives away nothing
 		if (p.Name == victim && !saved) || p.Name == poisoned {
 			dead = append(dead, p.Name)
+			s.Remove(p.Name, t.h.died) // still night, so they died "on Night n"
 		}
 	}
+	s.Phase = game.Day
 	if len(dead) == 0 {
 		t.add("", t.h.peaceful)
 		return nil
-	}
-	for _, d := range dead {
-		s.Remove(d, t.h.died)
 	}
 	t.add("", fmt.Sprintf(t.h.dawnDead, t.list(dead)))
 	for _, d := range dead {

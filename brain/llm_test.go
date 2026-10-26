@@ -3,6 +3,7 @@ package brain
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -127,6 +128,7 @@ func TestParseAction(t *testing.T) {
 		{"a comma after the last item", "{\"target\": \"小红\",\n}", Action{Target: "小红"}, false},
 		{"a missing comma between lines", "{\"thinking\": \"t\"\n\"target\": \"小红\"}", Action{Thinking: "t", Target: "小红"}, false},
 		{"a missing comma on one line", `{"thinking": "t" "target": "小红"}`, Action{Thinking: "t", Target: "小红"}, false},
+		{"a brace too many", `{"observations":["阿杰投了老王"]},"thinking":"t","target":"小红"}`, Action{Observations: []string{"阿杰投了老王"}, Thinking: "t", Target: "小红"}, false},
 		{"no JSON", "我投小红", Action{}, true},
 		{"broken JSON", `{"target": "小红"`, Action{}, true},
 	}
@@ -206,6 +208,35 @@ func TestNormalize(t *testing.T) {
 		"阿杰": {Side: game.Good}, "老王": {Side: "werewolf"},
 	}}}).Notes
 	assert.Equal(t, map[string]game.Belief{"老王": {Side: string(game.Werewolf)}}, notes.Beliefs, "a belief about yourself is dropped, sides are read")
+	notes = me.Normalize(Action{Notes: &game.Notes{Beliefs: map[string]game.Belief{"老王": {Side: "出局"}}}}).Notes
+	assert.Empty(t, notes.Beliefs, "a belief with no side is dropped")
+	assert.Empty(t, speech.Normalize(Action{Claim: &game.Claim{Role: "村民", Target: "empty"}}).Claim.Target)
+}
+
+func TestCheckRejectsEmptyReasoning(t *testing.T) {
+	zh := Turn{Kind: Speech, Me: game.Player{Name: "小林"}, Suspects: []string{"阿杰", game.Nobody}}
+	assert.ErrorContains(t, zh.Check(Action{Speech: "阿杰的女巫身份缺乏证据支持", Suspect: "阿杰"}), "不能用\"缺乏证据\"当理由")
+	assert.ErrorContains(t, zh.Check(Action{Speech: "我觉得小林很可疑", Suspect: "阿杰"}), "你就是小林")
+	assert.NoError(t, zh.Check(Action{Speech: "阿杰第1天投了老王，和他自己的说法对不上", Suspect: "阿杰"}))
+
+	en := Turn{Lang: game.English, Kind: Rebuttal, Me: game.Player{Name: "Leo"}, Suspects: []string{"Kai", game.Nobody}}
+	assert.ErrorContains(t, en.Check(Action{Speech: "Kai has No Proof at all.", Suspect: "Kai"}), `"no proof"`)
+	assert.ErrorContains(t, en.Check(Action{Speech: "Leo is not a wolf.", Suspect: "Kai"}), "you are Leo")
+}
+
+func TestPromptRepeatsWhatThePlayerKnowsForCertain(t *testing.T) {
+	turn := Turn{
+		Kind: Speech, Round: 2, Phase: game.Day, Me: game.Player{Name: "大刘", Role: game.Seer},
+		Seats: []Seat{{Name: "大刘"}, {Name: "阿杰"}}, Suspects: []string{"阿杰", game.Nobody},
+		Transcript: []game.Event{
+			{Round: 1, Phase: game.Night, Text: "你查验了阿杰，结果是好人。", Audience: []string{"大刘"}},
+			{Round: 1, Phase: game.Night, Speaker: "大刘", Text: "先查阿杰", Thought: true, Audience: []string{"大刘"}},
+		},
+	}
+	_, user := prompt(turn)
+	now := user[strings.Index(user, "【现在】"):]
+	assert.Contains(t, now, "你确定知道的事，和任何人的说法冲突时以这些为准：\n- [第1夜] 你查验了阿杰，结果是好人。")
+	assert.NotContains(t, now, "先查阿杰", "private thoughts are not facts")
 }
 
 func TestPromptForTheHunterNamesWhoIsAlreadyOut(t *testing.T) {

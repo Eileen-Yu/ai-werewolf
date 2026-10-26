@@ -132,6 +132,17 @@ func (t Turn) Check(a Action) error {
 	if t.Kind.Speaks() {
 		problems = append(problems, t.unspokenProblems(a.Speech)...)
 	}
+	if t.Kind.Speaks() && t.Kind != WolfPlan && t.Me.Name != "" && strings.Contains(a.Speech, t.Me.Name) {
+		problems = append(problems, fmt.Sprintf(tx.ownName, t.Me.Name))
+	}
+	if t.Kind.Declares() {
+		for _, p := range tx.noProof {
+			if strings.Contains(strings.ToLower(a.Speech), p) {
+				problems = append(problems, fmt.Sprintf(tx.noProofUsed, p))
+				break
+			}
+		}
+	}
 	for _, name := range t.BadBeliefs(a.Notes) {
 		problems = append(problems, fmt.Sprintf(tx.badBelief, name, l.List(l.SayAll(game.Sides))))
 	}
@@ -242,8 +253,10 @@ func (t Turn) BadBeliefs(n *game.Notes) []string {
 // worth asking again over: a pick written as "小红（她最可疑）" becomes 小红,
 // "不开枪" or "pass" becomes game.Pass where passing is allowed, and words
 // written in either language are read as the game's own. A claim of no role
-// ("null", "无") is no claim, and a player's belief about themselves is
-// dropped.
+// ("null", "无") is no claim, and one about nobody ("empty") is about no
+// one in particular. Beliefs about themselves, or that are not one of
+// game.Sides, are dropped: they are private notes, and only a name that is
+// not at the table is worth asking again over.
 func (t Turn) Normalize(a Action) Action {
 	if t.Kind.IsChoice() {
 		a.Target = closest(a.Target, t.Candidates)
@@ -258,6 +271,9 @@ func (t Turn) Normalize(a Action) Action {
 	if a.Claim != nil {
 		c := *a.Claim
 		c.Role, c.Result = game.Role(game.Read(string(c.Role))), game.Read(c.Result)
+		if isDecline(c.Target) {
+			c.Target = ""
+		}
 		a.Claim = &c
 		if isDecline(string(c.Role)) {
 			a.Claim = nil
@@ -267,8 +283,8 @@ func (t Turn) Normalize(a Action) Action {
 		n := *a.Notes
 		n.Beliefs = map[string]game.Belief{}
 		for name, b := range a.Notes.Beliefs {
-			if name != t.Me.Name {
-				b.Side = game.Read(b.Side)
+			b.Side = game.Read(b.Side)
+			if name != t.Me.Name && slices.Contains(game.Sides, b.Side) {
 				n.Beliefs[name] = b
 			}
 		}
@@ -278,7 +294,7 @@ func (t Turn) Normalize(a Action) Action {
 }
 
 // declines are words that, where no name was given, mean passing.
-var declines = []string{"不", "放弃", "无", "没有", "null", "pass", "none", "nobody", "no one", "skip", "not ", "don't", "n/a"}
+var declines = []string{"不", "放弃", "无", "没有", "null", "pass", "none", "nobody", "no one", "skip", "not ", "don't", "n/a", "empty"}
 
 func isDecline(s string) bool {
 	s = strings.ToLower(s)

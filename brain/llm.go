@@ -34,8 +34,10 @@ func (l LLM) Act(ctx context.Context, t Turn) (Action, error) {
 		{ConversationMessageOfUser: &dapr.ConversationMessageOfUserAlpha2{Content: content(user)}},
 	}
 	var last Action
+	var reply string
 	for range attempts {
-		reply, err := l.converse(ctx, msgs, temperatureFor(t.Kind))
+		var err error
+		reply, err = l.converse(ctx, msgs, temperatureFor(t.Kind))
 		if err != nil {
 			return Action{}, err
 		}
@@ -54,11 +56,12 @@ func (l LLM) Act(ctx context.Context, t Turn) (Action, error) {
 			&dapr.ConversationMessageAlpha2{ConversationMessageOfUser: &dapr.ConversationMessageOfUserAlpha2{Content: content(fmt.Sprintf(tx.invalid, err))}},
 		)
 	}
+	log.Printf("%s's last %s answer was: %.800s", t.Me.Name, t.Kind, reply)
 	return last, nil
 }
 
 // parseAction reads the first JSON object out of a reply, tolerating a code
-// fence or text around it, and a comma too many or too few. The nested
+// fence or text around it, a comma too many or too few, and a brace too many. The nested
 // fields are read leniently: a model often writes a claim as a plain string
 // or evidence as one sentence, and that is not worth a re-ask.
 func parseAction(tx *text, reply string) (Action, error) {
@@ -72,8 +75,8 @@ func parseAction(tx *text, reply string) (Action, error) {
 		Claim        json.RawMessage `json:"claim"`
 		Notes        json.RawMessage `json:"notes"`
 	}
-	err := json.NewDecoder(strings.NewReader(reply[start:])).Decode(&raw)
-	if err != nil && json.NewDecoder(strings.NewReader(repairCommas(reply[start:]))).Decode(&raw) != nil {
+	err := decodeObject(reply[start:], &raw)
+	if err != nil && decodeObject(repairCommas(reply[start:]), &raw) != nil {
 		return Action{}, fmt.Errorf(tx.badJSON, err)
 	}
 	a := raw.Action
@@ -84,6 +87,23 @@ func parseAction(tx *text, reply string) (Action, error) {
 		*f = strings.TrimSpace(*f)
 	}
 	return a, nil
+}
+
+// decodeObject decodes the JSON object s starts with, ignoring what follows
+// it, unless what follows is a comma: then a stray "}" closed the object
+// early, as in {"observations":[]},"speech":"…"}, and is dropped.
+func decodeObject(s string, v any) error {
+	for {
+		dec := json.NewDecoder(strings.NewReader(s))
+		if err := dec.Decode(v); err != nil {
+			return err
+		}
+		end := int(dec.InputOffset())
+		if !strings.HasPrefix(strings.TrimSpace(s[end:]), ",") {
+			return nil
+		}
+		s = s[:end-1] + s[end:]
+	}
 }
 
 var (
@@ -165,7 +185,7 @@ func prompt(t Turn) (system, user string) {
 	system = fmt.Sprintf(tx.rules, len(names), len(names), l.List(names), l.LineupSummary(),
 		t.Me.Name, l.Say(string(t.Me.Role)), t.Me.Persona, tx.strategies[t.Me.Role])
 
-	var seats, secrets, public, claims strings.Builder
+	var seats, secrets, public, claims, known strings.Builder
 	var thoughts []string
 	for _, s := range t.Seats {
 		who, status := s.Name, tx.alive
@@ -184,6 +204,9 @@ func prompt(t Turn) (system, user string) {
 			thoughts = append(thoughts, fmt.Sprintf("[%s] %s\n", e.When(l), e.Text))
 		case len(e.Audience) > 0:
 			secrets.WriteString(line)
+			if e.Speaker == "" {
+				fmt.Fprintf(&known, "- [%s] %s\n", e.When(l), e.Text)
+			}
 		default:
 			public.WriteString(line)
 		}
@@ -204,6 +227,9 @@ func prompt(t Turn) (system, user string) {
 	b.WriteString(tx.public + orNone(tx, public.String()))
 
 	fmt.Fprintf(&b, tx.now, l.When(t.Round, t.Phase), tx.instructions[t.Kind])
+	if known.Len() > 0 {
+		b.WriteString(tx.known + known.String())
+	}
 	if t.Kind == Speech || t.Kind == Rebuttal {
 		fmt.Fprintf(&b, tx.order, len(t.Spoken)+1, orNobody(l, t.Spoken), orNobody(l, t.Waiting))
 	}

@@ -202,6 +202,9 @@ func TestAnEnglishGameIsAllEnglish(t *testing.T) {
 		assert.False(t, han.MatchString(turn.Me.Name+turn.Me.Persona), "%s: %s", turn.Me.Name, turn.Me.Persona)
 		for _, s := range turn.Seats {
 			assert.False(t, han.MatchString(s.Death), "%s: %s", s.Name, s.Death)
+			if strings.HasPrefix(s.Death, "died") {
+				assert.Contains(t, s.Death, "Night", "%s died at night", s.Name)
+			}
 		}
 		for _, e := range turn.Transcript {
 			assert.False(t, han.MatchString(e.Said(game.English)), "[%s] %s", e.When(game.English), e.Said(game.English))
