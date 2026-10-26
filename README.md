@@ -77,7 +77,7 @@ Players call the model through the Dapr Conversation API. Create a conversation 
 
 ```bash
 diagrid component create llm --project werewolf --type conversation.openai \
-  --metadata key=<your OpenAI key> --metadata model=gpt-4o-mini
+  --metadata key=<your OpenAI key> --metadata model=gpt-6.1-sol
 ```
 
 ### 4. Start the game master
@@ -152,11 +152,11 @@ diagrid workflow start GameWorkflow --project werewolf --id werewolf --instance-
 
 ### Changing the model
 
-A game makes roughly 100 to 150 LLM calls. `gpt-4o-mini` is cheap but clearly struggles with the reasoning, and its speeches tend to be vague. For a better game, use a stronger model. `component update` replaces all the metadata, so pass the key again:
+A game makes roughly 100 to 150 LLM calls. `gpt-6.1-sol` is a good balance of reasoning and cost for it. For the strongest play, use `gpt-6-astra`; for a cheaper game, `gpt-6.1-terra`. `component update` replaces all the metadata, so pass the key again:
 
 ```bash
 diagrid component update llm --project werewolf \
-  --metadata key=<your OpenAI key> --metadata model=gpt-4.1
+  --metadata key=<your OpenAI key> --metadata model=gpt-6-astra
 ```
 
 ## FAQ
