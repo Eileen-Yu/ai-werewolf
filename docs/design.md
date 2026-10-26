@@ -63,7 +63,7 @@ Before checking, the game master repairs a few common slips that are not worth a
 - A name with a comment after it ("Ruby (she is the most suspicious)"), or "no shot" or "pass" for declining.
 - A belief about oneself in `beliefs`: that entry is dropped.
 - A `claim` role written as `"null"` or "none": treated as no claim.
-- JSON is read leniently: a `claim` written as a string, evidence written as one sentence, one comma too many or too few, or a stray early `}` can all still be read. Choice turns (vote, check, potions, shot) use a low temperature; speaking turns keep a high one.
+- JSON is read leniently: a `claim` written as a string, evidence written as one sentence, one comma too many or too few, or a stray early `}` can all still be read. Every request is sent with a temperature of 1, the only value `gpt-6.1-sol` accepts. It has to be sent: left out, Dapr's OpenAI component sends 0.
 
 If an answer is still invalid after the re-asks, the pick counts as a pass, and invalid claims and note entries are dropped. A problem only with the content of a speech is logged, and the speech still counts.
 

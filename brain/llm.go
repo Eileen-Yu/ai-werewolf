@@ -9,23 +9,17 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"sync/atomic"
 
 	dapr "github.com/dapr/go-sdk/client"
 
 	"github.com/Eileen-Yu/ai-werewolf/game"
 )
 
-// LLM plays through the Dapr Conversation API. Which model it talks to, and
-// the key for it, live in the conversation component, not here.
+// LLM plays through the Dapr Conversation API. The model, gpt-6.1-sol, and
+// the key for it live in the conversation component, not here.
 type LLM struct {
 	Client    dapr.Client
 	Component string
-
-	// defaultTemperature is set once the model has refused a temperature
-	// other than its own default, as some reasoning models do. From then on
-	// no temperature is sent.
-	defaultTemperature atomic.Bool
 }
 
 // attempts is how many times a player is asked before an invalid answer is
@@ -43,7 +37,7 @@ func (l *LLM) Act(ctx context.Context, t Turn) (Action, error) {
 	var reply string
 	for range attempts {
 		var err error
-		reply, err = l.converse(ctx, msgs, temperatureFor(t.Kind))
+		reply, err = l.converse(ctx, msgs)
 		if err != nil {
 			return Action{}, err
 		}
@@ -335,23 +329,12 @@ func orNobody(l game.Lang, names []string) string {
 	return l.List(names)
 }
 
-// temperatureFor keeps picks steady, where a creative answer is an invalid
-// one, and leaves speech lively.
-func temperatureFor(k TurnKind) float64 {
-	if k.IsChoice() && k != WolfPlan {
-		return 0.3
-	}
-	return 0.9
-}
+// temperature is the only one gpt-6.1-sol accepts. It is sent rather than
+// left out because Dapr's OpenAI component sends 0 when none is given.
+const temperature = 1.0
 
-func (l *LLM) converse(ctx context.Context, msgs []*dapr.ConversationMessageAlpha2, temperature float64) (string, error) {
-	resp, err := l.send(temperature, func(t *float64) (*dapr.ConversationResponseAlpha2, error) {
-		return l.Client.ConverseAlpha2(ctx, dapr.ConversationRequestAlpha2{
-			Name:        l.Component,
-			Temperature: t,
-			Inputs:      []*dapr.ConversationInputAlpha2{{Messages: msgs}},
-		})
-	})
+func (l *LLM) converse(ctx context.Context, msgs []*dapr.ConversationMessageAlpha2) (string, error) {
+	resp, err := l.Client.ConverseAlpha2(ctx, request(l.Component, msgs))
 	if err != nil {
 		return "", fmt.Errorf("conversation %s: %w", l.Component, err)
 	}
@@ -365,20 +348,13 @@ func (l *LLM) converse(ctx context.Context, msgs []*dapr.ConversationMessageAlph
 	return "", errors.New("conversation returned no text")
 }
 
-// send makes a request with temperature, unless the model is known to refuse
-// one. A model that refuses it is asked again without, and never sent one
-// again.
-func (l *LLM) send(temperature float64, request func(*float64) (*dapr.ConversationResponseAlpha2, error)) (*dapr.ConversationResponseAlpha2, error) {
-	if l.defaultTemperature.Load() {
-		return request(nil)
+func request(component string, msgs []*dapr.ConversationMessageAlpha2) dapr.ConversationRequestAlpha2 {
+	t := temperature
+	return dapr.ConversationRequestAlpha2{
+		Name:        component,
+		Temperature: &t,
+		Inputs:      []*dapr.ConversationInputAlpha2{{Messages: msgs}},
 	}
-	resp, err := request(&temperature)
-	if err == nil || !strings.Contains(err.Error(), "temperature") {
-		return resp, err
-	}
-	l.defaultTemperature.Store(true)
-	log.Printf("%s refused a temperature of %v; sending none from now on: %v", l.Component, temperature, err)
-	return request(nil)
 }
 
 func content(s string) []*dapr.ConversationMessageContentAlpha2 {

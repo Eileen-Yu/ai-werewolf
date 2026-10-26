@@ -73,7 +73,7 @@ The commands below use `werewolf` as the project name. Use your own.
 
 ### 3. Connect an LLM
 
-Players call the model through the Dapr Conversation API. Create a conversation component named `llm` in the project:
+Players call the model through the Dapr Conversation API. Create a conversation component named `llm` in the project. The model must be `gpt-6.1-sol` (see [The model](#the-model)):
 
 ```bash
 diagrid component create llm --project werewolf --type conversation.openai \
@@ -150,13 +150,15 @@ diagrid workflow start GameWorkflow --project werewolf --id werewolf --instance-
 | `werewolf engine` | `-addr <address>` | Address the local engine listens on. Default `localhost:4001` |
 | | `-db <file>` | SQLite file for the state. Default `werewolf.db` |
 
-### Changing the model
+### The model
 
-A game makes roughly 100 to 150 LLM calls. `gpt-6.1-sol` is a good balance of reasoning and cost for it. For the strongest play, use `gpt-6-astra`; for a cheaper game, `gpt-6.1-terra`. `component update` replaces all the metadata, so pass the key again:
+The players are tuned for OpenAI's `gpt-6.1-sol`, and that is the model to use. Every request is sent with a temperature of 1, the only value `gpt-6.1-sol` accepts. A game makes roughly 100 to 150 LLM calls.
+
+If you set the model name wrong, `component update` fixes it. It replaces all the metadata, so pass the key again:
 
 ```bash
 diagrid component update llm --project werewolf \
-  --metadata key=<your OpenAI key> --metadata model=gpt-6-astra
+  --metadata key=<your OpenAI key> --metadata model=gpt-6.1-sol
 ```
 
 ## FAQ
