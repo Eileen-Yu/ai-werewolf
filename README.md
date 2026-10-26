@@ -19,7 +19,7 @@ The game master's output is a god's-eye live feed: what everyone says out loud, 
 - **Standard nine-player game**: 3 werewolves, a seer, a witch, a hunter and 3 villagers. Wolves win by clearing a side.
 - **Players only know what they should**: nobody else's role is ever sent to the model. The filtering happens in code, not in the prompt.
 - **Characters who play differently, not just talk differently**: each has a way of deciding as well as a way of talking. One holds grudges and votes for whoever voted for her; another only follows evidence, even against someone he trusted. An English game seats nine internet archetypes, from Florida Man to Discord Mod, who each have a named rival at the table. A Chinese game seats four pairs of rivals and one of three loners. Seats are in a random order.
-- **The wolves have a plan**: each night they agree who to kill, who fakes a seer claim tomorrow and who they vote out, then play it out by day.
+- **The wolves play a different game each time**: the host deals the pack one of three plays, and only the wolves are told. In a counter-claim, one wolf fakes a seer claim and the pack backs him. In deep cover, nobody claims anything and the wolves never vote as a bloc. In the hook, one wolf plays the staunchest good player, even voting out an exposed teammate to be trusted later. Each night the pack agrees who to kill and how to play the day.
 - **Players have memory**: everyone keeps notes on what they believe about each other player and why, updated every turn.
 - **Bad answers are sent back**: voting for someone not at the table, quoting someone who never spoke, or "there is no proof" as a reason all get the answer handed back to try again.
 - **A game master you cannot kill**: state and history live in the workflow Catalyst hosts. If the process dies, another one carries on.
@@ -131,6 +131,7 @@ The `--data` for `diagrid workflow start` is JSON, and every field is optional:
 |---|---|---|
 | `lang` | `"zh"` | `"zh"` for Chinese, `"en"` for English |
 | `phaseDelay` | `0` | Pause between phases, in nanoseconds: `2000000000` is 2 seconds. A longer pause makes it easier to kill something mid-game |
+| `tactic` | dealt at random | Pins the pack's play, to show one off: `"counterclaim"`, `"deep_cover"` or `"hook"` |
 
 ```bash
 diagrid workflow start GameWorkflow --project werewolf --id werewolf --instance-id game-2 \

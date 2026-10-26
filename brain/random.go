@@ -19,7 +19,14 @@ func (Random) Act(_ context.Context, t Turn) (Action, error) {
 	case WolfPlan:
 		victim := pick(t.Candidates)
 		focus := pick(slices.DeleteFunc(slices.Clone(t.Suspects), func(s string) bool { return s == victim }))
-		return Action{Target: victim, Faker: game.Nobody, Focus: focus, Speech: fmt.Sprintf(tx.randomPlan, victim, focus)}, nil
+		a := Action{Target: victim, Faker: game.Nobody, Focus: focus, Speech: fmt.Sprintf(tx.randomPlan, victim, focus)}
+		switch t.Tactic {
+		case game.Counterclaim:
+			a.Faker = pick(t.Pack)
+		case game.Hook:
+			a.Hook = pick(t.Pack)
+		}
+		return a, nil
 	case LastWords:
 		return Action{Speech: tx.lastWords}, nil
 	case WolfChat:

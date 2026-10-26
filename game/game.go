@@ -91,18 +91,18 @@ func Cast(l Lang, rng *rand.Rand) []Player {
 // englishCast is exactly nine, so every one of them sits down in every
 // English game and each may name a rival.
 var englishCast = []Player{
-	{Name: "Florida Man", Persona: "has done things that made the local news, and talks in wild stories and wilder plans, like letting an alligator loose to sniff out the wolves",
-		Habit: "high-risk and impulsive: votes on a hunch, switches target on a whim, and would rather vote wrong than sit still. Discord Mod keeps telling you that you are breaking the rules, and you keep doing it"},
+	{Name: "Florida Man", Persona: "has done things that made the local news, and talks in wild stories and wilder plans",
+		Habit: "chaos first: every day you pitch one unhinged scheme, like letting an alligator loose or holding a swamp tribunal, and say who it is aimed at. You vote on your first hunch, read every real event in the wildest way possible, and switch targets on a whim; you would rather vote wrong than vote safe, and careful reasoning is not you. Discord Mod keeps saying you are breaking the rules, which only makes you do it more"},
 	{Name: "Karen", Persona: "entitled and loud, wants to speak to the manager, and takes every accusation as a personal attack",
 		Habit: "revenge-votes: whoever accused you or voted for you becomes your top suspect, and you vote for them the first chance you get. Discord Mod acts like the manager, and you want to report him to a real one"},
 	{Name: "Sigma Chad", Persona: "a self-made lone wolf of the grindset who talks in alpha slogans and calls anyone who agrees with the crowd an NPC",
 		Habit: "resists consensus and is overconfident: when most of the table suspects someone, you doubt it and back someone else, and once you have a read you rarely drop it. You keep going after NPC Steve, and Gym Bro thinks he is more alpha than you"},
-	{Name: "Discord Mod", Persona: "a volunteer moderator who takes the rules very seriously, announces violations and threatens bans",
-		Habit: "treats rule-breaking as a suspicion signal: anyone who contradicts themselves, makes things up, talks out of turn or plays chaotically goes up your list. Florida Man is everything you stand against"},
-	{Name: "LinkedIn Influencer", Persona: "turns every moment into a post about leadership, alignment and the lessons it taught you",
-		Habit: "values alliances and approval: backs whoever the table likes most, builds coalitions, and avoids voting against popular players. Chronically Online Girl mocks every post you make"},
+	{Name: "Discord Mod", Persona: "runs the table like a server: opens with a mod notice, hands out warnings and strikes, threatens bans",
+		Habit: "you keep a strike count: contradicting yourself, making things up, talking about people who have not spoken, voting against your own words and chaotic plans each earn a strike, and you say who has how many. You suspect and vote for whoever has the most strikes, whatever else they say. Florida Man is a walking rules violation"},
+	{Name: "LinkedIn Influencer", Persona: "makes every speech a LinkedIn post: a humble-brag opener, a lesson about leadership or alignment, and \"Agree?\" at the end",
+		Habit: "you back whoever the table likes most, build coalitions and never vote against a popular player; you switch sides the moment the room does, and call it agility. Chronically Online Girl mocks your posts, and you thank her for the feedback"},
 	{Name: "Conspiracy Carl", Persona: "sees patterns everywhere and says \"that's exactly what they want you to think\"",
-		Habit: "overweights obscure connections: a shared vote, the order people spoke in or a choice of word can convince you two players are a wolf team. NPC Steve keeps asking you for plain facts"},
+		Habit: "every day you build one far-fetched but self-consistent theory that ties at least three players together through real events: who voted together, who spoke right after whom, who used the same word. You vote by your theory and fit each new event into it instead of dropping it; a death only proves how deep it goes. NPC Steve keeps asking you for plain facts, which is exactly what someone in on it would do"},
 	{Name: "Gym Bro", Persona: "talks about gains, protein and leg day, hypes everyone up, and calls everyone bro",
 		Habit: "follows confident leaders: backs whoever sounds most sure of themselves and votes with them, and doubts anyone who hesitates. You want to prove you are more alpha than Sigma Chad"},
 	{Name: "NPC Steve", Persona: "an extremely ordinary guy who starts most answers with \"Okay.\" and never gets worked up, but still says what he thinks",
@@ -261,10 +261,28 @@ type Plan struct {
 	Victim string `json:"victim"`
 	// Faker is the wolf who claims to be the seer tomorrow, "" for nobody.
 	Faker string `json:"faker,omitempty"`
+	// Hook is the wolf who plays a staunch good player tomorrow, "" for nobody.
+	Hook string `json:"hook,omitempty"`
 	// Focus is who the pack pushes the vote onto tomorrow.
 	Focus string `json:"focus,omitempty"`
 	Notes string `json:"notes,omitempty"`
 }
+
+// Tactic is how the pack plays a whole game. It is dealt with the roles, so
+// that the wolves do not settle on the same best play every game.
+type Tactic string
+
+const (
+	// Counterclaim has a wolf claim to be the seer and the pack back him.
+	Counterclaim Tactic = "counterclaim"
+	// DeepCover has no wolf claim anything; they blend in and never vote as a bloc.
+	DeepCover Tactic = "deep_cover"
+	// Hook has one wolf side with the good players, even against a teammate,
+	// to be trusted later.
+	Hook Tactic = "hook"
+)
+
+var Tactics = []Tactic{Counterclaim, DeepCover, Hook}
 
 type State struct {
 	Lang    Lang     `json:"lang,omitempty"`
@@ -277,6 +295,8 @@ type State struct {
 	PoisonUsed   bool `json:"poisonUsed,omitempty"`
 	// Notes holds each player's latest notes, by name.
 	Notes map[string]Notes `json:"notes,omitempty"`
+	// Tactic is how the pack plays this game; only the wolves are told.
+	Tactic Tactic `json:"tactic,omitempty"`
 	// Plan is the wolves' latest plan.
 	Plan *Plan `json:"plan,omitempty"`
 }
@@ -343,8 +363,12 @@ func (s *State) Living(roles ...Role) []string {
 }
 
 // VoteCandidates is who voter may vote out, or name as their suspect: anyone
-// else alive, except that a wolf never turns on another wolf.
+// else alive, except that a wolf never turns on another wolf, unless the
+// pack's plan has him play the hook.
 func (s *State) VoteCandidates(voter string) []string {
+	if s.Plan != nil && s.Plan.Round == s.Round && s.Plan.Hook == voter {
+		return Without(s.Living(), voter)
+	}
 	return Without(s.Living(), s.Pack(voter)...)
 }
 

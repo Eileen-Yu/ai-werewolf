@@ -4,12 +4,14 @@ import "github.com/Eileen-Yu/ai-werewolf/game"
 
 // host is everything the game master says, in one language.
 type host struct {
-	welcome, yourRole, pack, nightFalls, noKill, victim, potionsLeft string
-	antidote, poison, noPotions, selfVictim, saved, poisoned         string
-	inspected, peaceful, died, dawnDead, shot, diedNow, order        string
-	rebuttals, stance, stances, vote, votes, abstain, tie            string
-	votedOut, exiled, plan, noFaker, faker, undecided, gameOver      string
-	revealed, comma, semicolon, result, silence                      string
+	welcome, yourRole, pack, nightFalls, noKill, victim, potionsLeft  string
+	antidote, poison, noPotions, selfVictim, saved, poisoned          string
+	inspected, peaceful, died, dawnDead, shot, diedNow, order         string
+	rebuttals, stance, stances, vote, votes, abstain, tie             string
+	votedOut, exiled, plan, noFaker, faker, hook, undecided, gameOver string
+	tactic                                                            string
+	tactics                                                           map[game.Tactic]string
+	revealed, comma, semicolon, result, silence                       string
 
 	// The god's-eye feed: asides, thoughts and secret lines.
 	observed, rejudged, judged, fromNothing, thinks, onlyFor, narrator string
@@ -55,6 +57,9 @@ var chineseHost = host{
 	plan:        "狼队计划（%s定）：今晚杀%s；明天%s，票投%s。打法：%s",
 	noFaker:     "不悍跳",
 	faker:       "%s悍跳预言家",
+	hook:        "%s倒钩",
+	tactic:      "本局狼队的打法是%s。",
+	tactics:     map[game.Tactic]string{game.Counterclaim: "悍跳", game.DeepCover: "潜水", game.Hook: "倒钩"},
 	undecided:   "未定",
 	gameOver:    "游戏结束，%s胜利！身份公开：%s",
 	revealed:    "%s=%s",
@@ -105,6 +110,9 @@ var englishHost = host{
 	plan:        "Pack plan (set by %s): kill %s tonight; tomorrow %s, and vote out %s. How: %s",
 	noFaker:     "nobody claims seer",
 	faker:       "%s claims seer",
+	hook:        "%s plays the hook",
+	tactic:      "This game the pack plays %s.",
+	tactics:     map[game.Tactic]string{game.Counterclaim: "the counter-claim", game.DeepCover: "deep cover", game.Hook: "the hook"},
 	undecided:   "undecided",
 	gameOver:    "Game over: the %s side wins! Roles: %s",
 	revealed:    "%s=%s",

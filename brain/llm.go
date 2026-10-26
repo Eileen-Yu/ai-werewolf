@@ -83,7 +83,7 @@ func parseAction(tx *text, reply string) (Action, error) {
 	a.Observations = lines(raw.Observations)
 	a.Claim = parseClaim(raw.Claim)
 	a.Notes = parseNotes(raw.Notes)
-	for _, f := range []*string{&a.Target, &a.Speech, &a.Suspect, &a.Faker, &a.Focus} {
+	for _, f := range []*string{&a.Target, &a.Speech, &a.Suspect, &a.Faker, &a.Hook, &a.Focus} {
 		*f = strings.TrimSpace(*f)
 	}
 	return a, nil
@@ -186,8 +186,12 @@ func prompt(t Turn) (system, user string) {
 	if t.Me.Habit != "" {
 		habit = fmt.Sprintf(tx.habit, t.Me.Habit)
 	}
+	strategy := tx.strategies[t.Me.Role]
+	if t.Me.Role == game.Werewolf {
+		strategy += tx.tactics[t.Tactic]
+	}
 	system = fmt.Sprintf(tx.rules, len(names), len(names), l.List(names), l.LineupSummary(),
-		t.Me.Name, l.Say(string(t.Me.Role)), t.Me.Persona, habit, tx.strategies[t.Me.Role])
+		t.Me.Name, l.Say(string(t.Me.Role)), t.Me.Persona, habit, strategy)
 
 	var seats, secrets, public, claims, known strings.Builder
 	var thoughts []string
@@ -231,6 +235,9 @@ func prompt(t Turn) (system, user string) {
 	b.WriteString(tx.public + orNone(tx, public.String()))
 
 	fmt.Fprintf(&b, tx.now, l.When(t.Round, t.Phase), tx.instructions[t.Kind])
+	if t.Me.Habit != "" {
+		fmt.Fprintf(&b, tx.habitNow, t.Me.Habit)
+	}
 	if known.Len() > 0 {
 		b.WriteString(tx.known + known.String())
 	}
@@ -238,13 +245,19 @@ func prompt(t Turn) (system, user string) {
 		fmt.Fprintf(&b, tx.order, len(t.Spoken)+1, orNobody(l, t.Spoken), orNobody(l, t.Waiting))
 	}
 	if p := t.Plan; p != nil && t.Phase == game.Day {
-		faker := tx.noFaker
-		if p.Faker != "" {
-			faker = fmt.Sprintf(tx.faker, p.Faker)
+		day := tx.noFaker
+		switch {
+		case p.Faker != "":
+			day = fmt.Sprintf(tx.faker, p.Faker)
+		case p.Hook != "":
+			day = fmt.Sprintf(tx.hook, p.Hook)
 		}
-		fmt.Fprintf(&b, tx.planLine, faker, p.Focus)
+		fmt.Fprintf(&b, tx.planLine, day, p.Focus)
 		if t.MustFakeSeer() && t.Kind == Speech {
 			b.WriteString(tx.mustFakeLine)
+		}
+		if t.IsHook() {
+			b.WriteString(tx.hookLine)
 		}
 	}
 	if t.Kind == Shoot && len(dead) > 0 {
@@ -264,7 +277,14 @@ func prompt(t Turn) (system, user string) {
 	fields := []string{f.observations, f.notes, f.thinking}
 	switch {
 	case t.Kind == WolfPlan:
-		fields = append(fields, f.victim, f.faker, f.focus, f.plan)
+		fields = append(fields, f.victim)
+		switch t.Tactic {
+		case game.Counterclaim:
+			fields = append(fields, f.faker)
+		case game.Hook:
+			fields = append(fields, f.hook)
+		}
+		fields = append(fields, f.focus, f.plan)
 	case t.Kind.IsChoice():
 		fields = append(fields, f.target)
 	case t.Kind.Declares():
@@ -277,7 +297,13 @@ func prompt(t Turn) (system, user string) {
 		fmt.Fprintf(&b, tx.targetOnly, l.List(l.SayAll(t.Candidates)))
 	}
 	if t.Kind == WolfPlan {
-		fmt.Fprintf(&b, tx.planOnly, l.List(t.Pack), l.Say(game.Nobody), l.List(l.SayAll(t.Suspects)))
+		switch t.Tactic {
+		case game.Counterclaim:
+			fmt.Fprintf(&b, tx.fakerOnly, l.List(t.Pack))
+		case game.Hook:
+			fmt.Fprintf(&b, tx.hookOnly, l.List(t.Pack))
+		}
+		fmt.Fprintf(&b, tx.focusOnly, l.List(l.SayAll(t.Suspects)))
 	}
 	if t.Kind.Declares() {
 		fmt.Fprintf(&b, tx.declareOnly, l.List(l.SayAll(t.Suspects)))

@@ -9,13 +9,16 @@ type text struct {
 	// player's name, role, persona, habit line and strategy.
 	rules string
 	// habit is the line for how the player decides, left out if they have none.
-	habit        string
-	strategies   map[game.Role]string
+	habit      string
+	strategies map[game.Role]string
+	// tactics is, for a wolf, how the pack plays this game.
+	tactics      map[game.Tactic]string
 	instructions map[TurnKind]string
 
 	// What Check hands back to the player.
 	badTarget, emptySpeech, badSuspect, badRole, badClaimTarget, badResult string
-	badFaker, badFocus, focusIsVictim, mustFake, quoted, notYet, badBelief string
+	badFaker, badHook, badFocus, focusIsVictim, mustFake, quoted, notYet   string
+	badBelief                                                              string
 	// quoteCues are ways of quoting what someone said, which cannot follow
 	// the name of someone who has not said anything in public yet; justNow
 	// is how a speech says someone has "just" spoken.
@@ -35,11 +38,13 @@ type text struct {
 	seats, secrets, notes, thoughts, claims, public  string
 	alive, you, host, none, beliefLine, intends      string
 	claimLine, now, order, planLine, noFaker         string
-	faker, mustFakeLine, nobodySpoke, silent         string
+	faker, hook, mustFakeLine, hookLine, habitNow    string
+	nobodySpoke, silent                              string
 	shootAlive, selfCheck, onlyJSON, seatLine, known string
 	line                                             string
 	fields                                           fields
-	targetOnly, planOnly, declareOnly, notesLine     string
+	targetOnly, fakerOnly, hookOnly, focusOnly       string
+	declareOnly, notesLine                           string
 
 	// Random's lines.
 	speechLines, wolfLines []string
@@ -48,8 +53,8 @@ type text struct {
 
 // fields describe each JSON field of the answer.
 type fields struct {
-	observations, notes, thinking, victim, faker, focus, plan string
-	target, speech, suspect, claim                            string
+	observations, notes, thinking, victim, faker, hook, focus, plan string
+	target, speech, suspect, claim                                  string
 }
 
 func (t Turn) text() *text {
@@ -107,10 +112,8 @@ var chineseText = text{
 必须点名：说清楚怀疑谁、相信谁、为什么。不超过120字。不要提到你是AI，不要写动作或旁白。
 不要说空话套话，比如"值得关注""转移注意力""大家要谨慎""再观察一下""缺乏证据"。每个怀疑都要有具体依据：某人的原话、他的投票、他跳身份的时机，或者别人的声明之间的矛盾。`,
 	strategies: map[game.Role]string{
-		game.Werewolf: "你和狼同伴要配合，白天按狼队计划执行：计划里要悍跳的人，当天第一次发言就跳；计划里要投的人，大家一起找他的破绽。" +
-			"你不能怀疑或投票给狼同伴，要帮悍跳的同伴说话。局势变了可以在夜里改计划，白天不要各打各的。" +
-			"真预言家是你们最大的威胁：有人跳预言家时，可以悍跳，也就是自称预言家、报一个假的查验结果" +
-			"（比如给同伴报好人，给真预言家报狼人），和他对跳争夺信任。女巫的解药可能救下你们的刀，猎人出局会开枪，所以要尽早找出神职并优先杀掉。" +
+		game.Werewolf: "你和狼同伴要配合，白天按狼队计划和本局的打法执行。局势变了可以在夜里改计划，白天不要各打各的。" +
+			"真预言家是你们最大的威胁。女巫的解药可能救下你们的刀，猎人出局会开枪，所以要尽早找出神职并优先杀掉。" +
 			"被放逐时的遗言也要继续伪装、搅浑水，绝不能承认自己是狼人。" +
 			"自刀是一招险棋：刀自己或同伴，赌女巫用解药救下，既骗掉解药，被救的狼第二天还能以\"银水\"（被女巫救过的人）的身份获得信任。" +
 			"但女巫不救，你们就真的少了一只狼，所以一般只在第1夜、女巫还有解药时考虑，而且要在计划里说清楚谁自刀。",
@@ -123,14 +126,23 @@ var chineseText = text{
 		game.Villager: "你没有任何夜间信息，只能靠分析发言找狼。关注谁的发言前后矛盾、谁在跟风、谁在保护谁、谁的投票和发言不一致。" +
 			"如果有两个人都自称预言家，必须判断真假：谁的查验结果和其他人的声明、死亡和投票更吻合，谁跳得更自然。",
 	},
+	tactics: map[game.Tactic]string{
+		game.Counterclaim: "本局狼队的打法是悍跳：计划里指定一只狼，当天第一次发言就跳预言家，报假的查验结果（比如给同伴报好人，给真预言家报狼人），和真预言家对跳争夺信任。" +
+			"其他狼帮他说话，白天一起找计划里要投的人的破绽，一起投他。不能怀疑或投票给狼同伴。",
+		game.DeepCover: "本局狼队的打法是潜水：谁都不跳神职，全都装成普通村民。" +
+			"白天不要几只狼一起冲同一个人，也不要互相维护，免得被看出是一伙的；各自附和好人里已经冒出来的怀疑，跟着主流投票。" +
+			"计划里的 focus 是你们各自顺势推一把的人，不是一起冲的人。不能怀疑或投票给狼同伴。",
+		game.Hook: "本局狼队的打法是倒钩：计划里指定一只狼当倒钩，他白天装成最坚定的好人：站边真预言家，同伴暴露了就跟着踩，甚至投他，用一个同伴换来好人的信任，留到后面关键的时候再带偏票。" +
+			"其他狼不跳预言家，也不要和倒钩的狼互相维护。只有倒钩的狼可以怀疑和投票给狼同伴，其他狼不能。",
+	},
 	instructions: map[TurnKind]string{
 		Speech:   "白天发言环节，轮到你了。",
 		Rebuttal: "回应环节：所有人都已经发过一次言。回应别人对你的怀疑，或者质疑某个人的说法（比如对跳的预言家、前后矛盾的人）。不超过80字。",
-		WolfChat: "现在是夜里，只有狼同伴能听到你说话。和同伴商量：今晚杀谁；白天怎么打，包括要不要有人悍跳预言家、票往谁身上引。",
+		WolfChat: "现在是夜里，只有狼同伴能听到你说话。和同伴商量：今晚杀谁；白天怎么按本局的打法来打，票往谁身上引。",
 		WolfPlan: "夜聊结束，你代表狼队定下最终计划，同伴白天会照着执行，主持人也会检查你的计划和局势是否一致。" +
 			"target 是今晚要杀的人，优先杀可能是神职、或者发言最有威胁的人；也可以自刀，选自己或同伴。" +
-			"faker 是明天悍跳预言家的狼，不跳就写\"无\"。focus 是明天要一起把票投给的人：他明天必须还活着，所以不能是今晚要杀的人。" +
-			"speech 写白天的具体打法，不超过80字，比如悍跳的人给谁报什么查验结果、怎么攻击 focus。",
+			"focus 是明天要把票引向的人：他明天必须还活着，所以不能是今晚要杀的人。" +
+			"speech 写白天按本局打法的具体打法，不超过80字。",
 		LastWords: "你被投票放逐了，发表遗言，不超过80字。",
 		Vote:      "根据今天的发言、回应和主持人汇总的表态，投票放逐一人。",
 		Inspect:   "选择今晚要查验的人。优先查最可疑、或者发言最能带动大家的人。",
@@ -145,7 +157,8 @@ var chineseText = text{
 	badRole:        "claim.role 只能是预言家、女巫、猎人、村民之一，你给的是 %q",
 	badClaimTarget: "claim.target %q 不是桌上的其他玩家",
 	badResult:      "预言家的 claim.result 只能是好人或狼人，你给的是 %q",
-	badFaker:       "faker 只能是狼人之一（%s）或者\"%s\"，你给的是 %q",
+	badFaker:       "本局要悍跳，faker 只能是狼人之一（%s），你给的是 %q",
+	badHook:        "本局要倒钩，hook 只能是狼人之一（%s），你给的是 %q",
 	badFocus:       "focus 必须是这些好人阵营的候选之一：%s，你给的是 %q",
 	focusIsVictim:  "%s今晚就会被杀，明天不可能再投票放逐他：focus 要换一个人",
 	mustFake:       "狼队计划要你今天悍跳预言家：claim.role 必须是预言家，并报一个查验结果",
@@ -181,6 +194,9 @@ var chineseText = text{
 	planLine:     "狼队今天的计划：%s，票投%s。\n",
 	noFaker:      "没人悍跳",
 	faker:        "%s悍跳预言家",
+	hook:         "%s倒钩",
+	hookLine:     "你就是倒钩的狼：今天要像最坚定的好人一样发言和投票，站边你认为是真的预言家，必要时可以怀疑、投票给狼同伴。\n",
+	habitNow:     "别忘了你的决策习惯：%s。\n",
 	mustFakeLine: "你就是要悍跳的人：这次发言必须跳预言家，claim.role 写预言家，并报一个查验结果。\n",
 	known:        "你确定知道的事，和任何人的说法冲突时以这些为准：\n",
 	nobodySpoke: "到现在为止还没有任何人公开发过言，也没有任何公开信息，谁是什么身份完全不知道。" +
@@ -201,7 +217,8 @@ var chineseText = text{
 		thinking:     `"thinking": "这次行动的理由，只有你自己看得到"`,
 		victim:       `"target": "今晚杀的人"`,
 		faker:        `"faker": "明天悍跳预言家的狼"`,
-		focus:        `"focus": "明天一起投的人"`,
+		hook:         `"hook": "倒钩的狼"`,
+		focus:        `"focus": "明天把票引向的人"`,
 		plan:         `"speech": "白天的具体打法"`,
 		target:       `"target": "名字"`,
 		speech:       `"speech": "你要说出口的话"`,
@@ -212,7 +229,9 @@ var chineseText = text{
 	seatLine:    "- %s：%s\n",
 	line:        "[%s] %s：%s\n",
 	targetOnly:  "target 只能是这些名字之一：%s。\n",
-	planOnly:    "faker 只能是：%s、%s。focus 只能是：%s，而且不能和 target 是同一个人。\n",
+	fakerOnly:   "faker 只能是：%s。\n",
+	hookOnly:    "hook 只能是：%s。之前定过的倒钩还在场的话，不要换人。\n",
+	focusOnly:   "focus 只能是：%s，而且不能和 target 是同一个人。\n",
 	declareOnly: "suspect 只能是这些之一：%s。claim 是你这次公开声明的身份；不声明身份就写 null，不要写成字符串。suspect 和 claim 会由主持人公开记录，必须和你的 speech 一致。\n",
 	notesLine:   "notes 是你完整的新笔记，会替换旧笔记：每个你有判断的其他玩家都要写上，名字只能是桌上的人，不要写你自己。JSON 里每一项之间都要有逗号，最后一项后面不要有逗号。",
 
@@ -280,10 +299,8 @@ Name names: say clearly who you suspect, who you trust, and why. At most 60 word
 No empty filler such as "worth watching", "deflecting", "let's be careful", "let's see more", "no proof". Every suspicion needs a concrete basis: what someone actually said, how they voted, when they claimed a role, or a contradiction between claims.
 Write everything in English.`,
 	strategies: map[game.Role]string{
-		game.Werewolf: "Work with your fellow werewolves and follow the pack's plan by day: whoever the plan says claims seer does it in their very first speech, and everyone goes after the person the plan says to vote out. " +
-			"Never suspect or vote for a teammate, and back up the teammate who claims seer. If things change, change the plan at night; never play separate games by day. " +
-			"The real seer is your biggest threat. When someone claims seer you can counter-claim: say you are the seer and report a fake check " +
-			"(a teammate as good, or the real seer as a werewolf) to fight for the table's trust. The witch's antidote can undo your kill and the hunter shoots when he goes, so find the power roles early and kill them first. " +
+		game.Werewolf: "Work with your fellow werewolves and follow the pack's plan and this game's play by day. If things change, change the plan at night; never play separate games by day. " +
+			"The real seer is your biggest threat. The witch's antidote can undo your kill and the hunter shoots when he goes, so find the power roles early and kill them first. " +
 			"In your last words, keep up the act and muddy the water; never admit to being a werewolf. " +
 			"A self-kill is a gamble: kill yourself or a teammate and bet the witch saves them, which wastes her antidote and makes the saved werewolf look trusted the next day. " +
 			"If she does not save, you really lose a werewolf, so only consider it on Night 1 while she still has the antidote, and say in the plan who it is.",
@@ -296,14 +313,23 @@ Write everything in English.`,
 		game.Villager: "You have no night information; you find werewolves by reading the table. Watch for who contradicts themselves, who just follows others, who protects whom, and whose vote does not match their words. " +
 			"If two people both claim seer, you must decide which is real: whose checks fit the other claims, the deaths and the votes better, and whose claim came more naturally.",
 	},
+	tactics: map[game.Tactic]string{
+		game.Counterclaim: "This game the pack plays the counter-claim: the plan names one werewolf who claims seer in their very first speech and reports a fake check (a teammate as good, or the real seer as a werewolf) to fight the real seer for the table's trust. " +
+			"The rest of you back them up, and all go after and vote out the person the plan names. Never suspect or vote for a teammate.",
+		game.DeepCover: "This game the pack plays deep cover: none of you claims a power role; you all pass as plain villagers. " +
+			"By day, never pile onto the same person together and never defend each other, or you will be read as a team; each of you echoes a suspicion a good player has already raised and votes with the majority. " +
+			"The plan's focus is someone each of you nudges along, not someone you charge together. Never suspect or vote for a teammate.",
+		game.Hook: "This game the pack plays the hook: the plan names one werewolf as the hook, who plays the staunchest good player at the table, backs the real seer, and when a teammate is exposed piles on and even votes them out, trading a teammate for the good side's trust to steer a vote later when it counts. " +
+			"The others do not claim seer and do not defend the hook. Only the hook may suspect or vote for a teammate.",
+	},
 	instructions: map[TurnKind]string{
 		Speech:   "It is the day's speeches and your turn to speak.",
 		Rebuttal: "Reply round: everyone has spoken once. Answer suspicion aimed at you, or challenge someone's story (a counter-claimed seer, someone who contradicts themselves). At most 40 words.",
-		WolfChat: "It is night, and only your fellow werewolves can hear you. Agree on who to kill tonight and how to play the day: whether one of you claims seer, and who to push the vote onto.",
+		WolfChat: "It is night, and only your fellow werewolves can hear you. Agree on who to kill tonight and how to play the day the way this game's play calls for, and who to push the vote onto.",
 		WolfPlan: "The night chat is over. Set the pack's final plan; your teammates will follow it by day, and the host will check it against the game. " +
 			"target is who to kill tonight: ideally someone who may hold a power role, or whose speeches are most dangerous to you; you may also self-kill, picking yourself or a teammate. " +
-			"faker is the werewolf who claims seer tomorrow, or \"nobody\" if none of you does. focus is who the pack votes out tomorrow: they must still be alive then, so not tonight's target. " +
-			"speech is the plan for the day, at most 40 words, such as what check the faker reports on whom and how to go after focus.",
+			"focus is who the pack steers the vote onto tomorrow: they must still be alive then, so not tonight's target. " +
+			"speech is how you play the day this game's way, at most 40 words.",
 		LastWords: "You have been voted out. Give your last words, at most 40 words.",
 		Vote:      "Based on today's speeches, replies and the stances the host summed up, vote one person out.",
 		Inspect:   "Choose who to check tonight. Check whoever is most suspicious, or whose speeches sway the table most.",
@@ -318,7 +344,8 @@ Write everything in English.`,
 	badRole:        "claim.role must be one of seer, witch, hunter, villager; you gave %q",
 	badClaimTarget: "claim.target %q is not another player at the table",
 	badResult:      "a seer's claim.result must be good or werewolf; you gave %q",
-	badFaker:       "faker must be one of the werewolves (%s) or \"%s\"; you gave %q",
+	badFaker:       "this game the pack counter-claims, so faker must be one of the werewolves (%s); you gave %q",
+	badHook:        "this game the pack plays the hook, so hook must be one of the werewolves (%s); you gave %q",
 	badFocus:       "focus must be one of these players on the good side: %s; you gave %q",
 	focusIsVictim:  "%s will be killed tonight and cannot be voted out tomorrow: pick someone else as focus",
 	mustFake:       "the pack's plan has you claim seer today: claim.role must be seer, with a check result",
@@ -354,6 +381,9 @@ Write everything in English.`,
 	planLine:     "The pack's plan for today: %s, and vote out %s.\n",
 	noFaker:      "nobody claims seer",
 	faker:        "%s claims seer",
+	hook:         "%s plays the hook",
+	hookLine:     "You are the hook: speak and vote today like the staunchest good player, back whoever you judge the real seer, and suspect or vote for a teammate if you must.\n",
+	habitNow:     "Remember how you decide: %s.\n",
 	mustFakeLine: "You are the one claiming seer: this speech must claim seer, with claim.role seer and a check result.\n",
 	known:        "What you know for certain; where anyone's word contradicts it, this wins:\n",
 	nobodySpoke: "Nobody has said anything in public yet and there is no public information at all; nobody knows anyone's role. " +
@@ -374,7 +404,8 @@ Write everything in English.`,
 		thinking:     `"thinking": "your reasoning for this move, seen only by you"`,
 		victim:       `"target": "who to kill tonight"`,
 		faker:        `"faker": "the werewolf who claims seer tomorrow"`,
-		focus:        `"focus": "who the pack votes out tomorrow"`,
+		hook:         `"hook": "the werewolf who plays the hook"`,
+		focus:        `"focus": "who you steer the vote onto tomorrow"`,
 		plan:         `"speech": "the plan for the day"`,
 		target:       `"target": "a name"`,
 		speech:       `"speech": "what you say out loud"`,
@@ -385,7 +416,9 @@ Write everything in English.`,
 	seatLine:    "- %s: %s\n",
 	line:        "[%s] %s: %s\n",
 	targetOnly:  "target must be one of: %s.\n",
-	planOnly:    "faker must be one of: %s, %s. focus must be one of: %s, and not the same person as target.\n",
+	fakerOnly:   "faker must be one of: %s.\n",
+	hookOnly:    "hook must be one of: %s. If a hook was named before and is still in the game, keep them.\n",
+	focusOnly:   "focus must be one of: %s, and not the same person as target.\n",
 	declareOnly: "suspect must be one of: %s. claim is the role you publicly claim in this speech; if you claim none, write null, not a string. The host puts suspect and claim on the record, so they must match your speech.\n",
 	notesLine:   "notes are your complete new notes and replace the old ones: include every other player you have a view on, only names at the table, never yourself. Put a comma between JSON items and none after the last one.",
 

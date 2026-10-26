@@ -3,6 +3,7 @@ package werewolf
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"net"
 	"regexp"
 	"slices"
@@ -236,15 +237,22 @@ func (b *firstVotes) Act(ctx context.Context, t brain.Turn) (brain.Action, error
 }
 
 func TestOnlyWolvesGetThePlanAndNeverSuspectEachOther(t *testing.T) {
-	b := &planWatcher{}
-	SetBrain(b)
 	client := startEngine(t)
 	startWorker(t, client)
+	for _, tactic := range []game.Tactic{game.Counterclaim, game.DeepCover} {
+		b := &planWatcher{}
+		SetBrain(b)
+		g := newGame()
+		g.Tactic = tactic
+		play(t, client, "plan-"+string(tactic), g)
+		require.NotEmpty(t, b.turns)
+		checkWolvesStandTogether(t, b.turns)
+	}
+}
 
-	playGame(t, client, "plan")
-
-	require.NotEmpty(t, b.turns)
-	for _, turn := range b.turns {
+func checkWolvesStandTogether(t *testing.T, turns []brain.Turn) {
+	t.Helper()
+	for _, turn := range turns {
 		if turn.Me.Role != game.Werewolf {
 			assert.Nil(t, turn.Plan, "%s is not a wolf", turn.Me.Name)
 			assert.Empty(t, turn.Pack, "%s is not a wolf", turn.Me.Name)
@@ -259,6 +267,83 @@ func TestOnlyWolvesGetThePlanAndNeverSuspectEachOther(t *testing.T) {
 			assert.Equal(t, turn.Round, turn.Plan.Round)
 		}
 	}
+}
+
+func TestOnlyTheHookMayTurnOnATeammate(t *testing.T) {
+	client := startEngine(t)
+	startWorker(t, client)
+	turnedOn := false
+	for i := range 6 {
+		b := &turnRecorder{}
+		SetBrain(b)
+		g := newGame()
+		g.Tactic = game.Hook
+		play(t, client, fmt.Sprintf("hook-%d", i), g)
+		for _, turn := range b.turns {
+			if turn.Me.Role != game.Werewolf || (turn.Kind != brain.Vote && !turn.Kind.Declares()) {
+				continue
+			}
+			names := turn.Suspects
+			if turn.Kind == brain.Vote {
+				names = turn.Candidates
+			}
+			for _, wolf := range game.Without(turn.Pack, turn.Me.Name) {
+				if slices.Contains(names, wolf) {
+					require.NotNil(t, turn.Plan, "%s may name %s with no plan", turn.Me.Name, wolf)
+					assert.Equal(t, turn.Me.Name, turn.Plan.Hook, "%s may name %s without being the hook", turn.Me.Name, wolf)
+					turnedOn = true
+				}
+			}
+		}
+	}
+	assert.True(t, turnedOn, "in six games the hook never had a teammate to turn on")
+}
+
+func TestThePackIsDealtATacticOnlyTheWolvesAreTold(t *testing.T) {
+	dealt := map[game.Tactic]bool{}
+	for seed := range uint64(30) {
+		dealt[deal{}.fill(rand.New(rand.NewPCG(seed, 1))).Tactic] = true
+	}
+	assert.Len(t, dealt, len(game.Tactics), "every tactic gets dealt")
+	assert.Equal(t, game.Hook, deal{Tactic: game.Hook}.fill(rand.New(rand.NewPCG(1, 2))).Tactic, "a pinned tactic is kept")
+
+	client := startEngine(t)
+	startWorker(t, client)
+	for i := range 3 {
+		b := &turnRecorder{}
+		SetBrain(b)
+		play(t, client, fmt.Sprintf("tactic-%d", i), newGame())
+		require.NotEmpty(t, b.turns)
+		for _, turn := range b.turns {
+			if turn.Me.Role == game.Werewolf {
+				require.Contains(t, game.Tactics, turn.Tactic)
+				told := slices.ContainsFunc(turn.Transcript, func(e game.Event) bool {
+					return e.Text == fmt.Sprintf(chineseHost.tactic, chineseHost.tactics[turn.Tactic])
+				})
+				assert.True(t, told, "%s is told the pack's tactic", turn.Me.Name)
+				continue
+			}
+			assert.Empty(t, turn.Tactic, "%s is not a wolf", turn.Me.Name)
+			for _, e := range turn.Transcript {
+				assert.NotContains(t, e.Text, "本局狼队的打法", "%s is not a wolf", turn.Me.Name)
+			}
+		}
+	}
+}
+
+func TestAGameRefusesAnUnknownTactic(t *testing.T) {
+	SetBrain(brain.Random{})
+	client := startEngine(t)
+	startWorker(t, client)
+
+	g := newGame()
+	g.Tactic = "yolo"
+	_, err := client.ScheduleWorkflow(t.Context(), "GameWorkflow", workflow.WithInstanceID("yolo"), workflow.WithInput(g))
+	require.NoError(t, err)
+	meta, err := client.WaitForWorkflowCompletion(t.Context(), "yolo")
+	require.NoError(t, err)
+	_, err = ReadResult(meta)
+	assert.ErrorContains(t, err, "unknown tactic")
 }
 
 // planWatcher plays randomly and records every daytime speech turn.

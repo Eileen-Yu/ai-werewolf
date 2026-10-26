@@ -31,7 +31,9 @@ The view has six parts:
 
 Before each move, the prompt lists again, right next to the task, what this player knows for certain (what the host told them privately: check results, tonight's victim, potions used), and says these win over anyone's claim. The same facts are already under "Your secrets", but that is too far away and the model forgets, for example a seer who checked someone as good and then suspects them by day.
 
-When speaking, the player is also told who has already spoken this round and who has not. A wolf also sees today's pack plan by day. The prompt ends with a checklist to go through before answering.
+When speaking, the player is also told who has already spoken this round and who has not. A wolf also sees today's pack plan by day.
+
+The pack's tactic is dealt with the roles, in the same activity, and only the wolves are told it. It is dealt rather than left to the wolves because, left to choose, they settle on the same best play, a seer counter-claim, every game. A tactic changes what the wolves are told, what the plan asks for, and in one case what they may do: a wolf never suspects or votes for a teammate, except the wolf today's plan names as the hook. The prompt ends with a checklist to go through before answering.
 
 ## How a player thinks
 
@@ -55,7 +57,7 @@ The game master checks every answer. If it is not valid, all the problems are se
 - `target` and `suspect` must be on the list given; for example, you cannot vote for yourself.
 - `claim` may only claim seer, witch, hunter or villager. Anyone it names must be at the table, and a seer's result must be good or werewolf.
 - Notes may not name anyone not at the table, and a read must be werewolf, good or unsure.
-- The wolf plan: the faker must be a wolf, and tomorrow's vote target must be a living good player who is not tonight's victim. The wolf the plan names as faker must claim seer in their speech that day.
+- The wolf plan: tomorrow's vote target must be a living good player who is not tonight's victim. What else it needs depends on the pack's tactic. A counter-claim names a wolf as faker, who must claim seer in their speech that day; the hook names a wolf as the hook; deep cover names neither.
 - No speech, night talk and wolf plan included, may quote someone who has never spoken in public ("said", "mentioned", "'s speech", "'s view"). In the day's speeches, nobody may say what someone still waiting for their turn "just" said. The prompt also lists who has not spoken in public yet, and on Night 1 it says outright that nobody has spoken.
 - Day speeches and last words may not use "no evidence", "no proof" or "nobody else confirmed it" as a reason: no claim can be proven on the spot, so that is true of everyone.
 - A speech may not refer to the speaker by their own name. Players speak of themselves as "I".

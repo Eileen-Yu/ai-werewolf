@@ -163,16 +163,30 @@ func TestPromptForADeclaringSpeechAsksForAStance(t *testing.T) {
 	assert.Contains(t, user, "suspect 只能是这些之一：老王、小红、无。")
 }
 
-func TestPromptForTheWolfPlanAsksForAVictimAndAPlan(t *testing.T) {
+func TestTheWolfPlanAsksForWhatThisGamesTacticNeeds(t *testing.T) {
 	turn := Turn{
 		Kind: WolfPlan, Round: 1, Phase: game.Night, Me: game.Player{Name: "阿杰", Role: game.Werewolf},
 		Candidates: []string{"老王", "小红"}, Suspects: []string{"老王", "小红"}, Pack: []string{"阿杰"},
 	}
+	for tactic, want := range map[game.Tactic]string{
+		game.Counterclaim: `"target": "今晚杀的人", "faker": "明天悍跳预言家的狼", "focus": "明天把票引向的人", "speech": "白天的具体打法"`,
+		game.Hook:         `"target": "今晚杀的人", "hook": "倒钩的狼", "focus": "明天把票引向的人", "speech": "白天的具体打法"`,
+		game.DeepCover:    `"target": "今晚杀的人", "focus": "明天把票引向的人", "speech": "白天的具体打法"`,
+	} {
+		turn.Tactic = tactic
+		system, user := prompt(turn)
+		assert.Contains(t, user, want, tactic)
+		assert.Contains(t, user, "target 只能是这些名字之一：老王、小红。")
+		assert.Contains(t, system, chineseText.tactics[tactic], "a wolf is told this game's play")
+	}
+}
 
-	_, user := prompt(turn)
-
-	assert.Contains(t, user, `"target": "今晚杀的人", "faker": "明天悍跳预言家的狼", "focus": "明天一起投的人", "speech": "白天的具体打法"`)
-	assert.Contains(t, user, "target 只能是这些名字之一：老王、小红。")
+func TestOnlyAWolfIsToldTheTactic(t *testing.T) {
+	for _, role := range []game.Role{game.Seer, game.Villager} {
+		turn := Turn{Kind: Speech, Round: 1, Phase: game.Day, Me: game.Player{Name: "小红", Role: role}, Tactic: game.Hook}
+		system, _ := prompt(turn)
+		assert.NotContains(t, system, "倒钩", role)
+	}
 }
 
 func TestCheck(t *testing.T) {
@@ -264,8 +278,9 @@ func TestPromptForTheHunterNamesWhoIsAlreadyOut(t *testing.T) {
 // player would read it.
 func TestAPlayersHabitIsInTheirPrompt(t *testing.T) {
 	turn := Turn{Kind: Vote, Round: 1, Phase: game.Day, Me: game.Player{Name: "华妃", Persona: "宫斗戏精", Habit: "谁投过你就投谁"}}
-	system, _ := prompt(turn)
+	system, user := prompt(turn)
 	assert.Contains(t, system, "性格：宫斗戏精。\n决策习惯，判断、改主意和投票都照这个来，这比说话风格更重要：谁投过你就投谁。\n策略：")
+	assert.Contains(t, user, "别忘了你的决策习惯：谁投过你就投谁。", "and again right where they act")
 
 	turn.Lang, turn.Me = game.English, game.Player{Name: "Ruby", Persona: "emotional", Habit: "holds a grudge"}
 	system, _ = prompt(turn)
@@ -321,11 +336,21 @@ func TestCheckHoldsTheWolfPlanToTheGame(t *testing.T) {
 		Candidates: []string{"阿杰", "小宇", "老王", "阿芳"}, Suspects: []string{"老王", "阿芳"}, Pack: []string{"阿杰", "小宇"},
 	}
 
+	plan.Tactic = game.Counterclaim
 	assert.NoError(t, plan.Check(Action{Target: "阿芳", Faker: "小宇", Focus: "老王", Speech: "小宇跳"}))
-	assert.NoError(t, plan.Check(Action{Target: "阿杰", Faker: game.Nobody, Focus: "老王", Speech: "自刀"}))
-	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Faker: game.Nobody, Focus: "阿芳", Speech: "集中投阿芳"}), "阿芳今晚就会被杀")
-	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Faker: game.Nobody, Focus: "小宇", Speech: "投小宇"}), "focus")
+	assert.NoError(t, plan.Check(Action{Target: "阿杰", Faker: "小宇", Focus: "老王", Speech: "自刀"}))
+	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Faker: "小宇", Focus: "阿芳", Speech: "集中投阿芳"}), "阿芳今晚就会被杀")
+	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Faker: "小宇", Focus: "小宇", Speech: "投小宇"}), "focus")
 	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Faker: "老王", Focus: "老王", Speech: "老王跳"}), "faker")
+	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Faker: game.Nobody, Focus: "老王", Speech: "不跳"}), "faker", "a counter-claim needs a claimant")
+
+	plan.Tactic = game.Hook
+	assert.NoError(t, plan.Check(Action{Target: "阿芳", Hook: "小宇", Focus: "老王", Speech: "小宇倒钩"}))
+	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Hook: "老王", Focus: "老王", Speech: "老王倒钩"}), "hook")
+	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Focus: "老王", Speech: "没人倒钩"}), "hook", "the hook needs a wolf to play it")
+
+	plan.Tactic = game.DeepCover
+	assert.NoError(t, plan.Check(Action{Target: "阿芳", Focus: "老王", Speech: "大家潜水"}), "deep cover names neither")
 
 	day := Turn{
 		Kind: Speech, Round: 2, Phase: game.Day, Me: game.Player{Name: "小宇", Role: game.Werewolf},

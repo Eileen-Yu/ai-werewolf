@@ -38,6 +38,9 @@ type Game struct {
 	// PhaseDelay is a durable timer between phases, so people watching can
 	// keep up and have time to kill something.
 	PhaseDelay time.Duration `json:"phaseDelay"`
+	// Tactic pins how the pack plays, for a demo; left out, one is dealt at
+	// random. It only takes effect when the game is dealt.
+	Tactic game.Tactic `json:"tactic,omitempty"`
 }
 
 type Result struct {
@@ -82,6 +85,10 @@ func GameWorkflow(ctx *workflow.WorkflowContext) (any, error) {
 			return nil, err
 		}
 		g.State.Lang = lang
+		if g.Tactic != "" && !slices.Contains(game.Tactics, g.Tactic) {
+			return nil, fmt.Errorf("unknown tactic %q: use one of %v", g.Tactic, game.Tactics)
+		}
+		g.State.Tactic = g.Tactic
 	}
 	t := &table{ctx: ctx, s: &g.State, h: hostFor(g.State.Lang), delay: g.PhaseDelay}
 
@@ -125,12 +132,12 @@ func (t *table) list(names []string) string { return t.s.Lang.List(names) }
 
 func (t *table) setup() error {
 	t.s.Round, t.s.Phase = 1, game.Night
-	var dealt []game.Player
-	in := deal{Players: t.s.Players, Lang: t.s.Lang}
+	var dealt deal
+	in := deal{Players: t.s.Players, Lang: t.s.Lang, Tactic: t.s.Tactic}
 	if err := t.ctx.CallActivity(AssignRolesActivity, workflow.WithActivityInput(in)).Await(&dealt); err != nil {
 		return err
 	}
-	t.s.Players = dealt
+	t.s.Players, t.s.Tactic = dealt.Players, dealt.Tactic
 
 	t.add("", fmt.Sprintf(t.h.welcome, len(t.s.Players), t.s.Lang.LineupSummary()))
 	wolves := t.s.Living(game.Werewolf)
@@ -138,6 +145,7 @@ func (t *table) setup() error {
 		t.add("", fmt.Sprintf(t.h.yourRole, t.say(string(p.Role))), p.Name)
 	}
 	t.add("", fmt.Sprintf(t.h.pack, t.list(wolves)), wolves...)
+	t.add("", fmt.Sprintf(t.h.tactic, t.h.tactics[t.s.Tactic]), wolves...)
 	return nil
 }
 
@@ -209,7 +217,7 @@ func (t *table) wolvesHunt() (string, error) {
 	}
 	leader := wolves[0]
 	turn := t.turn(brain.WolfPlan, leader, targets)
-	turn.Suspects = s.VoteCandidates(leader)
+	turn.Suspects = game.Without(targets, wolves...)
 	var a brain.Action
 	if err := t.act(turn).Await(&a); err != nil {
 		return "", err
@@ -219,17 +227,21 @@ func (t *table) wolvesHunt() (string, error) {
 		return "", nil
 	}
 	plan := &game.Plan{Round: s.Round, Victim: a.Target, Focus: a.Focus, Notes: a.Speech}
-	faker := t.h.noFaker
-	if a.Faker != game.Nobody && a.Faker != "" {
+	day := t.h.noFaker
+	switch {
+	case a.Faker != game.Nobody && a.Faker != "":
 		plan.Faker = a.Faker
-		faker = fmt.Sprintf(t.h.faker, a.Faker)
+		day = fmt.Sprintf(t.h.faker, a.Faker)
+	case a.Hook != "":
+		plan.Hook = a.Hook
+		day = fmt.Sprintf(t.h.hook, a.Hook)
 	}
 	s.Plan = plan
 	focus := plan.Focus
 	if focus == "" {
 		focus = t.h.undecided
 	}
-	t.add("", fmt.Sprintf(t.h.plan, leader, plan.Victim, faker, focus, plan.Notes), wolves...)
+	t.add("", fmt.Sprintf(t.h.plan, leader, plan.Victim, day, focus, plan.Notes), wolves...)
 	return plan.Victim, nil
 }
 
@@ -418,6 +430,7 @@ func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brai
 	}
 	if turn.Me.Role == game.Werewolf {
 		turn.Pack = t.s.Living(game.Werewolf)
+		turn.Tactic = t.s.Tactic
 		if p := t.s.Plan; p != nil && p.Round == t.s.Round {
 			turn.Plan = p
 		}
@@ -546,25 +559,35 @@ func (t *table) narrate(e game.Event) {
 	}
 }
 
-// deal is who sits down, if the game was started with players, and the
-// language to pick a cast in if it was not.
+// deal is what sits down and how the pack plays. Going in, the players and
+// tactic are empty unless the game was started with them, and Lang is the
+// language to pick a cast in; coming out, all are filled in.
 type deal struct {
 	Players []game.Player `json:"players,omitempty"`
 	Lang    game.Lang     `json:"lang,omitempty"`
+	Tactic  game.Tactic   `json:"tactic,omitempty"`
 }
 
-// AssignRolesActivity picks a cast if there is none and deals the roles. It is
-// an activity because both are random, and the workflow must replay the same.
+// AssignRolesActivity picks a cast and a tactic if there are none, and deals
+// the roles. It is an activity because all three are random, and the workflow
+// must replay the same.
 func AssignRolesActivity(ctx workflow.ActivityContext) (any, error) {
 	var in deal
 	if err := ctx.GetInput(&in); err != nil {
 		return nil, err
 	}
-	rng := rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
-	if len(in.Players) == 0 {
-		in.Players = game.Cast(in.Lang, rng)
+	return in.fill(rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))), nil
+}
+
+func (d deal) fill(rng *rand.Rand) deal {
+	if len(d.Players) == 0 {
+		d.Players = game.Cast(d.Lang, rng)
 	}
-	return game.AssignRoles(in.Players, rng), nil
+	if d.Tactic == "" {
+		d.Tactic = game.Tactics[rng.IntN(len(game.Tactics))]
+	}
+	d.Players = game.AssignRoles(d.Players, rng)
+	return d
 }
 
 // ActActivity asks a player for their move. A move that is still invalid
@@ -602,8 +625,11 @@ func ActActivity(ctx workflow.ActivityContext) (any, error) {
 		delete(a.Notes.Beliefs, name)
 	}
 	if t.Kind == brain.WolfPlan {
-		if !slices.Contains(t.Pack, a.Faker) {
+		if t.Tactic != game.Counterclaim || !slices.Contains(t.Pack, a.Faker) {
 			a.Faker = game.Nobody
+		}
+		if t.Tactic != game.Hook || !slices.Contains(t.Pack, a.Hook) {
+			a.Hook = ""
 		}
 		if !slices.Contains(t.Suspects, a.Focus) || a.Focus == a.Target {
 			a.Focus = ""
