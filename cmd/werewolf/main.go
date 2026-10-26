@@ -26,10 +26,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/eileenyu/catalyst-werewolf/brain"
-	"github.com/eileenyu/catalyst-werewolf/game"
-	"github.com/eileenyu/catalyst-werewolf/internal/engine"
-	"github.com/eileenyu/catalyst-werewolf/werewolf"
+	"github.com/Eileen-Yu/ai-werewolf/brain"
+	"github.com/Eileen-Yu/ai-werewolf/game"
+	"github.com/Eileen-Yu/ai-werewolf/internal/engine"
+	"github.com/Eileen-Yu/ai-werewolf/werewolf"
 )
 
 const usage = "usage: werewolf engine|gm|start [flags]"

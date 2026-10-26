@@ -1,156 +1,186 @@
-# catalyst-werewolf
+# AI Werewolf
 
-一局 9 人 AI 狼人杀，主持人是一个 Dapr Workflow。
+Nine LLM players sit down to a game of Werewolf, and the game master is a [Dapr Workflow](https://docs.dapr.io/developing-applications/building-blocks/workflow/) running on [Diagrid Catalyst](https://www.diagrid.io/catalyst).
 
-演示的看点：游戏进行到一半把主持人进程杀掉，再启动一个，游戏从断点继续。已经说过的话不会重新生成，LLM 不会被重复调用。
+Players fake seer claims, knife their own teammates to bait the witch's antidote, and call each other out. You can kill the game master at any point in a game and start another one: the game picks up where it stopped. Nothing already said is generated again, and no LLM call is repeated.
 
-## 规则
-
-标准 9 人局：3 狼人、预言家、女巫、猎人、3 村民。
-
-- 夜里：狼人先密谈，再由一只狼定下结构化的"狼队计划"：今晚刀谁（`target`）、明天谁悍跳预言家（`faker`）、明天票投谁（`focus`）。可以刀任何活着的人，包括自刀（刀自己或同伴，骗女巫的解药）。主持人会检查计划是否和局势一致，比如今晚要刀的人不能同时是明天要投的人。计划只发给狼人；被指定悍跳的狼当天发言必须跳预言家，狼人不能怀疑或投票给同伴。女巫知道今晚谁被刀，决定救不救、毒不毒（两瓶药各用一次，同一晚最多用一瓶，不能自救）；预言家查验一个人。
-- 天亮：只公布谁死了，不公布死因。猎人出局时可以开枪带走一人，被毒死的除外。
-- 白天：按轮换的顺序每人发言一次，然后是回应环节，每人再说一次，可以回应怀疑或者质疑别人。每次发言都带着公开的表态，记成"……【声明预言家，第1夜查验小红是好人，怀疑阿杰】"，后面的人可以直接拿它来质询。投票前主持人汇总每个人的最新表态，然后投票，平票无人出局。被放逐的人有遗言。
-- 胜负按屠边规则：狼人全部出局则好人胜利；村民全部出局，或者神职（预言家、女巫、猎人）全部出局，则狼人胜利。
-
-## 每个玩家知道什么
-
-主持人的 workflow 持有完整的 `game.State`，所有真相都在里面。每次调用 LLM 前，它从这份状态现场生成这个玩家的视图（`brain.Turn`）。视图只包含这个玩家有权知道的东西，过滤在代码里完成，不靠提示词让模型"自觉不看"。别人的身份从来不会传进去：座位信息的类型 `brain.Seat` 本身就没有 role 字段。
-
-视图分成六块：
-
-- 【座位和状态】：每个人是否存活。死了的人只写公开的死法，比如"第2夜死亡""被投票放逐"。
-- 【你的秘密信息】：自己的身份、狼同伴、夜聊和狼队计划、查验结果、女巫知道的刀口和药。这是唯一确定的事实。
-- 【你的笔记】：玩家自己维护的结构化记忆，包括对每个人的判断（`beliefs`：阵营是狼人、好人还是不确定，加上证据列表）和接下来的打算（`strategy`）。每次行动都会交回一份完整的新笔记。
-- 【你最近的私下想法】：最近 3 次行动的 `thinking`。更早的判断应该已经写进笔记里。
-- 【场上的身份声明】：从公开发言里摘出来的声明，每条都标着"未验证"。美玲声称查验小红是好人，进入别人上下文的只是"美玲声称：预言家，小红：好人（未验证）"，小红不会被当成好人。狼人的欺骗空间就留在这里。
-- 【公开记录】：所有人都看到的内容，也是唯一允许引用的历史。
-
-每次行动前，提示词会把这个玩家确定知道的事（主持人私下告诉他的：查验结果、刀口、用了什么药）紧挨着要做的事再列一遍，并写明和任何人的说法冲突时以这些为准。这些信息虽然在【你的秘密信息】里已经有了，但离得太远，模型容易忘，比如预言家查过某人是好人，白天又去怀疑他。
-
-发言时还会告诉它：这一轮谁已经说过、谁还没说。狼人白天还会看到今天的狼队计划。最后附一份回答前的自检清单。
-
-系统提示要求它按固定顺序思考，每一步对应 JSON 里的一个字段：
-
-1. `observations`：上次行动之后新发生了什么，只写具体的事。
-2. `notes.beliefs`：对照旧笔记更新判断。有新证据才改，"发言平淡""感觉可疑"不算证据。
-3. `notes.strategy`：接下来打算做什么。
-4. `thinking` 和这次的行动：`speech` 是说出口的话，`target` 是选中的人。白天发言还要给出 `suspect`（现在最怀疑谁，或者"无"）和 `claim`，格式是 `{"role", "target", "result"}`，不声明身份就写 null，狼人可以说假的。
-
-系统提示里还有一份推理要点，写明容易想错的规则组合。比如"预言家查验某人是好人"和"女巫救了这个人"并不矛盾，反而互相印证，两个人都更可信；有人报了你的查验结果，你知道自己的身份，报对了就是他像真预言家的证据；被刀的人不一定是好人，因为狼人可以自刀；"没有实证支持"不算证据，因为任何身份声明都没法当场证实。
-
-上帝视角的直播会打出每个人的观察和改判，比如"改判：老王 不确定→狼人，依据：……"，可以看到判断是怎么一步步更新的。
-
-主持人会校验回答。不合格时把所有问题一起告诉它让它重答，最多重答 2 次。校验这些：
-
-- `target` 和 `suspect` 必须在名单里，比如不能投给自己。
-- `claim` 只能声称预言家、女巫、猎人或村民，提到的人必须在桌上，预言家的结果只能是好人或狼人。
-- 笔记里不能出现桌上没有的名字，判断只能是狼人、好人或不确定。
-- 狼队计划：悍跳的人必须是狼，明天要投的人必须是活着的好人，而且不能是今晚要刀的人。被指定悍跳的狼当天发言时，`claim` 必须是预言家。
-- 任何发言（包括夜聊和狼队计划）都不能引用从没公开说过话的人，比如"说过""提到""的发言""的观点"。白天发言时，也不能说今天还没轮到的人"刚才"如何。提示词里也会直接列出还没公开发过言的人；第 1 夜会明说"还没有任何人公开发过言"。
-- 白天发言和遗言不能拿"缺乏证据""没有实证""没有其他人证实"当理由：任何身份声明都没法当场证实，这句话对谁都成立。
-- 发言里不能用第三人称说自己的名字，说到自己要用"我"。
-
-校验之前，主持人先修正几种常见的小错，不会因为它们要求重答：
-
-- 名字后面带了注释（"小红（她最可疑）"），或者用"不开枪""pass"表示放弃。
-- 在 beliefs 里写了自己：这一条直接删掉。
-- `claim` 的身份写成 `"null"` 或"无"：当作不声明身份。
-- 解析 JSON 比较宽松：`claim` 写成字符串、证据只写了一句话、多一个或少一个逗号，都能读出来。做选择的回合（投票、查验、用药、开枪）用低 temperature，说话的回合保持高 temperature。
-
-重答以后还不合格，选择算弃权，无效的声明和笔记条目会被丢掉。发言内容的问题只记一条日志，发言照常算数。
-
-## 中文或英文
-
-开局时选语言，默认中文。`"en"` 整局都是英文：玩家的名字和性格、规则和提示词、主持人的话，以及 LLM 的发言。
-
-```bash
-go run ./cmd/werewolf start -engine localhost:4001 -lang en
-diagrid workflow start GameWorkflow --project <项目> --id werewolf --instance-id game-en --data '{"lang":"en"}'
+```text
+[Night 1]   Ruby(werewolf) thinks: By targeting Walter, we eliminate a potential threat. Claiming seer will protect us and distract from our true identities.
+[Night 1]   Dave(witch) thinks: I need to use my antidote wisely, and since Walter is dead, saving him is the best option to keep a good player in the game.
+[Day 1] Host: Day breaks. Nobody died last night.
+[Day 1] Ruby(werewolf): I'm the seer. I checked Mia, and she is good. We should focus on getting rid of Jake today. [claims seer, Mia: good, suspects Jake]
+[Day 1] Jake(villager): Ruby, I see your claim, but targeting me seems like an easy route for you. Mia, what do you think of Ruby's claim? [claims villager, suspects Ruby]
 ```
 
-语言在发身份时定下来，存进游戏状态，之后每一轮都沿用。`gm` 不需要任何设置，同一个 `gm` 可以同时主持中文局和英文局。
+The game master's output is a god's-eye live feed: what everyone says out loud, what they privately think, and how their read on each player changes over the game.
 
-游戏内部的词（身份、阵营、昼夜、"放弃""无"）在状态里始终存成中文，规则只比较这些值。语言只决定显示成什么样，以及玩家回答时可以用哪种语言的词：英文局里回答 `werewolf`、`good`、`pass`，会被读成狼人、好人、放弃。所有给玩家看的文字集中在 `brain/text.go` 和 `werewolf/text.go`，中英文各一份，逻辑代码共用。
+## Features
 
-## 结构
+- **Standard nine-player game**: 3 werewolves, a seer, a witch, a hunter and 3 villagers. Wolves win by clearing a side.
+- **Players only know what they should**: nobody else's role is ever sent to the model. The filtering happens in code, not in the prompt.
+- **The wolves have a plan**: each night they agree who to kill, who fakes a seer claim tomorrow and who they vote out, then play it out by day.
+- **Players have memory**: everyone keeps notes on what they believe about each other player and why, updated every turn.
+- **Bad answers are sent back**: voting for someone not at the table, quoting someone who never spoke, or "there is no proof" as a reason all get the answer handed back to try again.
+- **A game master you cannot kill**: state and history live in the workflow Catalyst hosts. If the process dies, another one carries on.
+- **Chinese or English**: one setting at the start of a game switches players, rules and speech.
+- **Free to try**: a local mode plays with random players, with no account and no API key.
 
-| 目录 | 内容 |
-|---|---|
-| `game/` | 规则：发身份、谁能看到什么、计票、胜负。纯函数，不依赖 Dapr |
-| `brain/` | 玩家怎么想：`random`（随机，免费）和 `llm`（Dapr Conversation API） |
-| `werewolf/` | 主持人 workflow。每轮一次执行，用 continue-as-new 进入下一轮 |
-| `internal/engine/` | 本地 workflow 引擎（durabletask + SQLite），只在本地玩和跑测试时用；在 Catalyst 上玩不需要它 |
-| `cmd/werewolf/` | 命令行：`engine`、`gm`、`start` |
+## Rules
 
-信息隔离由主持人负责：每个玩家每次只收到 `State.VisibleTo(自己)` 的那部分记录。上帝视角的直播会把所有人的私下想法也打出来（标成"内心"），可以看到每个人嘴上说的和心里想的有什么不同。
+- **Night**: the werewolves talk in private and pick who to kill (they may pick one of their own). The witch learns who was killed and may save them or poison someone: each potion works once, at most one per night, and she cannot save herself. The seer checks one player.
+- **Dawn**: only who died is announced, not how. A hunter who is out may shoot one player, unless the witch poisoned him.
+- **Day**: everyone speaks once, then everyone gets one reply. Then a vote: a tie means nobody goes. Whoever is voted out gets last words.
+- **Winning**: the good side wins when every werewolf is out. The werewolves win when every villager is out, or every power role is out.
 
-随机数和 LLM 调用都只发生在 activity 里，workflow 本身是确定性的。这是"杀掉还能续上"的前提。
+## Quick start: play with LLMs on Catalyst
 
-## 本地玩（不需要 Dapr）
+### Prerequisites
 
-开三个终端：
+- [Go](https://go.dev/dl/) 1.26 or later
+- A [Diagrid Catalyst](https://catalyst.diagrid.io) account
+- The [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/intro):
 
-```bash
-go run ./cmd/werewolf engine                          # 本地引擎，状态存在 werewolf.db
-go run ./cmd/werewolf gm -engine localhost:4001       # 主持人；它的输出就是上帝视角的直播
-go run ./cmd/werewolf start -engine localhost:4001    # 开一局，等结果
-```
+  ```bash
+  curl -o- https://downloads.diagrid.io/cli/install.sh | bash
+  diagrid login
+  ```
 
-演示杀进程：游戏进行中按 Ctrl+C 停掉 `gm`，过几秒再启动一次。游戏会接着往下走，前面的内容不会重复打印。引擎也可以一起杀掉：状态在 `werewolf.db` 里，重启引擎后再启动 `gm` 照样能续上。
+- An OpenAI API key
 
-`-delay` 设置阶段之间的停顿（默认 2 秒）。这个停顿是 durable timer，同样能扛住重启。
-
-本地引擎只能用 `random` 大脑，因为 LLM 大脑要调用 Dapr 的 Conversation API。
-
-## 在 Catalyst 上玩
-
-在 Catalyst 上玩不需要本地引擎，也不用运行 `werewolf engine`：Catalyst 托管的 workflow 就是引擎，只需要跑 `gm` 这一个进程。
-
-`gm` 不加 `-engine` 时连 Dapr。`diagrid dev run` 会把 Catalyst 的 `DAPR_GRPC_ENDPOINT` 和 `DAPR_API_TOKEN` 注入给它，这时 workflow 状态和执行历史都存在 Catalyst 里。
+### 1. Get the code and build it
 
 ```bash
-diagrid project update <项目> --enable-managed-workflow      # Workflow API 需要它
+git clone https://github.com/Eileen-Yu/ai-werewolf.git
+cd ai-werewolf
 go build -o bin/werewolf ./cmd/werewolf
-diagrid dev run --project <项目> --id werewolf --approve -- ./bin/werewolf gm   # 主持人，输出就是直播
-
-# 另一个终端开局；phaseDelay 的单位是纳秒，可以不填
-diagrid workflow start GameWorkflow --project <项目> --id werewolf --instance-id game-1 --data '{"phaseDelay":2000000000}'
-diagrid workflow get game-1 --project <项目> --id werewolf  # 结果和执行历史
 ```
 
-演示杀进程：Ctrl+C 停掉 `dev run`，再运行一次同样的命令。
+### 2. Create a Catalyst project
 
-### 让 LLM 来玩
-
-在项目里建一个 conversation component，名字叫 `llm`。或者另取一个名字，再通过 `-llm-component` 传给 `gm`。然后给 `gm` 加上 `-brain llm`：
+The game master needs the Workflow API, so create the project with managed workflow turned on:
 
 ```bash
-diagrid component create llm --project <项目> --type conversation.openai --metadata key=<你的 key> --metadata model=gpt-4o-mini
-diagrid dev run --project <项目> --id werewolf --approve -- ./bin/werewolf gm -brain llm
+diagrid project create werewolf --enable-managed-workflow --wait
 ```
 
-一局大约 100 到 150 次 LLM 调用，每一轮大约 35 次。
-
-`gpt-4o-mini` 便宜，但 9 个人、几十条记录的上下文里推理明显吃力，发言容易空泛。想要更像样的对局，换个更强的模型。`component update` 会整体替换 metadata，所以 key 要一起带上：
+If you already have a project, turn it on there instead:
 
 ```bash
-diagrid component update llm --project <项目> --metadata key=<你的 key> --metadata model=gpt-4.1
+diagrid project update <project> --enable-managed-workflow
 ```
 
-## 测试
+The commands below use `werewolf` as the project name. Use your own.
+
+### 3. Connect an LLM
+
+Players call the model through the Dapr Conversation API. Create a conversation component named `llm` in the project:
+
+```bash
+diagrid component create llm --project werewolf --type conversation.openai \
+  --metadata key=<your OpenAI key> --metadata model=gpt-4o-mini
+```
+
+### 4. Start the game master
+
+```bash
+diagrid dev run --project werewolf --id werewolf --approve -- ./bin/werewolf gm -brain llm
+```
+
+`dev run` creates the app ID `werewolf` on Catalyst and starts the game master on your machine. Once you see `game master ready (brain: llm)`, you can start a game. This terminal is the live feed.
+
+### 5. Start a game
+
+In another terminal:
+
+```bash
+diagrid workflow start GameWorkflow --project werewolf --id werewolf --instance-id game-1 --data '{"lang":"en"}'
+```
+
+Leave out `--data` for a game in Chinese. When the game is over, get the result and the execution history:
+
+```bash
+diagrid workflow get game-1 --project werewolf --id werewolf
+```
+
+### 6. Try killing the game master
+
+While a game is running, press Ctrl+C in the game master's terminal, wait a moment, and run the command from step 4 again. The game carries on from where it stopped, and nothing earlier is repeated.
+
+## Play locally (no account needed)
+
+If you would rather not sign up or pay for an API, you can play a game with random players on your machine. The local engine keeps its state in a SQLite file, `werewolf.db`. Open three terminals:
+
+```bash
+go run ./cmd/werewolf engine                                   # local workflow engine
+go run ./cmd/werewolf gm -engine localhost:4001                # game master; its output is the live feed
+go run ./cmd/werewolf start -engine localhost:4001 -lang en    # start a game and wait for the result
+```
+
+Killing processes works here too: stop `gm` and start it again, or stop the engine as well and start both again.
+
+Local mode only has random players. LLM players need the Conversation API that Catalyst provides.
+
+## Configuration
+
+### Game input
+
+The `--data` for `diagrid workflow start` is JSON, and every field is optional:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `lang` | `"zh"` | `"zh"` for Chinese, `"en"` for English |
+| `phaseDelay` | `0` | Pause between phases, in nanoseconds: `2000000000` is 2 seconds. A longer pause makes it easier to kill something mid-game |
+
+```bash
+diagrid workflow start GameWorkflow --project werewolf --id werewolf --instance-id game-2 \
+  --data '{"lang":"en","phaseDelay":2000000000}'
+```
+
+### Command line
+
+| Command | Flag | Meaning |
+|---|---|---|
+| `werewolf gm` | `-brain random\|llm` | Random or LLM players. Default `random` |
+| | `-llm-component <name>` | Name of the conversation component. Default `llm` |
+| | `-engine <address>` | Use a local engine; leave it out to use Dapr (Catalyst) |
+| `werewolf start` | `-engine <address>` | As above |
+| | `-lang zh\|en` | Language of the game. Default `zh` |
+| | `-delay <duration>` | Pause between phases. Default `2s` |
+| | `-id <name>` | Game instance ID. Default is generated from the time |
+| `werewolf engine` | `-addr <address>` | Address the local engine listens on. Default `localhost:4001` |
+| | `-db <file>` | SQLite file for the state. Default `werewolf.db` |
+
+### Changing the model
+
+A game makes roughly 100 to 150 LLM calls. `gpt-4o-mini` is cheap but clearly struggles with the reasoning, and its speeches tend to be vague. For a better game, use a stronger model. `component update` replaces all the metadata, so pass the key again:
+
+```bash
+diagrid component update llm --project werewolf \
+  --metadata key=<your OpenAI key> --metadata model=gpt-4.1
+```
+
+## FAQ
+
+**The feed shows `connection reset by peer` or `reconnecting work item listener stream`.**
+The connection dropped for a moment. The game master reconnects by itself and the game is not affected.
+
+**I changed the code. Can a game in progress carry on?**
+If you only changed how players think (`brain/`), yes. If you changed the game master's flow (`werewolf/`), let running games finish or start a new one. Never run two game masters with different code at the same time.
+
+**How do I stop a game?**
+
+```bash
+diagrid workflow terminate game-1 --project werewolf --id werewolf
+```
+
+## Hacking on it
+
+How the game master works, what each player can see, and how LLM answers are checked are in [docs/design.md](docs/design.md). To run the tests:
 
 ```bash
 go test ./...
 ```
 
-`werewolf/workflow_test.go` 在测试进程里起一个内存引擎，用随机大脑完整跑 10 局，覆盖女巫和猎人的各种情况。另外有两个用例：
-- 按剧本让女巫救人，检查这一晚是平安夜。
-- 在中途杀掉主持人 worker，换一个新的接手，检查游戏照样能打完。
+## License
 
-英文局也有一个完整对局的用例：检查每个玩家收到的座位、记录和主持人的话里都没有汉字。`brain/llm_test.go` 对每种回合的英文提示词和报错做同样的检查，漏翻的字符串会在这里被发现。
-
-## 下一步
-
-- 观战网页，加一个"拔电源"按钮
-- 真人玩家：投票改成 `WaitForExternalEvent`，超时视为弃票
+[MIT](LICENSE)

@@ -19,8 +19,8 @@ import (
 
 	"github.com/dapr/durabletask-go/workflow"
 
-	"github.com/eileenyu/catalyst-werewolf/brain"
-	"github.com/eileenyu/catalyst-werewolf/game"
+	"github.com/Eileen-Yu/ai-werewolf/brain"
+	"github.com/Eileen-Yu/ai-werewolf/game"
 )
 
 var players brain.Brain = brain.Random{}

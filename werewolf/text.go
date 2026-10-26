@@ -1,6 +1,6 @@
 package werewolf
 
-import "github.com/eileenyu/catalyst-werewolf/game"
+import "github.com/Eileen-Yu/ai-werewolf/game"
 
 // host is everything the game master says, in one language.
 type host struct {

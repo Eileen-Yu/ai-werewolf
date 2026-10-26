@@ -1,4 +1,4 @@
-module github.com/eileenyu/catalyst-werewolf
+module github.com/Eileen-Yu/ai-werewolf
 
 go 1.26.0
 

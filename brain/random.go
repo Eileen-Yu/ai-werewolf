@@ -6,7 +6,7 @@ import (
 	"math/rand/v2"
 	"slices"
 
-	"github.com/eileenyu/catalyst-werewolf/game"
+	"github.com/Eileen-Yu/ai-werewolf/game"
 )
 
 // Random plays without an LLM: canned lines and random picks. It costs

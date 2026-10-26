@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/eileenyu/catalyst-werewolf/game"
+	"github.com/Eileen-Yu/ai-werewolf/game"
 )
 
 func TestPromptSeparatesWhatThePlayerKnows(t *testing.T) {

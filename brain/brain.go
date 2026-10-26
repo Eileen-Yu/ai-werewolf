@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/eileenyu/catalyst-werewolf/game"
+	"github.com/Eileen-Yu/ai-werewolf/game"
 )
 
 type TurnKind string

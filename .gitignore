@@ -1,3 +1,4 @@
 /bin/
 *.db
 *.db-*
+.DS_Store

@@ -1,6 +1,6 @@
 package brain
 
-import "github.com/eileenyu/catalyst-werewolf/game"
+import "github.com/Eileen-Yu/ai-werewolf/game"
 
 // text is everything a player reads, in one language. The logic that uses it
 // is the same for every language.

@@ -12,7 +12,7 @@ import (
 
 	dapr "github.com/dapr/go-sdk/client"
 
-	"github.com/eileenyu/catalyst-werewolf/game"
+	"github.com/Eileen-Yu/ai-werewolf/game"
 )
 
 // LLM plays through the Dapr Conversation API. Which model it talks to, and
