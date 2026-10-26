@@ -31,17 +31,20 @@ func (Random) Act(_ context.Context, t Turn) (Action, error) {
 			others = append(others, s.Name)
 		}
 	}
-	if t.Kind.IsChoice() {
-		return Action{Target: pick(t.Candidates)}, nil
-	}
 	switch t.Kind {
+	case WolfPlan:
+		victim := pick(t.Candidates)
+		return Action{Target: victim, Speech: fmt.Sprintf("今晚杀%s，白天都别踩同伴。", victim)}, nil
 	case LastWords:
 		return Action{Speech: "我是好人，你们一定要找出狼人！"}, nil
 	case WolfChat:
 		return Action{Speech: fmt.Sprintf(pick(wolfLines), pick(t.Candidates))}, nil
-	default:
-		return Action{Speech: fmt.Sprintf(pick(speechLines), pick(others))}, nil
 	}
+	if t.Kind.IsChoice() {
+		return Action{Target: pick(t.Candidates)}, nil
+	}
+	suspect := pick(others)
+	return Action{Speech: fmt.Sprintf(pick(speechLines), suspect), Suspect: suspect}, nil
 }
 
 func pick(xs []string) string {

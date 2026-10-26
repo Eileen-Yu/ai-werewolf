@@ -179,6 +179,16 @@ func (s *State) Living(roles ...Role) []string {
 	return out
 }
 
+// VoteCandidates is who voter may vote out: anyone else alive, except that a
+// wolf never votes out another wolf.
+func (s *State) VoteCandidates(voter string) []string {
+	exclude := []string{voter}
+	if p := s.Player(voter); p != nil && p.Role == Werewolf {
+		exclude = s.Living(Werewolf)
+	}
+	return Without(s.Living(), exclude...)
+}
+
 // Winner is "狼人" or "好人" once the game is decided, and "" before. Wolves
 // win by clearing a side (all gods or all villagers), or once they are as many
 // as everyone else and so control every vote.

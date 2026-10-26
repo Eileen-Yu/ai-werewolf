@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -42,12 +44,17 @@ func TestGamesPlayToAWinner(t *testing.T) {
 }
 
 func TestWitchSavingTheVictimMakesAPeacefulNight(t *testing.T) {
-	b := &savingWitch{}
-	SetBrain(b)
 	client := startEngine(t)
 	startWorker(t, client)
 
-	playGame(t, client, "saved")
+	// The witch cannot save herself, so replay any game where the wolves
+	// happened to pick her.
+	var b *savingWitch
+	for i := 0; i < 20 && (b == nil || b.kinds[brain.Save] == 0); i++ {
+		b = &savingWitch{}
+		SetBrain(b)
+		playGame(t, client, fmt.Sprintf("saved-%d", i))
+	}
 
 	assert.Contains(t, b.firstDawn, "天亮了，昨晚是平安夜。")
 	assert.Equal(t, 1, b.kinds[brain.Save])
@@ -83,6 +90,51 @@ func (b *savingWitch) Act(ctx context.Context, t brain.Turn) (brain.Action, erro
 		return brain.Action{Target: t.Candidates[0]}, nil
 	case brain.Poison:
 		return brain.Action{Target: brain.Pass}, nil
+	}
+	return brain.Random{}.Act(ctx, t)
+}
+
+func TestVotersSeeStancesAndOnlyWolvesSeeThePlan(t *testing.T) {
+	b := &firstVotes{heard: map[string][]game.Event{}}
+	SetBrain(b)
+	client := startEngine(t)
+	startWorker(t, client)
+
+	res := playGame(t, client, "stances")
+
+	require.GreaterOrEqual(t, len(b.heard), 8, "at most the witch died on night 1")
+	for name, events := range b.heard {
+		var plan, stances, summary bool
+		for _, e := range events {
+			plan = plan || strings.HasPrefix(e.Text, "狼队计划")
+			stances = stances || (e.Phase == game.Day && e.Speaker != "" && strings.Contains(e.Text, "【怀疑"))
+			summary = summary || strings.HasPrefix(e.Text, "投票前，各人的最新表态")
+		}
+		wolf := slices.ContainsFunc(res.Players, func(p game.Player) bool { return p.Name == name && p.Role == game.Werewolf })
+		assert.Equal(t, wolf, plan, "%s sees the wolf plan only if a wolf", name)
+		assert.True(t, stances, "%s hears speeches with their stance", name)
+		assert.True(t, summary, "%s hears the stance summary", name)
+	}
+}
+
+// firstVotes plays randomly and records what each voter could see when the
+// first day's vote came round. The witch always saves and never poisons, so
+// every wolf is still alive to vote; only the witch herself can die that night.
+type firstVotes struct {
+	mu    sync.Mutex
+	heard map[string][]game.Event
+}
+
+func (b *firstVotes) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	switch {
+	case t.Kind == brain.Save:
+		return brain.Action{Target: t.Candidates[0]}, nil
+	case t.Kind == brain.Poison:
+		return brain.Action{Target: brain.Pass}, nil
+	case t.Kind == brain.Vote && t.Round == 1:
+		b.heard[t.Me.Name] = t.Transcript
 	}
 	return brain.Random{}.Act(ctx, t)
 }

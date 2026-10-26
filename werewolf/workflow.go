@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand/v2"
+	"slices"
 	"strings"
 	"time"
 
@@ -170,29 +171,30 @@ func (t *table) night() error {
 	return nil
 }
 
-// wolvesHunt has the wolves plot and pick a victim, returning "" if they
-// pick nobody.
+// wolvesHunt has the wolves plot, then the first of them settles the plan:
+// tonight's victim and how the pack plays the day. The plan is written down
+// for every wolf, so tomorrow's speeches and votes have one thing to follow.
+// It returns "" if the wolves pick nobody.
 func (t *table) wolvesHunt() (string, error) {
 	s := t.s
 	wolves := s.Living(game.Werewolf)
 	targets := game.Without(s.Living(), wolves...)
 	if len(wolves) > 1 { // a lone wolf has nobody to plot with
-		if err := t.goRound(brain.WolfChat, wolves, targets, wolves...); err != nil {
+		if _, err := t.goRound(brain.WolfChat, wolves, targets, wolves...); err != nil {
 			return "", err
 		}
 	}
-	kills, err := t.chooseAll(brain.Kill, wolves, func(string) []string { return targets })
-	if err != nil {
+	leader := wolves[0]
+	var plan brain.Action
+	if err := t.act(t.turn(brain.WolfPlan, leader, targets)).Await(&plan); err != nil {
 		return "", err
 	}
-	victim, ok := game.Tally(kills)
-	if !ok && len(kills) > 0 {
-		victim = kills[0].Target // the wolves disagree: the first one decides
+	t.think(leader, plan.Thinking)
+	if plan.Target == "" {
+		return "", nil
 	}
-	if victim != "" {
-		t.add("", fmt.Sprintf("狼人决定今晚杀%s。", victim), wolves...)
-	}
-	return victim, nil
+	t.add("", fmt.Sprintf("狼队计划（%s定）：今晚杀%s。白天：%s", leader, plan.Target, plan.Speech), wolves...)
+	return plan.Target, nil
 }
 
 // witchActs lets the witch, told tonight's victim, use at most one potion.
@@ -280,15 +282,21 @@ func (t *table) day() error {
 	alive := s.Living()
 	order := game.Rotate(alive, s.Round-1)
 	t.add("", fmt.Sprintf("今天的发言顺序：%s。", strings.Join(order, "、")))
-	if err := t.goRound(brain.Speech, order, nil); err != nil {
+	if _, err := t.goRound(brain.Speech, order, nil); err != nil {
 		return err
 	}
 	t.add("", "回应环节：每人再说一次，可以回应怀疑或者质疑别人。")
-	if err := t.goRound(brain.Rebuttal, order, nil); err != nil {
+	stances, err := t.goRound(brain.Rebuttal, order, nil)
+	if err != nil {
 		return err
 	}
+	summary := make([]string, len(order))
+	for i, name := range order {
+		summary[i] = name + "：" + stance(stances[i])
+	}
+	t.add("", "投票前，各人的最新表态："+strings.Join(summary, "；")+"。")
 
-	votes, err := t.chooseAll(brain.Vote, alive, func(me string) []string { return game.Without(alive, me) })
+	votes, err := t.chooseAll(brain.Vote, alive, s.VoteCandidates)
 	if err != nil {
 		return err
 	}
@@ -309,7 +317,7 @@ func (t *table) day() error {
 	}
 	s.Remove(out, "被投票放逐")
 	t.add("", fmt.Sprintf("%s被放逐了。", out))
-	if err := t.speak(t.turn(brain.LastWords, out, nil)); err != nil {
+	if _, err := t.speak(t.turn(brain.LastWords, out, nil)); err != nil {
 		return err
 	}
 	if s.Player(out).Role == game.Hunter {
@@ -321,16 +329,28 @@ func (t *table) day() error {
 }
 
 // goRound has each speaker talk in order, each one told who has spoken
-// before them and who is still to come.
-func (t *table) goRound(kind brain.TurnKind, order, candidates []string, audience ...string) error {
+// before them and who is still to come. It returns their actions in order.
+func (t *table) goRound(kind brain.TurnKind, order, candidates []string, audience ...string) ([]brain.Action, error) {
+	actions := make([]brain.Action, len(order))
 	for i, name := range order {
 		turn := t.turn(kind, name, candidates)
 		turn.Spoken, turn.Waiting = order[:i], order[i+1:]
-		if err := t.speak(turn, audience...); err != nil {
-			return err
+		a, err := t.speak(turn, audience...)
+		if err != nil {
+			return nil, err
 		}
+		actions[i] = a
 	}
-	return nil
+	return actions, nil
+}
+
+// stance is a declaring speech's claim and suspect, as the record shows them.
+func stance(a brain.Action) string {
+	s := "怀疑" + a.Suspect
+	if a.Claim != "" {
+		s = "声明" + a.Claim + "，" + s
+	}
+	return s
 }
 
 var retry = workflow.WithActivityRetryPolicy(&workflow.RetryPolicy{
@@ -344,7 +364,7 @@ func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brai
 	for i, p := range t.s.Players {
 		seats[i] = brain.Seat{Name: p.Name, Death: p.Death}
 	}
-	return brain.Turn{
+	turn := brain.Turn{
 		Kind:       kind,
 		Round:      t.s.Round,
 		Phase:      t.s.Phase,
@@ -353,6 +373,10 @@ func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brai
 		Transcript: t.s.VisibleTo(name),
 		Candidates: candidates,
 	}
+	if kind.Declares() {
+		turn.Suspects = append(game.Without(t.s.Living(), name), brain.Nobody)
+	}
+	return turn
 }
 
 func (t *table) act(turn brain.Turn) workflow.Task {
@@ -360,15 +384,20 @@ func (t *table) act(turn brain.Turn) workflow.Task {
 }
 
 // speak plays a speaking turn: the player's thinking goes into their own
-// memory, then what they say is heard by audience (everyone if empty).
-func (t *table) speak(turn brain.Turn, audience ...string) error {
+// memory, then what they say is heard by audience (everyone if empty). A
+// declaring speech is recorded with its stance, so later speakers can quote it.
+func (t *table) speak(turn brain.Turn, audience ...string) (brain.Action, error) {
 	var a brain.Action
 	if err := t.act(turn).Await(&a); err != nil {
-		return err
+		return a, err
 	}
 	t.think(turn.Me.Name, a.Thinking)
-	t.add(turn.Me.Name, a.Speech, audience...)
-	return nil
+	said := a.Speech
+	if turn.Kind.Declares() {
+		said += "【" + stance(a) + "】"
+	}
+	t.add(turn.Me.Name, said, audience...)
+	return a, nil
 }
 
 // choose asks one player to pick from candidates; "" means they abstained.
@@ -447,7 +476,8 @@ func AssignRolesActivity(ctx workflow.ActivityContext) (any, error) {
 
 // ActActivity asks a player for their move. A move that is still invalid
 // after the brain's own re-asking is not allowed to stall the game: a bad
-// pick counts as abstaining and an empty speech as silence.
+// pick counts as abstaining, an empty speech as silence and a bad suspect as
+// suspecting nobody.
 func ActActivity(ctx workflow.ActivityContext) (any, error) {
 	var t brain.Turn
 	if err := ctx.GetInput(&t); err != nil {
@@ -459,11 +489,15 @@ func ActActivity(ctx workflow.ActivityContext) (any, error) {
 	}
 	if err := t.Check(a); err != nil {
 		log.Printf("%s's %s move is invalid, playing it as a pass: %v", t.Me.Name, t.Kind, err)
-		if t.Kind.IsChoice() {
-			a.Target = ""
-		} else {
-			a.Speech = "（沉默）"
-		}
+	}
+	if t.Kind.IsChoice() && !slices.Contains(t.Candidates, a.Target) {
+		a.Target = ""
+	}
+	if t.Kind.Speaks() && a.Speech == "" {
+		a.Speech = "（沉默）"
+	}
+	if t.Kind.Declares() && !slices.Contains(t.Suspects, a.Suspect) {
+		a.Suspect = brain.Nobody
 	}
 	return a, nil
 }

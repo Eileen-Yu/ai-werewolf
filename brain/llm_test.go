@@ -95,13 +95,39 @@ func TestParseAction(t *testing.T) {
 	}
 }
 
+func TestPromptForADeclaringSpeechAsksForAStance(t *testing.T) {
+	turn := Turn{Kind: Rebuttal, Round: 1, Phase: game.Day, Me: game.Player{Name: "阿杰"}, Suspects: []string{"老王", "小红", Nobody}}
+
+	_, user := prompt(turn)
+
+	assert.Contains(t, user, `"suspect"`)
+	assert.Contains(t, user, `"claim"`)
+	assert.Contains(t, user, "suspect 只能是这些之一：老王、小红、无。")
+}
+
+func TestPromptForTheWolfPlanAsksForAVictimAndAPlan(t *testing.T) {
+	turn := Turn{Kind: WolfPlan, Round: 1, Phase: game.Night, Me: game.Player{Name: "阿杰", Role: game.Werewolf}, Candidates: []string{"老王", "小红"}}
+
+	_, user := prompt(turn)
+
+	assert.Contains(t, user, `"target": "今晚杀的人", "speech": "白天的打法"`)
+	assert.Contains(t, user, "target 只能是这些名字之一：老王、小红。")
+}
+
 func TestCheck(t *testing.T) {
 	vote := Turn{Kind: Vote, Candidates: []string{"老王", "小红"}}
-	speech := Turn{Kind: Speech}
+	speech := Turn{Kind: Speech, Suspects: []string{"老王", Nobody}}
+	wolfChat := Turn{Kind: WolfChat}
+	plan := Turn{Kind: WolfPlan, Candidates: []string{"老王"}}
 
 	assert.NoError(t, vote.Check(Action{Target: "小红"}))
 	assert.ErrorContains(t, vote.Check(Action{Target: "阿杰"}), "老王、小红")
 	assert.Error(t, vote.Check(Action{}))
-	assert.NoError(t, speech.Check(Action{Speech: "我怀疑老王"}))
-	assert.Error(t, speech.Check(Action{Thinking: "只想了没说"}))
+	assert.NoError(t, speech.Check(Action{Speech: "我怀疑老王", Suspect: "老王"}))
+	assert.NoError(t, speech.Check(Action{Speech: "我还没想好", Suspect: Nobody}))
+	assert.Error(t, speech.Check(Action{Thinking: "只想了没说", Suspect: "老王"}))
+	assert.ErrorContains(t, speech.Check(Action{Speech: "我怀疑小李"}), "suspect")
+	assert.NoError(t, wolfChat.Check(Action{Speech: "今晚刀老王"}), "only daytime speeches declare a stance")
+	assert.NoError(t, plan.Check(Action{Target: "老王", Speech: "阿杰悍跳"}))
+	assert.ErrorContains(t, plan.Check(Action{Target: "老王"}), "speech", "a plan without a plan for the day")
 }

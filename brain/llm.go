@@ -46,10 +46,12 @@ const rules = `你在玩一局%d人狼人杀，桌上只有这%d个人：%s。�
 4. 提到你自己之前的观点时，必须和【公开记录】里你真实说过的话一致。
 
 说话风格：像真人玩家，口语化，符合你的性格。不要开场白和客套（不要说"大家好""我是某某"），直接说观点。
-必须点名：说清楚怀疑谁、相信谁、为什么。不超过120字。不要提到你是AI，不要写动作或旁白。`
+必须点名：说清楚怀疑谁、相信谁、为什么。不超过120字。不要提到你是AI，不要写动作或旁白。
+不要说空话套话，比如"值得关注""转移注意力""大家要谨慎""再观察一下"。每个怀疑都要有具体依据：某人的原话、他的投票、他跳身份的时机，或者别人的声明之间的矛盾。`
 
 var strategies = map[game.Role]string{
-	game.Werewolf: "你和狼同伴要配合。白天不要无理由地怀疑同伴；如果要和同伴切割（假装怀疑他）来给自己做身份，必须是夜里商量好的。" +
+	game.Werewolf: "你和狼同伴要配合，白天按【你的秘密信息】里的狼队计划执行：计划里要悍跳的人，第一次发言就跳；要把票引向谁，就一起找他的破绽。" +
+		"投票时你不能投狼同伴。白天不要无理由地怀疑同伴；如果要和同伴切割（假装怀疑他）来给自己做身份，必须是计划里写好的。" +
 		"真预言家是你们最大的威胁：有人跳预言家时，可以悍跳，也就是自称预言家、报一个假的查验结果" +
 		"（比如给同伴报好人，给真预言家报狼人），和他对跳争夺信任。女巫的解药可能救下你们的刀，猎人出局会开枪，所以要尽早找出神职并优先杀掉。" +
 		"被放逐时的遗言也要继续伪装、搅浑水，绝不能承认自己是狼人。",
@@ -63,12 +65,13 @@ var strategies = map[game.Role]string{
 }
 
 var instructions = map[TurnKind]string{
-	Speech:    "白天发言环节，轮到你了。",
-	Rebuttal:  "回应环节：所有人都已经发过一次言。回应别人对你的怀疑，或者质疑某个人的说法（比如对跳的预言家、前后矛盾的人）。不超过80字。",
-	WolfChat:  "现在是夜里，只有狼同伴能听到你说话。和同伴定下：今晚杀谁；白天怎么打，包括要不要有人悍跳预言家、要不要切割、投票怎么统一。",
+	Speech:   "白天发言环节，轮到你了。",
+	Rebuttal: "回应环节：所有人都已经发过一次言。回应别人对你的怀疑，或者质疑某个人的说法（比如对跳的预言家、前后矛盾的人）。不超过80字。",
+	WolfChat: "现在是夜里，只有狼同伴能听到你说话。和同伴商量：今晚杀谁；白天怎么打，包括要不要有人悍跳预言家、要不要切割、票往谁身上引。",
+	WolfPlan: "夜聊结束，你代表狼队定下最终计划，同伴白天会照着执行。target 是今晚要杀的人，优先杀可能是神职、或者发言最有威胁的人。" +
+		"speech 写白天的打法，不超过80字：谁悍跳预言家、给谁报什么查验结果（或者都不跳），白天一起把票引向谁。",
 	LastWords: "你被投票放逐了，发表遗言，不超过80字。",
-	Vote:      "根据今天的发言和回应，投票放逐一人。",
-	Kill:      "决定今晚杀谁。优先杀可能是预言家、或者发言最有威胁的人。",
+	Vote:      "根据今天的发言、回应和主持人汇总的表态，投票放逐一人。",
 	Inspect:   "选择今晚要查验的人。优先查最可疑、或者发言最能带动大家的人。",
 	Save:      "今晚谁被狼人杀了在【你的秘密信息】里。决定要不要用解药救他：选他的名字表示救，选\"" + Pass + "\"表示不救。",
 	Poison:    "决定要不要用毒药：选一个名字表示毒死他，选\"" + Pass + "\"表示不用。毒错了好人会很伤，没有把握就别用。",
@@ -117,6 +120,8 @@ func parseAction(reply string) (Action, error) {
 	}
 	a.Target = strings.TrimSpace(a.Target)
 	a.Speech = strings.TrimSpace(a.Speech)
+	a.Suspect = strings.TrimSpace(a.Suspect)
+	a.Claim = strings.TrimSpace(a.Claim)
 	return a, nil
 }
 
@@ -162,10 +167,17 @@ func prompt(t Turn) (system, user string) {
 	if t.Kind == Speech || t.Kind == Rebuttal {
 		fmt.Fprintf(&b, "你是这一轮第%d个发言。已经发言：%s。还没发言：%s。\n", len(t.Spoken)+1, orNobody(t.Spoken), orNobody(t.Waiting))
 	}
-	if t.Kind.IsChoice() {
-		fmt.Fprintf(&b, `只回复一个JSON对象，不要任何其他内容：{"thinking": "你的私下分析和选择理由，只有你自己看得到", "target": "名字"}。target 只能是这些名字之一：%s。`, strings.Join(t.Candidates, "、"))
-	} else {
-		b.WriteString(`只回复一个JSON对象，不要任何其他内容：{"thinking": "你的私下分析，只有你自己看得到", "speech": "你要说出口的话"}`)
+	b.WriteString("只回复一个JSON对象，不要任何其他内容：")
+	switch {
+	case t.Kind == WolfPlan:
+		fmt.Fprintf(&b, `{"thinking": "你的私下分析，只有你自己看得到", "target": "今晚杀的人", "speech": "白天的打法"}。target 只能是这些名字之一：%s。`, strings.Join(t.Candidates, "、"))
+	case t.Kind.IsChoice():
+		fmt.Fprintf(&b, `{"thinking": "你的私下分析和选择理由，只有你自己看得到", "target": "名字"}。target 只能是这些名字之一：%s。`, strings.Join(t.Candidates, "、"))
+	case t.Kind.Declares():
+		fmt.Fprintf(&b, `{"thinking": "你的私下分析，只有你自己看得到", "speech": "你要说出口的话", "suspect": "你现在最怀疑的人", "claim": "你公开声明的身份和信息，比如\"预言家，第1夜查验小红是好人\"；不声明身份就留空"}。`+
+			`suspect 只能是这些之一：%s。suspect 和 claim 会由主持人公开记录，必须和你的 speech 一致。`, strings.Join(t.Suspects, "、"))
+	default:
+		b.WriteString(`{"thinking": "你的私下分析，只有你自己看得到", "speech": "你要说出口的话"}`)
 	}
 	return system, b.String()
 }
