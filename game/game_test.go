@@ -50,18 +50,35 @@ func TestAChineseCastSeatsEveryRivalPairAndOneLoner(t *testing.T) {
 	assert.Len(t, Cast(English, rand.New(rand.NewPCG(1, 2))), len(Lineup))
 }
 
-func TestNoCharacterNamesAnyoneInTheCast(t *testing.T) {
+func TestACharacterNamesOnlyRivalsSureToBeAtTheTable(t *testing.T) {
 	everyone := slices.Clone(englishCast)
+	seatedWith := map[string][]string{}
+	for _, p := range englishCast {
+		for _, other := range englishCast {
+			if other.Name != p.Name {
+				seatedWith[p.Name] = append(seatedWith[p.Name], other.Name)
+			}
+		}
+	}
 	for _, pair := range chineseRivals {
 		everyone = append(everyone, pair[:]...)
+		seatedWith[pair[0].Name] = []string{pair[1].Name}
+		seatedWith[pair[1].Name] = []string{pair[0].Name}
 	}
 	everyone = append(everyone, chineseLoners...)
+
 	for _, p := range everyone {
 		assert.NotEmpty(t, p.Habit, "%s has a way of deciding", p.Name)
 		for _, other := range everyone {
-			assert.NotContains(t, p.Persona+p.Habit, other.Name,
-				"%s's character names %s, who may not be at the table, or makes them say their own name", p.Name, other.Name)
+			if !slices.Contains(seatedWith[p.Name], other.Name) {
+				assert.NotContains(t, p.Persona+p.Habit, other.Name,
+					"%s's character names %s, who may not be at the table, or makes them say their own name", p.Name, other.Name)
+			}
 		}
+	}
+	for _, pair := range chineseRivals {
+		assert.Contains(t, pair[0].Habit, pair[1].Name, "rivals know each other")
+		assert.Contains(t, pair[1].Habit, pair[0].Name, "rivals know each other")
 	}
 }
 

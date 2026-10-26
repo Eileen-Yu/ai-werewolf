@@ -5,11 +5,11 @@ Nine LLM players sit down to a game of Werewolf, and the game master is a [Dapr 
 Players fake seer claims, knife their own teammates to bait the witch's antidote, and call each other out. You can kill the game master at any point in a game and start another one: the game picks up where it stopped. Nothing already said is generated again, and no LLM call is repeated.
 
 ```text
-[Night 1]   Ruby(werewolf) thinks: By targeting Walter, we eliminate a potential threat. Claiming seer will protect us and distract from our true identities.
-[Night 1]   Dave(witch) thinks: I need to use my antidote wisely, and since Walter is dead, saving him is the best option to keep a good player in the game.
+[Night 1]   Karen(werewolf) thinks: By targeting NPC Steve, we eliminate a potential threat. Claiming seer will protect us and distract from our true identities.
+[Night 1]   Discord Mod(witch) thinks: I need to use my antidote wisely, and since NPC Steve is dead, saving him is the best option to keep a good player in the game.
 [Day 1] Host: Day breaks. Nobody died last night.
-[Day 1] Ruby(werewolf): I'm the seer. I checked Mia, and she is good. We should focus on getting rid of Jake today. [claims seer, Mia: good, suspects Jake]
-[Day 1] Jake(villager): Ruby, I see your claim, but targeting me seems like an easy route for you. Mia, what do you think of Ruby's claim? [claims villager, suspects Ruby]
+[Day 1] Karen(werewolf): I'm the seer. I checked Gym Bro, and he is good. We should focus on getting rid of Florida Man today. [claims seer, Gym Bro: good, suspects Florida Man]
+[Day 1] Florida Man(villager): Karen, I see your claim, but targeting me seems like an easy route for you. Gym Bro, what do you think of Karen's claim? [claims villager, suspects Karen]
 ```
 
 The game master's output is a god's-eye live feed: what everyone says out loud, what they privately think, and how their read on each player changes over the game.
@@ -18,7 +18,7 @@ The game master's output is a god's-eye live feed: what everyone says out loud, 
 
 - **Standard nine-player game**: 3 werewolves, a seer, a witch, a hunter and 3 villagers. Wolves win by clearing a side.
 - **Players only know what they should**: nobody else's role is ever sent to the model. The filtering happens in code, not in the prompt.
-- **Characters who play differently, not just talk differently**: each has a way of deciding as well as a way of talking. One holds grudges and votes for whoever voted for her; another only follows evidence, even against someone he trusted. A Chinese game seats four pairs of rivals and one of three loners, in a random order.
+- **Characters who play differently, not just talk differently**: each has a way of deciding as well as a way of talking. One holds grudges and votes for whoever voted for her; another only follows evidence, even against someone he trusted. An English game seats nine internet archetypes, from Florida Man to Discord Mod, who each have a named rival at the table. A Chinese game seats four pairs of rivals and one of three loners. Seats are in a random order.
 - **The wolves have a plan**: each night they agree who to kill, who fakes a seer claim tomorrow and who they vote out, then play it out by day.
 - **Players have memory**: everyone keeps notes on what they believe about each other player and why, updated every turn.
 - **Bad answers are sent back**: voting for someone not at the table, quoting someone who never spoke, or "there is no proof" as a reason all get the answer handed back to try again.
