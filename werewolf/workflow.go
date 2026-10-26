@@ -26,6 +26,8 @@ var players brain.Brain = brain.Random{}
 // SetBrain chooses how every player thinks. Call it before starting the worker.
 func SetBrain(b brain.Brain) { players = b }
 
+// Game is the workflow input. A State with no players gets
+// game.DefaultPlayers, so `{}` is enough to start a game.
 type Game struct {
 	State game.State `json:"state"`
 	// PhaseDelay is a durable timer between phases, so people watching can
@@ -103,6 +105,9 @@ type table struct {
 
 func (t *table) setup() error {
 	t.s.Round = 1
+	if len(t.s.Players) == 0 {
+		t.s.Players = game.DefaultPlayers()
+	}
 	var dealt []game.Player
 	if err := t.ctx.CallActivity(AssignRolesActivity, workflow.WithActivityInput(t.s.Players)).Await(&dealt); err != nil {
 		return err

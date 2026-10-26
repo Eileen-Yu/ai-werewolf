@@ -32,22 +32,32 @@ go run ./cmd/werewolf start -engine localhost:4001    # 开一局，等结果
 
 `-delay` 设置阶段之间的停顿（默认 2 秒）。这个停顿是 durable timer，同样能扛住重启。
 
-## 在 Catalyst 上玩（还没验证过）
+本地引擎只能用 `random` 大脑，因为 LLM 大脑要调用 Dapr 的 Conversation API。
 
-本地引擎只支持 `random` 大脑。要让 LLM 来玩，需要真正的 Dapr，`gm` 和 `start` 不加 `-engine` 时就会连 Dapr。
+## 在 Catalyst 上玩
 
-1. 在项目里建一个 conversation component，名字叫 `llm`。或者另取一个名字，再通过 `-llm-component` 传给 `gm`：
+`gm` 不加 `-engine` 时连 Dapr。`diagrid dev run` 会把 Catalyst 的 `DAPR_GRPC_ENDPOINT` 和 `DAPR_API_TOKEN` 注入给它，这时 workflow 状态和执行历史都存在 Catalyst 里。
 
-   ```bash
-   diagrid component create llm --type conversation.openai --metadata key=<你的 key> --metadata model=gpt-4o-mini
-   ```
+```bash
+diagrid project update <项目> --enable-managed-workflow      # Workflow API 需要它
+go build -o bin/werewolf ./cmd/werewolf
+diagrid dev run --project <项目> --id werewolf --approve -- ./bin/werewolf gm   # 主持人，输出就是直播
 
-2. 用 `diagrid dev run` 跑主持人和开局，它会注入 `DAPR_GRPC_ENDPOINT` 和 `DAPR_API_TOKEN`：
+# 另一个终端开局；phaseDelay 的单位是纳秒，可以不填
+diagrid workflow start GameWorkflow --project <项目> --id werewolf --instance-id game-1 --data '{"phaseDelay":2000000000}'
+diagrid workflow get game-1 --project <项目> --id werewolf  # 结果和执行历史
+```
 
-   ```bash
-   diagrid dev run --project <项目> --id werewolf -- go run ./cmd/werewolf gm -brain llm
-   diagrid dev run --project <项目> --id werewolf -- go run ./cmd/werewolf start
-   ```
+演示杀进程：Ctrl+C 停掉 `dev run`，再运行一次同样的命令。
+
+### 让 LLM 来玩（还没验证过）
+
+在项目里建一个 conversation component，名字叫 `llm`。或者另取一个名字，再通过 `-llm-component` 传给 `gm`。然后给 `gm` 加上 `-brain llm`：
+
+```bash
+diagrid component create llm --project <项目> --type conversation.openai --metadata key=<你的 key> --metadata model=gpt-4o-mini
+diagrid dev run --project <项目> --id werewolf --approve -- ./bin/werewolf gm -brain llm
+```
 
 一局大约 60 次 LLM 调用。
 

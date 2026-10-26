@@ -27,7 +27,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/eileenyu/catalyst-werewolf/brain"
-	"github.com/eileenyu/catalyst-werewolf/game"
 	"github.com/eileenyu/catalyst-werewolf/internal/engine"
 	"github.com/eileenyu/catalyst-werewolf/werewolf"
 )
@@ -130,7 +129,7 @@ func runStart(ctx context.Context, args []string) error {
 	defer closeConn()
 
 	client := workflow.NewClient(conn)
-	input := werewolf.Game{State: game.State{Players: game.DefaultPlayers()}, PhaseDelay: *delay}
+	input := werewolf.Game{PhaseDelay: *delay}
 	if _, err := client.ScheduleWorkflow(ctx, "GameWorkflow", workflow.WithInstanceID(*id), workflow.WithInput(input)); err != nil {
 		return fmt.Errorf("start game: %w", err)
 	}

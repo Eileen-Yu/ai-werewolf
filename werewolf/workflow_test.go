@@ -81,7 +81,7 @@ func (k *killAfter) tick() {
 }
 
 func newGame() Game {
-	return Game{State: game.State{Players: game.DefaultPlayers()}}
+	return Game{}
 }
 
 func playGame(t *testing.T, client *workflow.Client, id string) Result {
