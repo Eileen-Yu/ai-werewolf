@@ -64,20 +64,11 @@ type killAfter struct {
 	kill  func()
 }
 
-func (k *killAfter) Speak(ctx context.Context, t brain.Turn) (string, error) {
-	k.tick()
-	return brain.Random{}.Speak(ctx, t)
-}
-
-func (k *killAfter) Choose(ctx context.Context, t brain.Turn) (string, error) {
-	k.tick()
-	return brain.Random{}.Choose(ctx, t)
-}
-
-func (k *killAfter) tick() {
+func (k *killAfter) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
 	if k.calls.Add(1) >= k.n {
 		k.once.Do(k.kill)
 	}
+	return brain.Random{}.Act(ctx, t)
 }
 
 func newGame() Game {

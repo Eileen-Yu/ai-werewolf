@@ -5,6 +5,9 @@ package brain
 
 import (
 	"context"
+	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/eileenyu/catalyst-werewolf/game"
 )
@@ -12,7 +15,8 @@ import (
 type TurnKind string
 
 const (
-	Speech    TurnKind = "speech"     // daytime speech
+	Speech    TurnKind = "speech"     // daytime speech, first time round the table
+	Rebuttal  TurnKind = "rebuttal"   // daytime, second time round: answer and challenge
 	WolfChat  TurnKind = "wolf_chat"  // night, wolves only
 	LastWords TurnKind = "last_words" // after being voted out
 	Vote      TurnKind = "vote"       // daytime vote
@@ -20,22 +24,58 @@ const (
 	Inspect   TurnKind = "inspect"    // seer picks who to check
 )
 
+// IsChoice reports whether the turn asks for a Target rather than a Speech.
+func (k TurnKind) IsChoice() bool {
+	return k == Vote || k == Kill || k == Inspect
+}
+
+// Seat is what everyone knows about a player: their name and, once they are
+// out, how they left. Never their role.
+type Seat struct {
+	Name  string `json:"name"`
+	Death string `json:"death,omitempty"`
+}
+
 // Turn is everything a player is told when it is their turn. Transcript is
 // already filtered to what this player may see.
 type Turn struct {
 	Kind       TurnKind     `json:"kind"`
 	Round      int          `json:"round"`
+	Phase      game.Phase   `json:"phase"`
 	Me         game.Player  `json:"me"`
-	Players    []string     `json:"players"` // everyone at the table, dead or alive
-	Alive      []string     `json:"alive"`
+	Seats      []Seat       `json:"seats"`
 	Transcript []game.Event `json:"transcript"`
-	Candidates []string     `json:"candidates"`
+	Candidates []string     `json:"candidates,omitempty"`
+	// Spoken and Waiting are, for a speaking turn, who has already spoken in
+	// this go round the table and who is still to.
+	Spoken  []string `json:"spoken,omitempty"`
+	Waiting []string `json:"waiting,omitempty"`
+}
+
+// Action is a player's move. Thinking is private and becomes part of the
+// player's own memory; Speech is said aloud; Target is the pick on a choice
+// turn.
+type Action struct {
+	Thinking string `json:"thinking"`
+	Speech   string `json:"speech,omitempty"`
+	Target   string `json:"target,omitempty"`
+}
+
+// Check reports what is wrong with an action for this turn, in words that can
+// be handed back to the player.
+func (t Turn) Check(a Action) error {
+	if t.Kind.IsChoice() {
+		if !slices.Contains(t.Candidates, strings.TrimSpace(a.Target)) {
+			return fmt.Errorf("target 必须是这些名字之一：%s，你给的是 %q", strings.Join(t.Candidates, "、"), a.Target)
+		}
+		return nil
+	}
+	if strings.TrimSpace(a.Speech) == "" {
+		return fmt.Errorf("speech 不能为空")
+	}
+	return nil
 }
 
 type Brain interface {
-	// Speak returns what the player says on a Speech, WolfChat or LastWords turn.
-	Speak(ctx context.Context, t Turn) (string, error)
-	// Choose returns the player's free-text pick on a Vote, Kill or Inspect
-	// turn; the caller matches it against t.Candidates.
-	Choose(ctx context.Context, t Turn) (string, error)
+	Act(ctx context.Context, t Turn) (Action, error)
 }

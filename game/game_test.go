@@ -31,6 +31,32 @@ func TestVisibleToHidesOtherPlayersSecrets(t *testing.T) {
 	assert.Equal(t, []Event{{Round: 1, Text: "天黑请闭眼"}}, s.VisibleTo("大刘"))
 }
 
+func TestThoughtsAreOnlyVisibleToTheThinker(t *testing.T) {
+	s := &State{Round: 1, Phase: Day}
+	s.Think("老王", "美玲像预言家")
+
+	require.Len(t, s.VisibleTo("老王"), 1)
+	assert.True(t, s.VisibleTo("老王")[0].Thought)
+	assert.Equal(t, "第1天", s.VisibleTo("老王")[0].When())
+	assert.Empty(t, s.VisibleTo("美玲"))
+}
+
+func TestRemoveRecordsHowAndWhen(t *testing.T) {
+	s := &State{Round: 2, Phase: Night, Players: []Player{{Name: "小红", Alive: true}}}
+	s.Remove("小红", "被狼人杀害")
+
+	assert.False(t, s.Player("小红").Alive)
+	assert.Equal(t, "第2夜被狼人杀害", s.Player("小红").Death)
+}
+
+func TestRotate(t *testing.T) {
+	names := []string{"a", "b", "c"}
+	assert.Equal(t, []string{"a", "b", "c"}, Rotate(names, 0))
+	assert.Equal(t, []string{"c", "a", "b"}, Rotate(names, 2))
+	assert.Equal(t, []string{"b", "c", "a"}, Rotate(names, 4))
+	assert.Nil(t, Rotate(nil, 1))
+}
+
 func TestWinner(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -79,11 +105,4 @@ func TestTally(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
-}
-
-func TestMatchCandidate(t *testing.T) {
-	candidates := []string{"老王", "小红", "阿杰"}
-	assert.Equal(t, "小红", MatchCandidate("我投小红，不是老王", candidates))
-	assert.Equal(t, "阿杰", MatchCandidate("阿杰", candidates))
-	assert.Equal(t, "", MatchCandidate("我弃票", candidates))
 }

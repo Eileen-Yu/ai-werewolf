@@ -58,8 +58,7 @@ func Register(r *workflow.Registry) error {
 	return errors.Join(
 		r.AddWorkflow(GameWorkflow),
 		r.AddActivity(AssignRolesActivity),
-		r.AddActivity(SpeakActivity),
-		r.AddActivity(ChooseActivity),
+		r.AddActivity(ActActivity),
 	)
 }
 
@@ -105,7 +104,7 @@ type table struct {
 }
 
 func (t *table) setup() error {
-	t.s.Round = 1
+	t.s.Round, t.s.Phase = 1, game.Night
 	if len(t.s.Players) == 0 {
 		t.s.Players = game.DefaultPlayers()
 	}
@@ -126,17 +125,14 @@ func (t *table) setup() error {
 
 func (t *table) night() error {
 	s := t.s
+	s.Phase = game.Night
 	t.add("", fmt.Sprintf("第%d夜，天黑请闭眼。", s.Round))
 
 	wolves := s.Living(game.Werewolf)
 	targets := game.Without(s.Living(), wolves...)
 	if len(wolves) > 1 { // a lone wolf has nobody to plot with
-		for _, w := range wolves {
-			line, err := t.speak(brain.WolfChat, w, targets)
-			if err != nil {
-				return err
-			}
-			t.add(w, line, wolves...)
+		if err := t.goRound(brain.WolfChat, wolves, targets, wolves...); err != nil {
+			return err
 		}
 	}
 	kills, err := t.chooseAll(brain.Kill, wolves, func(string) []string { return targets })
@@ -168,11 +164,12 @@ func (t *table) night() error {
 		return err
 	}
 
+	s.Phase = game.Day
 	if victim == "" {
 		t.add("", "天亮了，昨晚是平安夜。")
 		return nil
 	}
-	s.Player(victim).Alive = false
+	s.Remove(victim, "被狼人杀害（狼人不会杀同伴，所以一定是好人）")
 	t.add("", fmt.Sprintf("天亮了，昨晚%s死了。", victim))
 	return nil
 }
@@ -180,12 +177,14 @@ func (t *table) night() error {
 func (t *table) day() error {
 	s := t.s
 	alive := s.Living()
-	for _, p := range alive {
-		line, err := t.speak(brain.Speech, p, game.Without(alive, p))
-		if err != nil {
-			return err
-		}
-		t.add(p, line)
+	order := game.Rotate(alive, s.Round-1)
+	t.add("", fmt.Sprintf("今天的发言顺序：%s。", strings.Join(order, "、")))
+	if err := t.goRound(brain.Speech, order, nil); err != nil {
+		return err
+	}
+	t.add("", "回应环节：每人再说一次，可以回应怀疑或者质疑别人。")
+	if err := t.goRound(brain.Rebuttal, order, nil); err != nil {
+		return err
 	}
 
 	votes, err := t.chooseAll(brain.Vote, alive, func(me string) []string { return game.Without(alive, me) })
@@ -207,14 +206,25 @@ func (t *table) day() error {
 		t.add("", "平票，今天无人出局。")
 		return t.pause()
 	}
-	s.Player(out).Alive = false
+	s.Remove(out, "被投票放逐")
 	t.add("", fmt.Sprintf("%s被放逐了。", out))
-	words, err := t.speak(brain.LastWords, out, nil)
-	if err != nil {
+	if err := t.speak(t.turn(brain.LastWords, out, nil)); err != nil {
 		return err
 	}
-	t.add(out, words)
 	return t.pause()
+}
+
+// goRound has each speaker talk in order, each one told who has spoken
+// before them and who is still to come.
+func (t *table) goRound(kind brain.TurnKind, order, candidates []string, audience ...string) error {
+	for i, name := range order {
+		turn := t.turn(kind, name, candidates)
+		turn.Spoken, turn.Waiting = order[:i], order[i+1:]
+		if err := t.speak(turn, audience...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 var retry = workflow.WithActivityRetryPolicy(&workflow.RetryPolicy{
@@ -224,25 +234,35 @@ var retry = workflow.WithActivityRetryPolicy(&workflow.RetryPolicy{
 })
 
 func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brain.Turn {
-	var everyone []string
-	for _, p := range t.s.Players {
-		everyone = append(everyone, p.Name)
+	seats := make([]brain.Seat, len(t.s.Players))
+	for i, p := range t.s.Players {
+		seats[i] = brain.Seat{Name: p.Name, Death: p.Death}
 	}
 	return brain.Turn{
 		Kind:       kind,
 		Round:      t.s.Round,
+		Phase:      t.s.Phase,
 		Me:         *t.s.Player(name),
-		Players:    everyone,
-		Alive:      t.s.Living(),
+		Seats:      seats,
 		Transcript: t.s.VisibleTo(name),
 		Candidates: candidates,
 	}
 }
 
-func (t *table) speak(kind brain.TurnKind, name string, candidates []string) (string, error) {
-	var line string
-	err := t.ctx.CallActivity(SpeakActivity, workflow.WithActivityInput(t.turn(kind, name, candidates)), retry).Await(&line)
-	return line, err
+func (t *table) act(turn brain.Turn) workflow.Task {
+	return t.ctx.CallActivity(ActActivity, workflow.WithActivityInput(turn), retry)
+}
+
+// speak plays a speaking turn: the player's thinking goes into their own
+// memory, then what they say is heard by audience (everyone if empty).
+func (t *table) speak(turn brain.Turn, audience ...string) error {
+	var a brain.Action
+	if err := t.act(turn).Await(&a); err != nil {
+		return err
+	}
+	t.think(turn.Me.Name, a.Thinking)
+	t.add(turn.Me.Name, a.Speech, audience...)
+	return nil
 }
 
 // chooseAll asks every voter at once and waits for them all, so votes are
@@ -250,14 +270,16 @@ func (t *table) speak(kind brain.TurnKind, name string, candidates []string) (st
 func (t *table) chooseAll(kind brain.TurnKind, voters []string, candidates func(voter string) []string) ([]game.Vote, error) {
 	tasks := make([]workflow.Task, len(voters))
 	for i, v := range voters {
-		tasks[i] = t.ctx.CallActivity(ChooseActivity, workflow.WithActivityInput(t.turn(kind, v, candidates(v))), retry)
+		tasks[i] = t.act(t.turn(kind, v, candidates(v)))
 	}
 	votes := make([]game.Vote, len(voters))
 	for i, task := range tasks {
-		votes[i].Voter = voters[i]
-		if err := task.Await(&votes[i].Target); err != nil {
+		var a brain.Action
+		if err := task.Await(&a); err != nil {
 			return nil, err
 		}
+		t.think(voters[i], a.Thinking)
+		votes[i] = game.Vote{Voter: voters[i], Target: a.Target}
 	}
 	return votes, nil
 }
@@ -269,22 +291,35 @@ func (t *table) pause() error {
 	return t.ctx.CreateTimer(t.delay).Await(nil)
 }
 
-// add records an event and narrates it from the god's-eye view. Narration is
-// skipped on replay so a resumed game does not print its history twice.
+// add records an event and narrates it from the god's-eye view.
 func (t *table) add(speaker, text string, audience ...string) {
-	e := t.s.Add(speaker, text, audience...)
+	t.narrate(t.s.Add(speaker, text, audience...))
+}
+
+func (t *table) think(name, text string) {
+	if text != "" {
+		t.narrate(t.s.Think(name, text))
+	}
+}
+
+// narrate prints an event. It is skipped on replay so a resumed game does not
+// print its history twice.
+func (t *table) narrate(e game.Event) {
 	if t.ctx.IsReplaying() {
 		return
 	}
 	who := "主持人"
-	if p := t.s.Player(speaker); p != nil {
+	if p := t.s.Player(e.Speaker); p != nil {
 		who = fmt.Sprintf("%s(%s)", p.Name, p.Role)
 	}
-	line := fmt.Sprintf("[第%d轮] %s：%s", e.Round, who, e.Text)
-	if len(e.Audience) > 0 {
-		line += fmt.Sprintf("   〔仅%s可见〕", strings.Join(e.Audience, "、"))
+	switch {
+	case e.Thought:
+		fmt.Printf("[%s]   %s 内心：%s\n", e.When(), who, e.Text)
+	case len(e.Audience) > 0:
+		fmt.Printf("[%s] %s：%s   〔仅%s可见〕\n", e.When(), who, e.Text, strings.Join(e.Audience, "、"))
+	default:
+		fmt.Printf("[%s] %s：%s\n", e.When(), who, e.Text)
 	}
-	fmt.Println(line)
 }
 
 func AssignRolesActivity(ctx workflow.ActivityContext) (any, error) {
@@ -295,28 +330,25 @@ func AssignRolesActivity(ctx workflow.ActivityContext) (any, error) {
 	return game.AssignRoles(ps, rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))), nil
 }
 
-func SpeakActivity(ctx workflow.ActivityContext) (any, error) {
+// ActActivity asks a player for their move. A move that is still invalid
+// after the brain's own re-asking is not allowed to stall the game: a bad
+// pick counts as abstaining and an empty speech as silence.
+func ActActivity(ctx workflow.ActivityContext) (any, error) {
 	var t brain.Turn
 	if err := ctx.GetInput(&t); err != nil {
 		return nil, err
 	}
-	return players.Speak(ctx.Context(), t)
-}
-
-// ChooseActivity returns the candidate the player named, or "" for an
-// abstention when the reply names nobody on the list.
-func ChooseActivity(ctx workflow.ActivityContext) (any, error) {
-	var t brain.Turn
-	if err := ctx.GetInput(&t); err != nil {
-		return nil, err
-	}
-	reply, err := players.Choose(ctx.Context(), t)
+	a, err := players.Act(ctx.Context(), t)
 	if err != nil {
 		return nil, err
 	}
-	pick := game.MatchCandidate(reply, t.Candidates)
-	if pick == "" {
-		log.Printf("%s's %s reply names no candidate, counted as abstaining: %q", t.Me.Name, t.Kind, reply)
+	if err := t.Check(a); err != nil {
+		log.Printf("%s's %s move is invalid, playing it as a pass: %v", t.Me.Name, t.Kind, err)
+		if t.Kind.IsChoice() {
+			a.Target = ""
+		} else {
+			a.Speech = "（沉默）"
+		}
 	}
-	return pick, nil
+	return a, nil
 }

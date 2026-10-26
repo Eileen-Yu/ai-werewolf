@@ -24,19 +24,23 @@ var (
 	}
 )
 
-func (Random) Speak(_ context.Context, t Turn) (string, error) {
-	switch t.Kind {
-	case LastWords:
-		return "我是好人，你们一定要找出狼人！", nil
-	case WolfChat:
-		return fmt.Sprintf(pick(wolfLines), pick(t.Candidates)), nil
-	default:
-		return fmt.Sprintf(pick(speechLines), pick(t.Candidates)), nil
+func (Random) Act(_ context.Context, t Turn) (Action, error) {
+	others := make([]string, 0, len(t.Seats))
+	for _, s := range t.Seats {
+		if s.Death == "" && s.Name != t.Me.Name {
+			others = append(others, s.Name)
+		}
 	}
-}
-
-func (Random) Choose(_ context.Context, t Turn) (string, error) {
-	return pick(t.Candidates), nil
+	switch t.Kind {
+	case Vote, Kill, Inspect:
+		return Action{Target: pick(t.Candidates)}, nil
+	case LastWords:
+		return Action{Speech: "我是好人，你们一定要找出狼人！"}, nil
+	case WolfChat:
+		return Action{Speech: fmt.Sprintf(pick(wolfLines), pick(t.Candidates))}, nil
+	default:
+		return Action{Speech: fmt.Sprintf(pick(speechLines), pick(others))}, nil
+	}
 }
 
 func pick(xs []string) string {

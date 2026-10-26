@@ -4,9 +4,9 @@
 package game
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"slices"
-	"strings"
 )
 
 type Role string
@@ -20,11 +20,20 @@ const (
 // Lineup is the role mix for a six-player game.
 var Lineup = []Role{Werewolf, Werewolf, Seer, Villager, Villager, Villager}
 
+type Phase string
+
+const (
+	Night Phase = "夜"
+	Day   Phase = "天"
+)
+
 type Player struct {
 	Name    string `json:"name"`
 	Persona string `json:"persona"`
 	Role    Role   `json:"role,omitempty"`
 	Alive   bool   `json:"alive"`
+	// Death says how the player left the game, e.g. "第1夜被狼人杀害".
+	Death string `json:"death,omitempty"`
 }
 
 // DefaultPlayers is the cast used when a game is started without one.
@@ -55,26 +64,49 @@ func AssignRoles(players []Player, rng *rand.Rand) []Player {
 // sees it; otherwise only the named players do.
 type Event struct {
 	Round    int      `json:"round"`
+	Phase    Phase    `json:"phase"`
 	Speaker  string   `json:"speaker,omitempty"`
 	Text     string   `json:"text"`
 	Audience []string `json:"audience,omitempty"`
+	// Thought marks a player's private reasoning; its Audience is the player.
+	Thought bool `json:"thought,omitempty"`
 }
 
 func (e Event) VisibleTo(name string) bool {
 	return len(e.Audience) == 0 || slices.Contains(e.Audience, name)
 }
 
+// When is the event's time on the game clock, e.g. "第2天".
+func (e Event) When() string {
+	return fmt.Sprintf("第%d%s", e.Round, e.Phase)
+}
+
 type State struct {
 	Round   int      `json:"round"`
+	Phase   Phase    `json:"phase"`
 	Players []Player `json:"players"`
 	Log     []Event  `json:"log"`
 }
 
 // Add appends an event to the transcript and returns it.
 func (s *State) Add(speaker, text string, audience ...string) Event {
-	e := Event{Round: s.Round, Speaker: speaker, Text: text, Audience: audience}
+	e := Event{Round: s.Round, Phase: s.Phase, Speaker: speaker, Text: text, Audience: audience}
 	s.Log = append(s.Log, e)
 	return e
+}
+
+// Think records a player's private reasoning, which only they will see.
+func (s *State) Think(name, text string) Event {
+	e := Event{Round: s.Round, Phase: s.Phase, Speaker: name, Text: text, Audience: []string{name}, Thought: true}
+	s.Log = append(s.Log, e)
+	return e
+}
+
+// Remove takes a player out of the game; how is e.g. "被狼人杀害".
+func (s *State) Remove(name, how string) {
+	p := s.Player(name)
+	p.Alive = false
+	p.Death = fmt.Sprintf("第%d%s%s", s.Round, s.Phase, how)
 }
 
 // VisibleTo is the part of the transcript the named player is allowed to see.
@@ -152,16 +184,14 @@ func Tally(votes []Vote) (string, bool) {
 	return best, true
 }
 
-// MatchCandidate finds which candidate a free-text reply names: the one that
-// appears earliest, so "小红，不是老王" picks 小红. It returns "" when none do.
-func MatchCandidate(reply string, candidates []string) string {
-	best, bestAt := "", -1
-	for _, c := range candidates {
-		if at := strings.Index(reply, c); at >= 0 && (bestAt < 0 || at < bestAt) {
-			best, bestAt = c, at
-		}
+// Rotate returns names starting from index n, wrapping around, so the
+// speaking order moves round the table from one day to the next.
+func Rotate(names []string, n int) []string {
+	if len(names) == 0 {
+		return nil
 	}
-	return best
+	n %= len(names)
+	return append(slices.Clone(names[n:]), names[:n]...)
 }
 
 // Without returns names minus the excluded ones.
