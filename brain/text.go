@@ -91,6 +91,7 @@ var chineseText = text{
 推理要点，很多人会想错：
 - 预言家查验某人是好人，和女巫救了这个人，完全不矛盾：狼人刀了一个好人，女巫把他救了下来。
 - 两个人的声明对得上，就是证据。比如A声称查验B是好人，C声称是女巫、那晚救了B：两个说法互相印证，A和C都更可信，除非他们是串通好的狼。
+- 有人报了你的查验结果时，你知道自己的真实身份：报对了，是他像真预言家的有力证据；把你报错了，他一定在撒谎。
 - 两个人对跳同一个神职时，不要说"他没有实证"，要比较谁的说法和其他声明、死亡、投票更吻合，谁跳得更自然。
 - 被狼人刀的人不一定是好人，狼人可以自刀；被女巫救下的人也不一定是好人。
 - 平安夜：要么女巫用了解药，要么狼人没杀人。一晚死两个人：一个被刀，一个被毒。
@@ -151,7 +152,7 @@ var chineseText = text{
 	badBelief:      "notes.beliefs 里的 %q 有问题：名字必须是桌上的其他玩家，side 只能是%s",
 	quoteCues:      []string{"说过", "说的", "提到", "的发言", "发言里", "发言中", "的观点", "的说法"},
 	justNow:        "刚才",
-	noProof:        []string{"缺乏证据", "没有证据", "缺乏实证", "没有实证", "缺乏实质证据", "没有任何证据", "证据支持", "缺乏足够的证据"},
+	noProof:        []string{"缺乏证据", "没有证据", "缺乏实证", "没有实证", "缺乏实质证据", "没有任何证据", "证据支持", "缺乏足够的证据", "更多证据", "其他人证实", "其他证实", "未得到证实", "没有得到证实", "没有被验证", "没有验证", "没有得到验证"},
 	noProofUsed:    "不能用\"%s\"当理由：身份声明本来就没法当场证实，这句话对谁都成立。换成具体的依据：谁的说法和哪件事对得上或对不上，谁的投票和发言不一致",
 	ownName:        "你就是%s。说到自己要用\"我\"，不要用第三人称说自己的名字",
 	sep:            "；",
@@ -261,6 +262,7 @@ How to think, in this order every time:
 Reasoning points people often get wrong:
 - A seer checking someone as good and the witch saving that same person do not contradict each other: the werewolves killed a good player and the witch saved them.
 - Two claims that fit together are evidence. If A claims they checked B as good, and C claims to be the witch and to have saved B that night, the claims back each other up and both A and C become more credible, unless they are werewolves working together.
+- When someone reports a check on you, you know your own role: if they got it right, that is strong evidence they are the real seer; if they got it wrong, they are certainly lying.
 - When two people claim the same power role, do not say "he has no proof". Compare whose story fits the other claims, the deaths and the votes better, and whose claim came more naturally.
 - Someone the werewolves killed is not necessarily good, since werewolves can self-kill; someone the witch saved is not necessarily good either.
 - A night with no deaths means either the witch used the antidote or the werewolves killed nobody. Two deaths in one night means one kill and one poisoning.
@@ -322,7 +324,7 @@ Write everything in English.`,
 	badBelief:      "%q in notes.beliefs is wrong: names must be other players at the table, and side one of %s",
 	quoteCues:      []string{" said", " says", " mentioned", "'s speech", "'s point", "'s argument", " argued", " claimed"},
 	justNow:        " just",
-	noProof:        []string{"no proof", "no evidence", "lack of evidence", "lacks evidence", "without evidence", "without proof", "no real evidence", "no solid evidence"},
+	noProof:        []string{"no proof", "no evidence", "lack of evidence", "lacks evidence", "without evidence", "without proof", "no real evidence", "no solid evidence", "more evidence", "not been verified", "not verified", "nobody has confirmed", "no one has confirmed"},
 	noProofUsed:    "do not use \"%s\" as a reason: no role claim can be proven on the spot, so it is true of everyone. Use something concrete instead: whose story fits or contradicts which event, whose vote does not match their words",
 	ownName:        "you are %s. Refer to yourself as \"I\", never by your own name",
 	sep:            "; ",

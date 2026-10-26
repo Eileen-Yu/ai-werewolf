@@ -218,6 +218,8 @@ func TestCheckRejectsEmptyReasoning(t *testing.T) {
 	assert.ErrorContains(t, zh.Check(Action{Speech: "阿杰的女巫身份缺乏证据支持", Suspect: "阿杰"}), "不能用\"缺乏证据\"当理由")
 	assert.ErrorContains(t, zh.Check(Action{Speech: "我觉得小林很可疑", Suspect: "阿杰"}), "你就是小林")
 	assert.NoError(t, zh.Check(Action{Speech: "阿杰第1天投了老王，和他自己的说法对不上", Suspect: "阿杰"}))
+	lastWords := Turn{Kind: LastWords, Me: game.Player{Name: "小林"}}
+	assert.ErrorContains(t, lastWords.Check(Action{Speech: "小红的说法没有其他人证实"}), "其他人证实")
 
 	en := Turn{Lang: game.English, Kind: Rebuttal, Me: game.Player{Name: "Leo"}, Suspects: []string{"Kai", game.Nobody}}
 	assert.ErrorContains(t, en.Check(Action{Speech: "Kai has No Proof at all.", Suspect: "Kai"}), `"no proof"`)

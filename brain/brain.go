@@ -135,7 +135,7 @@ func (t Turn) Check(a Action) error {
 	if t.Kind.Speaks() && t.Kind != WolfPlan && t.Me.Name != "" && strings.Contains(a.Speech, t.Me.Name) {
 		problems = append(problems, fmt.Sprintf(tx.ownName, t.Me.Name))
 	}
-	if t.Kind.Declares() {
+	if t.Kind.Declares() || t.Kind == LastWords {
 		for _, p := range tx.noProof {
 			if strings.Contains(strings.ToLower(a.Speech), p) {
 				problems = append(problems, fmt.Sprintf(tx.noProofUsed, p))
