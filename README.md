@@ -28,7 +28,7 @@ The game master's output is a god's-eye live feed: what everyone says out loud, 
 ## Rules
 
 - **Night**: the werewolves talk in private and pick who to kill (they may pick one of their own). The witch learns who was killed and may save them or poison someone: each potion works once, at most one per night, and she cannot save herself. The seer checks one player.
-- **Dawn**: only who died is announced, not how. A hunter who is out may shoot one player, unless the witch poisoned him.
+- **Dawn**: only who died is announced, not how. A hunter who is out may shoot one player, unless the witch poisoned him. The shot is not announced either: a hunter killed at night shoots before dawn, and the player he shot is simply on the list of the dead. A hunter voted out by day shoots after his last words, and the host only says who has died.
 - **Day**: everyone speaks once, then everyone gets one reply. Then a vote: a tie means nobody goes. Whoever is voted out gets last words.
 - **Winning**: the good side wins when every werewolf is out. The werewolves win when every villager is out, or every power role is out.
 

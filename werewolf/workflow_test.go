@@ -95,6 +95,70 @@ func (b *savingWitch) Act(ctx context.Context, t brain.Turn) (brain.Action, erro
 	return brain.Random{}.Act(ctx, t)
 }
 
+func TestTheHuntersShotIsNeverAnnounced(t *testing.T) {
+	client := startEngine(t)
+	startWorker(t, client)
+
+	seen := 0
+	for i := 0; i < 30 && seen == 0; i++ {
+		b := &shootingHunter{}
+		SetBrain(b)
+		playGame(t, client, fmt.Sprintf("shot-%d", i))
+		if len(b.shots) == 0 {
+			continue
+		}
+		shot := b.shots[0]
+		for _, turn := range b.turns {
+			for _, e := range turn.Transcript {
+				if strings.HasPrefix(e.Text, "你开枪带走了") {
+					assert.Equal(t, shot.hunter, turn.Me.Name, "only the hunter is told who he shot")
+				}
+				if len(e.Audience) == 0 && e.Speaker == "" && !strings.HasPrefix(e.Text, "欢迎") {
+					assert.NotContains(t, e.Text, "猎人", "the host never says who the hunter is")
+				}
+			}
+			for _, s := range turn.Seats {
+				if s.Name == shot.target && s.Death != "" {
+					seen++
+					assert.Equal(t, game.Chinese.When(shot.round, shot.phase)+"死亡", s.Death, "%s is shown dying like anyone else", s.Name)
+				}
+			}
+		}
+	}
+	require.NotZero(t, seen, "no game went on after the hunter shot someone")
+}
+
+// shootingHunter plays randomly, except that the witch never uses a potion and
+// the hunter always shoots. It records every turn and every shot.
+type shootingHunter struct {
+	mu    sync.Mutex
+	turns []brain.Turn
+	shots []struct {
+		round          int
+		phase          game.Phase
+		hunter, target string
+	}
+}
+
+func (b *shootingHunter) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.turns = append(b.turns, t)
+	switch t.Kind {
+	case brain.Save, brain.Poison:
+		return brain.Action{Target: game.Pass}, nil
+	case brain.Shoot:
+		target := t.Candidates[0]
+		b.shots = append(b.shots, struct {
+			round          int
+			phase          game.Phase
+			hunter, target string
+		}{t.Round, t.Phase, t.Me.Name, target})
+		return brain.Action{Target: target}, nil
+	}
+	return brain.Random{}.Act(ctx, t)
+}
+
 func TestVotersSeeStancesAndOnlyWolvesSeeThePlan(t *testing.T) {
 	b := &firstVotes{heard: map[string][]game.Event{}}
 	SetBrain(b)

@@ -66,7 +66,7 @@ var chineseText = text{
 - 女巫：有一瓶解药和一瓶毒药，各只能用一次，同一晚最多用一瓶。每晚会知道谁被狼人杀了，可以用解药救他（不能救自己），也可以用毒药毒死任何一个人。
 - 猎人：出局时可以开枪带走一个人；被女巫毒死时不能开枪。
 - 村民：没有特殊能力。
-流程：天亮后只公布昨晚谁死了，不公布死因（可能被狼人杀，也可能被女巫毒死，被救的人不会死）。
+流程：天亮后只公布昨晚谁死了，不公布死因（可能被狼人杀，可能被女巫毒死，也可能被出局的猎人开枪带走；被救的人不会死）。猎人开枪也不公布，被带走的人只会出现在死亡名单里。
 白天先按顺序每人发言一次，再进入回应环节每人再说一次，最后投票放逐一人，平票则无人出局。被放逐的人有遗言。
 胜负：狼人全部出局则好人胜利；所有村民出局，或者预言家、女巫、猎人全部出局，则狼人胜利。
 
@@ -94,10 +94,10 @@ var chineseText = text{
 - 有人报了你的查验结果时，你知道自己的真实身份：报对了，是他像真预言家的有力证据；把你报错了，他一定在撒谎。
 - 两个人对跳同一个神职时，不要说"他没有实证"，要比较谁的说法和其他声明、死亡、投票更吻合，谁跳得更自然。
 - 被狼人刀的人不一定是好人，狼人可以自刀；被女巫救下的人也不一定是好人。
-- 平安夜：要么女巫用了解药，要么狼人没杀人。一晚死两个人：一个被刀，一个被毒。
+- 平安夜：要么女巫用了解药，要么狼人没杀人。一晚死两个人：可能一个被刀、一个被毒，也可能被刀的是猎人，他开枪带走了另一个。一晚死三个人：一个被刀、一个被毒，被刀的猎人还开枪带走了一个。
 - 每种神职只有一个人。两个人声称同一个神职，至少有一个是假的，假的那个很可能是狼人。
 - 女巫声称某晚救了某人，而那晚这个人死了，或者那晚不是平安夜，她的说法就有问题。
-- 猎人开枪带走的人不一定是狼人。被放逐的人不一定是狼人，翻不翻牌要看结果。
+- 白天有人被放逐之后又有人死亡，说明被放逐的是猎人，开枪带走了他。猎人带走的人不一定是狼人。被放逐的人不一定是狼人，翻不翻牌要看结果。
 - 第1夜还没有任何公开信息，没有人能看出谁是神职。
 
 说到自己时用"我"，不要用第三人称说自己的名字。
@@ -237,7 +237,7 @@ Roles:
 - Witch: has one antidote and one poison, each usable once, and at most one per night. Each night she learns who the werewolves killed and may save them with the antidote (never herself), or poison anyone.
 - Hunter: when out of the game, may shoot one person and take them out too; not if the witch poisoned them.
 - Villager: no power.
-Flow: at dawn only who died is announced, never how (killed by werewolves or poisoned by the witch; a saved player does not die).
+Flow: at dawn only who died is announced, never how (killed by werewolves, poisoned by the witch, or shot by a hunter who went out; a saved player does not die). A hunter's shot is not announced either: the player shot simply appears among the dead.
 By day everyone speaks once in order, then once more in a reply round, then everyone votes one person out; a tie means nobody goes. The exiled player gets last words.
 Winning: the good side wins when every werewolf is out; the werewolves win when every villager is out, or when the seer, witch and hunter are all out.
 
@@ -265,10 +265,10 @@ Reasoning points people often get wrong:
 - When someone reports a check on you, you know your own role: if they got it right, that is strong evidence they are the real seer; if they got it wrong, they are certainly lying.
 - When two people claim the same power role, do not say "he has no proof". Compare whose story fits the other claims, the deaths and the votes better, and whose claim came more naturally.
 - Someone the werewolves killed is not necessarily good, since werewolves can self-kill; someone the witch saved is not necessarily good either.
-- A night with no deaths means either the witch used the antidote or the werewolves killed nobody. Two deaths in one night means one kill and one poisoning.
+- A night with no deaths means either the witch used the antidote or the werewolves killed nobody. Two deaths in one night means either one kill and one poisoning, or the player killed was the hunter and shot the other. Three deaths means a kill, a poisoning and the killed hunter's shot.
 - There is only one of each power role. If two people claim the same one, at least one is lying, and the liar is very likely a werewolf.
 - If the witch claims she saved someone on a night when that person died, or on a night that was not peaceful, her story is wrong.
-- Whoever the hunter shoots is not necessarily a werewolf. Whoever is exiled is not necessarily a werewolf either.
+- If someone dies by day right after an exile, the exiled player was the hunter and shot them. Whoever the hunter shoots is not necessarily a werewolf. Whoever is exiled is not necessarily a werewolf either.
 - On Night 1 there is no public information at all; nobody can tell who holds a power role.
 
 Refer to yourself as "I", never by your own name.

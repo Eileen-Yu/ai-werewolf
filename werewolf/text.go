@@ -6,7 +6,7 @@ import "github.com/Eileen-Yu/ai-werewolf/game"
 type host struct {
 	welcome, yourRole, pack, nightFalls, noKill, victim, potionsLeft string
 	antidote, poison, noPotions, selfVictim, saved, poisoned         string
-	inspected, peaceful, died, dawnDead, shotHow, shot, order        string
+	inspected, peaceful, died, dawnDead, shot, diedNow, order        string
 	rebuttals, stance, stances, vote, votes, abstain, tie            string
 	votedOut, exiled, plan, noFaker, faker, undecided, gameOver      string
 	revealed, comma, semicolon, result, silence                      string
@@ -40,8 +40,8 @@ var chineseHost = host{
 	peaceful:    "天亮了，昨晚是平安夜。",
 	died:        "死亡",
 	dawnDead:    "天亮了，昨晚死亡的是：%s。",
-	shotHow:     "被猎人开枪带走",
-	shot:        "%s是猎人，开枪带走了%s。",
+	shot:        "你开枪带走了%s。",
+	diedNow:     "%s死亡了。",
 	order:       "今天的发言顺序：%s。",
 	rebuttals:   "回应环节：每人再说一次，可以回应怀疑或者质疑别人。",
 	stance:      "%s：%s",
@@ -90,8 +90,8 @@ var englishHost = host{
 	peaceful:    "Day breaks. Nobody died last night.",
 	died:        "died",
 	dawnDead:    "Day breaks. Died last night: %s.",
-	shotHow:     "shot by the hunter",
-	shot:        "%s is the hunter and shot %s.",
+	shot:        "You shot %s.",
+	diedNow:     "%s has died.",
 	order:       "Today's speaking order: %s.",
 	rebuttals:   "Reply round: everyone speaks once more, to answer suspicion or challenge someone.",
 	stance:      "%s: %s",

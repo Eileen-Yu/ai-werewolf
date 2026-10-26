@@ -83,5 +83,6 @@ go test ./...
 
 - The witch is scripted to save the victim, and the night must pass with no death.
 - The game master worker is killed mid-game and a new one takes over, and the game must still finish.
+- The hunter always shoots, and no public line may name the hunter; the player shot must be shown dying like anyone else, and only the hunter is told who he shot.
 
 There is also a full English game that checks no player's seats, record or host lines contain any Chinese characters, and a full Chinese game that checks the stored roles, phases and winner are in English. `brain/llm_test.go` checks the English prompts and error messages for every kind of turn the same way, which catches any string left untranslated.

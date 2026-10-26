@@ -166,25 +166,32 @@ func (t *table) night() error {
 	}
 
 	var dead []string
-	for _, p := range s.Players { // table order, so the list gives away nothing
+	for _, p := range s.Players {
 		if (p.Name == victim && !saved) || p.Name == poisoned {
 			dead = append(dead, p.Name)
 			s.Remove(p.Name, t.h.died) // still night, so they died "on Night n"
 		}
 	}
+	// A hunter the wolves killed shoots before dawn, so the one shot is just
+	// another name on the list and nobody is told who the hunter is.
+	for _, d := range slices.Clone(dead) {
+		if s.Player(d).Role == game.Hunter && d != poisoned {
+			shot, err := t.hunterShoots(d)
+			if err != nil {
+				return err
+			}
+			if shot != "" {
+				dead = append(dead, shot)
+			}
+		}
+	}
+	slices.SortFunc(dead, func(a, b string) int { return seat(s, a) - seat(s, b) }) // table order, so the list gives away nothing
 	s.Phase = game.Day
 	if len(dead) == 0 {
 		t.add("", t.h.peaceful)
 		return nil
 	}
 	t.add("", fmt.Sprintf(t.h.dawnDead, t.list(dead)))
-	for _, d := range dead {
-		if s.Player(d).Role == game.Hunter && d != poisoned {
-			if err := t.hunterShoots(d); err != nil {
-				return err
-			}
-		}
-	}
 	return nil
 }
 
@@ -298,14 +305,21 @@ func (t *table) seerChecks() error {
 
 // hunterShoots gives a hunter who has just gone out the chance to take
 // someone with them. Passing stays private, so the hunter is not exposed.
-func (t *table) hunterShoots(hunter string) error {
+// The shot is not announced either: only the hunter is told, and the one shot
+// is announced as having died, like anyone else. It returns who was shot.
+func (t *table) hunterShoots(hunter string) (string, error) {
 	target, err := t.choose(brain.Shoot, hunter, append(game.Without(t.s.Living(), hunter), game.Pass))
 	if err != nil || target == "" || target == game.Pass {
-		return err
+		return "", err
 	}
-	t.s.Remove(target, t.h.shotHow)
-	t.add("", fmt.Sprintf(t.h.shot, hunter, target))
-	return nil
+	t.s.Remove(target, t.h.died)
+	t.add("", fmt.Sprintf(t.h.shot, target), hunter)
+	return target, nil
+}
+
+// seat is where name sits at the table.
+func seat(s *game.State, name string) int {
+	return slices.IndexFunc(s.Players, func(p game.Player) bool { return p.Name == name })
 }
 
 func (t *table) day() error {
@@ -352,8 +366,12 @@ func (t *table) day() error {
 		return err
 	}
 	if s.Player(out).Role == game.Hunter {
-		if err := t.hunterShoots(out); err != nil {
+		shot, err := t.hunterShoots(out)
+		if err != nil {
 			return err
+		}
+		if shot != "" {
+			t.add("", fmt.Sprintf(t.h.diedNow, shot))
 		}
 	}
 	return t.pause()
