@@ -186,16 +186,32 @@ func (t *table) wolvesHunt() (string, error) {
 		}
 	}
 	leader := wolves[0]
-	var plan brain.Action
-	if err := t.act(t.turn(brain.WolfPlan, leader, targets)).Await(&plan); err != nil {
+	turn := t.turn(brain.WolfPlan, leader, targets)
+	turn.Suspects = s.VoteCandidates(leader)
+	var a brain.Action
+	if err := t.act(turn).Await(&a); err != nil {
 		return "", err
 	}
-	t.remember(leader, plan)
-	if plan.Target == "" {
+	t.remember(leader, a)
+	if a.Target == "" {
 		return "", nil
 	}
-	t.add("", fmt.Sprintf("狼队计划（%s定）：今晚杀%s。白天：%s", leader, plan.Target, plan.Speech), wolves...)
-	return plan.Target, nil
+	plan := &game.Plan{Round: s.Round, Victim: a.Target, Focus: a.Focus, Notes: a.Speech}
+	faker := "不悍跳"
+	if a.Faker != brain.Nobody && a.Faker != "" {
+		plan.Faker = a.Faker
+		faker = a.Faker + "悍跳预言家"
+	}
+	s.Plan = plan
+	t.add("", fmt.Sprintf("狼队计划（%s定）：今晚杀%s；明天%s，票投%s。打法：%s", leader, plan.Victim, faker, orNone(plan.Focus), plan.Notes), wolves...)
+	return plan.Victim, nil
+}
+
+func orNone(s string) string {
+	if s == "" {
+		return "未定"
+	}
+	return s
 }
 
 // witchActs lets the witch, told tonight's victim, use at most one potion.
@@ -367,7 +383,13 @@ func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brai
 		Candidates: candidates,
 	}
 	if kind.Declares() {
-		turn.Suspects = append(game.Without(t.s.Living(), name), brain.Nobody)
+		turn.Suspects = append(t.s.VoteCandidates(name), brain.Nobody)
+	}
+	if turn.Me.Role == game.Werewolf {
+		turn.Pack = t.s.Living(game.Werewolf)
+		if p := t.s.Plan; p != nil && p.Round == t.s.Round {
+			turn.Plan = p
+		}
 	}
 	return turn
 }
@@ -434,16 +456,46 @@ func (t *table) add(speaker, text string, audience ...string) {
 }
 
 // remember keeps a player's thinking and, if they wrote any, their new notes.
+// What they observed and how their beliefs moved is shown to the audience
+// but not recorded: the notes already carry it forward.
 func (t *table) remember(name string, a brain.Action) {
+	t.aside(name, "观察", strings.Join(a.Observations, "；"))
 	if a.Thinking != "" {
 		t.narrate(t.s.Think(name, a.Thinking))
 	}
-	if a.Notes != nil {
-		if t.s.Notes == nil {
-			t.s.Notes = map[string]game.Notes{}
-		}
-		t.s.Notes[name] = *a.Notes
+	if a.Notes == nil {
+		return
 	}
+	old := t.s.Notes[name].Beliefs
+	for _, p := range t.s.Players {
+		b, ok := a.Notes.Beliefs[p.Name]
+		if was, had := old[p.Name]; ok && (!had || was.Side != b.Side) {
+			from := "无"
+			if had {
+				from = was.Side
+			}
+			t.aside(name, "改判", fmt.Sprintf("%s %s→%s，依据：%s", p.Name, from, b.Side, strings.Join(b.Evidence, "；")))
+		}
+	}
+	if t.s.Notes == nil {
+		t.s.Notes = map[string]game.Notes{}
+	}
+	t.s.Notes[name] = *a.Notes
+}
+
+// aside prints something for the audience only, without recording it.
+func (t *table) aside(name, label, text string) {
+	if text == "" || t.ctx.IsReplaying() {
+		return
+	}
+	fmt.Printf("[第%d%s]   %s %s：%s\n", t.s.Round, t.s.Phase, t.who(name), label, text)
+}
+
+func (t *table) who(name string) string {
+	if p := t.s.Player(name); p != nil {
+		return fmt.Sprintf("%s(%s)", p.Name, p.Role)
+	}
+	return "主持人"
 }
 
 // narrate prints an event. It is skipped on replay so a resumed game does not
@@ -452,10 +504,7 @@ func (t *table) narrate(e game.Event) {
 	if t.ctx.IsReplaying() {
 		return
 	}
-	who := "主持人"
-	if p := t.s.Player(e.Speaker); p != nil {
-		who = fmt.Sprintf("%s(%s)", p.Name, p.Role)
-	}
+	who := t.who(e.Speaker)
 	switch {
 	case e.Thought:
 		fmt.Printf("[%s]   %s 内心：%s\n", e.When(), who, e.Text)
@@ -477,9 +526,10 @@ func AssignRolesActivity(ctx workflow.ActivityContext) (any, error) {
 // ActActivity asks a player for their move. A move that is still invalid
 // after the brain's own re-asking is not allowed to stall the game: a bad
 // pick counts as abstaining, an empty speech as silence, a bad suspect as
-// suspecting nobody; a bad claim is dropped, and so are notes on people who
-// are not at the table. A speech that quotes someone yet to speak is let
-// through: it is a slip, not a broken move.
+// suspecting nobody; a bad claim is dropped, and so are bad beliefs. A wolf
+// plan's bad seer claimant means nobody claims and a bad focus means none.
+// The rest is let through: a speech that quotes someone yet to speak, or a
+// faker who does not claim, is a slip, not a broken move.
 func ActActivity(ctx workflow.ActivityContext) (any, error) {
 	var t brain.Turn
 	if err := ctx.GetInput(&t); err != nil {
@@ -504,8 +554,16 @@ func ActActivity(ctx workflow.ActivityContext) (any, error) {
 	if a.Claim != nil && (!t.Kind.Declares() || len(t.ClaimProblems(*a.Claim)) > 0) {
 		a.Claim = nil
 	}
-	for _, name := range t.UnknownNames(a.Notes) {
-		delete(a.Notes.Suspicions, name)
+	for _, name := range t.BadBeliefs(a.Notes) {
+		delete(a.Notes.Beliefs, name)
+	}
+	if t.Kind == brain.WolfPlan {
+		if !slices.Contains(t.Pack, a.Faker) {
+			a.Faker = brain.Nobody
+		}
+		if !slices.Contains(t.Suspects, a.Focus) || a.Focus == a.Target {
+			a.Focus = ""
+		}
 	}
 	return a, nil
 }

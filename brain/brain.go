@@ -74,27 +74,39 @@ type Turn struct {
 	Transcript []game.Event `json:"transcript"`
 	Notes      game.Notes   `json:"notes"`
 	Candidates []string     `json:"candidates,omitempty"`
-	// Suspects is, for a declaring turn, who may be named as the suspect,
-	// Nobody included.
+	// Suspects is who may be named as the suspect on a declaring turn, Nobody
+	// included, or as the focus of a wolf plan.
 	Suspects []string `json:"suspects,omitempty"`
 	// Spoken and Waiting are, for a speaking turn, who has already spoken in
 	// this go round the table and who is still to.
 	Spoken  []string `json:"spoken,omitempty"`
 	Waiting []string `json:"waiting,omitempty"`
+	// Pack is, for a wolf, the living wolves, this one included.
+	Pack []string `json:"pack,omitempty"`
+	// Plan is, for a wolf, the pack's plan for this round, if there is one.
+	Plan *game.Plan `json:"plan,omitempty"`
 }
 
-// Action is a player's move. Thinking is private and Notes replaces the
-// player's notes; both are their memory. Speech is said aloud; Target is the
-// pick on a choice turn. Suspect and Claim are a declaring speech's stance,
-// put on the record so others can hold the player to it; a wolf's Claim may
-// be a lie.
+// Action is a player's move.
+//
+// Observations, Thinking and Notes are private and are the player's memory:
+// what has newly happened, how they reasoned about this move, and what they
+// now believe and plan. Notes replaces their previous notes.
+//
+// Speech is said aloud and Target is the pick on a choice turn. Suspect and
+// Claim are a declaring speech's stance, put on the record so others can hold
+// the player to it; a wolf's Claim may be a lie. Faker and Focus are a wolf
+// plan's seer claimant and vote target.
 type Action struct {
-	Thinking string      `json:"thinking"`
-	Speech   string      `json:"speech,omitempty"`
-	Target   string      `json:"target,omitempty"`
-	Suspect  string      `json:"suspect,omitempty"`
-	Claim    *game.Claim `json:"claim,omitempty"`
-	Notes    *game.Notes `json:"notes,omitempty"`
+	Observations []string    `json:"observations,omitempty"`
+	Thinking     string      `json:"thinking"`
+	Notes        *game.Notes `json:"notes,omitempty"`
+	Speech       string      `json:"speech,omitempty"`
+	Target       string      `json:"target,omitempty"`
+	Suspect      string      `json:"suspect,omitempty"`
+	Claim        *game.Claim `json:"claim,omitempty"`
+	Faker        string      `json:"faker,omitempty"`
+	Focus        string      `json:"focus,omitempty"`
 }
 
 // Claimable is what a player may claim to be. A wolf claims one of these too.
@@ -120,11 +132,17 @@ func (t Turn) Check(a Action) error {
 	if t.Kind.Declares() && a.Claim != nil {
 		problems = append(problems, t.ClaimProblems(*a.Claim)...)
 	}
+	if t.Kind == WolfPlan {
+		problems = append(problems, t.planProblems(a)...)
+	}
+	if t.Kind == Speech && t.MustFakeSeer() && (a.Claim == nil || a.Claim.Role != game.Seer) {
+		problems = append(problems, "狼队计划要你今天悍跳预言家：claim.role 必须是预言家，并报一个查验结果")
+	}
 	if t.Kind.Speaks() {
 		problems = append(problems, t.unspokenProblems(a.Speech)...)
 	}
-	for _, name := range t.UnknownNames(a.Notes) {
-		problems = append(problems, fmt.Sprintf("notes.suspicions 里的 %q 不是桌上的其他玩家", name))
+	for _, name := range t.BadBeliefs(a.Notes) {
+		problems = append(problems, fmt.Sprintf("notes.beliefs 里的 %q 有问题：名字必须是桌上的其他玩家，side 只能是%s", name, strings.Join(game.Sides, "、")))
 	}
 	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, "；"))
@@ -145,6 +163,29 @@ func (t Turn) ClaimProblems(c game.Claim) []string {
 		problems = append(problems, fmt.Sprintf("预言家的 claim.result 只能是好人或狼人，你给的是 %q", c.Result))
 	}
 	return problems
+}
+
+// planProblems checks a wolf plan against the game: the seer claimant must
+// be a wolf, and the pack cannot push tomorrow's vote onto a teammate, or
+// onto tonight's victim, who will be dead by then.
+func (t Turn) planProblems(a Action) []string {
+	var problems []string
+	if a.Faker != Nobody && !slices.Contains(t.Pack, a.Faker) {
+		problems = append(problems, fmt.Sprintf("faker 只能是狼人之一（%s）或者\"%s\"，你给的是 %q", strings.Join(t.Pack, "、"), Nobody, a.Faker))
+	}
+	if !slices.Contains(t.Suspects, a.Focus) {
+		problems = append(problems, fmt.Sprintf("focus 必须是这些好人阵营的候选之一：%s，你给的是 %q", strings.Join(t.Suspects, "、"), a.Focus))
+	}
+	if a.Focus != "" && a.Focus == a.Target {
+		problems = append(problems, fmt.Sprintf("%s今晚就会被杀，明天不可能再投票放逐他：focus 要换一个人", a.Focus))
+	}
+	return problems
+}
+
+// MustFakeSeer reports whether the pack's plan has this wolf claim to be the
+// seer today.
+func (t Turn) MustFakeSeer() bool {
+	return t.Plan != nil && t.Plan.Faker == t.Me.Name
 }
 
 // unspokenProblems catches a speech quoting someone who has not spoken: anyone
@@ -187,20 +228,64 @@ func (t Turn) Silent() []string {
 	return silent
 }
 
-// UnknownNames lists the names in notes' suspicions that are not other
-// players at the table.
-func (t Turn) UnknownNames(n *game.Notes) []string {
+// BadBeliefs lists the names in notes' beliefs that are not other players at
+// the table, or whose side is not one of game.Sides.
+func (t Turn) BadBeliefs(n *game.Notes) []string {
 	if n == nil {
 		return nil
 	}
-	var unknown []string
-	for name := range n.Suspicions {
-		if !slices.Contains(t.others(), name) {
-			unknown = append(unknown, name)
+	var bad []string
+	for name, b := range n.Beliefs {
+		if !slices.Contains(t.others(), name) || !slices.Contains(game.Sides, b.Side) {
+			bad = append(bad, name)
 		}
 	}
-	slices.Sort(unknown)
-	return unknown
+	slices.Sort(bad)
+	return bad
+}
+
+// Normalize repairs near misses before a move is checked: a pick written as
+// "小红（她最可疑）" becomes 小红, and "不开枪" becomes Pass where passing is
+// allowed.
+func (t Turn) Normalize(a Action) Action {
+	if t.Kind.IsChoice() {
+		a.Target = closest(a.Target, t.Candidates)
+	}
+	if t.Kind.Declares() {
+		a.Suspect = closest(a.Suspect, t.Suspects)
+	}
+	if t.Kind == WolfPlan {
+		a.Focus = closest(a.Focus, t.Suspects)
+		a.Faker = closest(a.Faker, append(slices.Clone(t.Pack), Nobody))
+	}
+	return a
+}
+
+// declines are words that, where no name was given, mean passing.
+var declines = []string{"不", "放弃", "无", "没有"}
+
+func closest(s string, options []string) string {
+	if s == "" || slices.Contains(options, s) {
+		return s
+	}
+	var named []string
+	for _, o := range options {
+		if o != Pass && o != Nobody && strings.Contains(s, o) {
+			named = append(named, o)
+		}
+	}
+	if len(named) == 1 {
+		return named[0]
+	}
+	if len(named) > 0 {
+		return s
+	}
+	for _, none := range []string{Pass, Nobody} {
+		if slices.Contains(options, none) && slices.ContainsFunc(declines, func(d string) bool { return strings.Contains(s, d) }) {
+			return none
+		}
+	}
+	return s
 }
 
 // others is everyone at the table but this player, alive or not.

@@ -28,7 +28,13 @@ func TestPromptSeparatesWhatThePlayerKnows(t *testing.T) {
 				Suspect: "阿杰", Claim: &game.Claim{Role: game.Seer, Target: "阿杰", Result: "狼人"},
 			},
 		},
-		Notes:   game.Notes{Suspicions: map[string]string{"美玲": "真预言家，要对跳", "外人": "不在桌上，不显示"}, Strategy: "悍跳预言家"},
+		Notes: game.Notes{
+			Beliefs: map[string]game.Belief{
+				"美玲": {Side: "好人", Evidence: []string{"第2天美玲声称查验阿杰是狼人，说中了"}},
+				"外人": {Side: "狼人"},
+			},
+			Strategy: "悍跳预言家",
+		},
 		Spoken:  []string{"美玲"},
 		Waiting: []string{"阿杰"},
 	}
@@ -44,7 +50,11 @@ func TestPromptSeparatesWhatThePlayerKnows(t *testing.T) {
 	assert.Contains(t, user, "【你最近的私下想法】只有你知道\n[第1夜] 美玲最像预言家。\n")
 	assert.Contains(t, user, "【】里是主持人记下的表态\n[第2天] 美玲：我是预言家，查了阿杰是狼。【声称预言家，阿杰：狼人，怀疑阿杰】\n")
 	assert.Contains(t, user, "可能是假的\n- [第2天] 美玲声称：预言家，阿杰：狼人（未验证）\n")
-	assert.Contains(t, user, "【你的笔记】你上一次写下的判断和打算，只有你知道\n- 美玲：真预言家，要对跳\n打算：悍跳预言家\n")
+	assert.Contains(t, user, "【你的笔记】你上一次写下的判断和打算，只有你知道\n- 美玲：好人。证据：第2天美玲声称查验阿杰是狼人，说中了\n打算：悍跳预言家\n")
+	assert.NotContains(t, user, "外人", "only people at the table are shown")
+	assert.Contains(t, system, "预言家查验某人是好人，和女巫救了这个人，完全不矛盾")
+	assert.Contains(t, system, "\"发言平淡\"\"可能在隐藏身份\"\"感觉不对劲\"都不算证据")
+	assert.Contains(t, user, `"observations"`)
 	assert.Contains(t, user, "【回答前自检】")
 	assert.Contains(t, user, "你是这一轮第2个发言。已经发言：美玲。还没发言：阿杰。")
 	assert.Contains(t, user, `"speech"`)
@@ -105,6 +115,13 @@ func TestParseAction(t *testing.T) {
 			false,
 		},
 		{"empty claim is no claim", `{"speech":"过","suspect":"无","claim":{"role":""}}`, Action{Speech: "过", Suspect: "无"}, false},
+		{"claim as a string is no claim", `{"speech":"过","suspect":"无","claim":"不声明"}`, Action{Speech: "过", Suspect: "无"}, false},
+		{
+			"one-sentence lists", `{"observations":"阿杰投了老王","notes":{"beliefs":{"阿杰":{"side":"狼人","evidence":"他投了老王"}}},"target":"阿杰"}`,
+			Action{Observations: []string{"阿杰投了老王"}, Notes: &game.Notes{Beliefs: map[string]game.Belief{"阿杰": {Side: "狼人", Evidence: []string{"他投了老王"}}}}, Target: "阿杰"},
+			false,
+		},
+		{"text with braces after the object", "{\"target\":\"小红\"}\n备注：{随便写的}", Action{Target: "小红"}, false},
 		{"code fence", "```json\n{\"thinking\":\"t\",\"speech\":\" 我怀疑老王 \"}\n```", Action{Thinking: "t", Speech: "我怀疑老王"}, false},
 		{"no JSON", "我投小红", Action{}, true},
 		{"broken JSON", `{"target": "小红"`, Action{}, true},
@@ -133,11 +150,14 @@ func TestPromptForADeclaringSpeechAsksForAStance(t *testing.T) {
 }
 
 func TestPromptForTheWolfPlanAsksForAVictimAndAPlan(t *testing.T) {
-	turn := Turn{Kind: WolfPlan, Round: 1, Phase: game.Night, Me: game.Player{Name: "阿杰", Role: game.Werewolf}, Candidates: []string{"老王", "小红"}}
+	turn := Turn{
+		Kind: WolfPlan, Round: 1, Phase: game.Night, Me: game.Player{Name: "阿杰", Role: game.Werewolf},
+		Candidates: []string{"老王", "小红"}, Suspects: []string{"老王", "小红"}, Pack: []string{"阿杰"},
+	}
 
 	_, user := prompt(turn)
 
-	assert.Contains(t, user, `"target": "今晚杀的人", "speech": "白天的打法"`)
+	assert.Contains(t, user, `"target": "今晚杀的人", "faker": "明天悍跳预言家的狼", "focus": "明天一起投的人", "speech": "白天的具体打法"`)
 	assert.Contains(t, user, "target 只能是这些名字之一：老王、小红。")
 }
 
@@ -145,7 +165,7 @@ func TestCheck(t *testing.T) {
 	vote := Turn{Kind: Vote, Candidates: []string{"老王", "小红"}}
 	speech := Turn{Kind: Speech, Suspects: []string{"老王", Nobody}}
 	wolfChat := Turn{Kind: WolfChat}
-	plan := Turn{Kind: WolfPlan, Candidates: []string{"老王"}}
+	plan := Turn{Kind: WolfPlan, Candidates: []string{"老王"}, Suspects: []string{"老王", "小红"}, Pack: []string{"阿杰"}}
 
 	assert.NoError(t, vote.Check(Action{Target: "小红"}))
 	assert.ErrorContains(t, vote.Check(Action{Target: "阿杰"}), "老王、小红")
@@ -155,8 +175,45 @@ func TestCheck(t *testing.T) {
 	assert.Error(t, speech.Check(Action{Thinking: "只想了没说", Suspect: "老王"}))
 	assert.ErrorContains(t, speech.Check(Action{Speech: "我怀疑小李"}), "suspect")
 	assert.NoError(t, wolfChat.Check(Action{Speech: "今晚刀老王"}), "only daytime speeches declare a stance")
-	assert.NoError(t, plan.Check(Action{Target: "老王", Speech: "阿杰悍跳"}))
-	assert.ErrorContains(t, plan.Check(Action{Target: "老王"}), "speech", "a plan without a plan for the day")
+	assert.NoError(t, plan.Check(Action{Target: "老王", Faker: "阿杰", Focus: "小红", Speech: "阿杰悍跳"}))
+	assert.ErrorContains(t, plan.Check(Action{Target: "老王", Faker: "阿杰", Focus: "小红"}), "speech", "a plan without a plan for the day")
+}
+
+func TestNormalize(t *testing.T) {
+	shoot := Turn{Kind: Shoot, Candidates: []string{"老王", "小红", Pass}}
+	speech := Turn{Kind: Speech, Suspects: []string{"老王", "小红", Nobody}}
+
+	assert.Equal(t, "小红", shoot.Normalize(Action{Target: "小红（她最可疑）"}).Target)
+	assert.Equal(t, Pass, shoot.Normalize(Action{Target: "不开枪"}).Target)
+	assert.Equal(t, "老王和小红", shoot.Normalize(Action{Target: "老王和小红"}).Target, "two names stay ambiguous, and invalid")
+	assert.Equal(t, "老王", speech.Normalize(Action{Suspect: "老王吧"}).Suspect)
+	assert.Equal(t, Nobody, speech.Normalize(Action{Suspect: "没有"}).Suspect)
+}
+
+func TestCheckHoldsTheWolfPlanToTheGame(t *testing.T) {
+	plan := Turn{
+		Kind: WolfPlan, Me: game.Player{Name: "阿杰", Role: game.Werewolf},
+		Candidates: []string{"阿杰", "小宇", "老王", "阿芳"}, Suspects: []string{"老王", "阿芳"}, Pack: []string{"阿杰", "小宇"},
+	}
+
+	assert.NoError(t, plan.Check(Action{Target: "阿芳", Faker: "小宇", Focus: "老王", Speech: "小宇跳"}))
+	assert.NoError(t, plan.Check(Action{Target: "阿杰", Faker: Nobody, Focus: "老王", Speech: "自刀"}))
+	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Faker: Nobody, Focus: "阿芳", Speech: "集中投阿芳"}), "阿芳今晚就会被杀")
+	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Faker: Nobody, Focus: "小宇", Speech: "投小宇"}), "focus")
+	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Faker: "老王", Focus: "老王", Speech: "老王跳"}), "faker")
+
+	day := Turn{
+		Kind: Speech, Round: 2, Phase: game.Day, Me: game.Player{Name: "小宇", Role: game.Werewolf},
+		Seats: []Seat{{Name: "小宇"}, {Name: "老王"}}, Suspects: []string{"老王", Nobody},
+		Plan: &game.Plan{Round: 2, Faker: "小宇", Focus: "老王"},
+	}
+	seer := &game.Claim{Role: game.Seer, Target: "老王", Result: "狼人"}
+	assert.ErrorContains(t, day.Check(Action{Speech: "我是村民", Suspect: "老王"}), "悍跳预言家")
+	assert.NoError(t, day.Check(Action{Speech: "我是预言家，老王是狼", Suspect: "老王", Claim: seer}))
+
+	_, user := prompt(day)
+	assert.Contains(t, user, "狼队今天的计划：小宇悍跳预言家，票投老王。")
+	assert.Contains(t, user, "你就是要悍跳的人")
 }
 
 func TestCheckRejectsWhatIsNotOnTheRecord(t *testing.T) {
@@ -176,7 +233,10 @@ func TestCheckRejectsWhatIsNotOnTheRecord(t *testing.T) {
 	assert.ErrorContains(t, turn.Check(Action{Speech: "我是狼人", Suspect: "老王", Claim: &game.Claim{Role: game.Werewolf}}), "claim.role")
 	assert.ErrorContains(t, turn.Check(Action{Speech: "我查了小李", Suspect: "老王", Claim: &game.Claim{Role: game.Seer, Target: "小李", Result: "好人"}}), "小李")
 	assert.ErrorContains(t, turn.Check(Action{Speech: "我查了老王", Suspect: "老王", Claim: &game.Claim{Role: game.Seer, Target: "老王", Result: "可疑"}}), "好人或狼人")
-	assert.ErrorContains(t, turn.Check(Action{Speech: "嗯", Suspect: "老王", Notes: &game.Notes{Suspicions: map[string]string{"小李": "可疑", "小红": "我自己"}}}), `"小李"`)
+	assert.ErrorContains(t, turn.Check(Action{Speech: "嗯", Suspect: "老王", Notes: &game.Notes{Beliefs: map[string]game.Belief{"小李": {Side: "狼人"}}}}), `"小李"`)
+	assert.ErrorContains(t, turn.Check(Action{Speech: "嗯", Suspect: "老王", Notes: &game.Notes{Beliefs: map[string]game.Belief{"小红": {Side: "好人"}}}}), `"小红"`, "no belief about yourself")
+	assert.ErrorContains(t, turn.Check(Action{Speech: "嗯", Suspect: "老王", Notes: &game.Notes{Beliefs: map[string]game.Belief{"老王": {Side: "可疑"}}}}), "side 只能是")
+	assert.NoError(t, turn.Check(Action{Speech: "嗯", Suspect: "老王", Notes: &game.Notes{Beliefs: map[string]game.Belief{"老王": {Side: "不确定"}}}}))
 
 	later := turn
 	later.Round = 2
@@ -192,6 +252,7 @@ func TestCheckRejectsWhatIsNotOnTheRecord(t *testing.T) {
 	assert.NoError(t, firstNight.Check(Action{Speech: "今晚刀大刘"}))
 	_, user := prompt(firstNight)
 	assert.Contains(t, user, "到现在为止还没有任何人公开发过言")
+	assert.Contains(t, user, "不要编\"他像预言家\"这类没有依据的理由")
 	_, user = prompt(later)
 	assert.NotContains(t, user, "还没有公开发过言")
 	_, user = prompt(turn)

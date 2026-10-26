@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
+	"slices"
 )
 
 // Random plays without an LLM: canned lines and random picks. It costs
@@ -25,16 +26,11 @@ var (
 )
 
 func (Random) Act(_ context.Context, t Turn) (Action, error) {
-	others := make([]string, 0, len(t.Seats))
-	for _, s := range t.Seats {
-		if s.Death == "" && s.Name != t.Me.Name {
-			others = append(others, s.Name)
-		}
-	}
 	switch t.Kind {
 	case WolfPlan:
 		victim := pick(t.Candidates)
-		return Action{Target: victim, Speech: fmt.Sprintf("今晚杀%s，白天都别踩同伴。", victim)}, nil
+		focus := pick(slices.DeleteFunc(slices.Clone(t.Suspects), func(s string) bool { return s == victim }))
+		return Action{Target: victim, Faker: Nobody, Focus: focus, Speech: fmt.Sprintf("今晚杀%s，白天一起投%s。", victim, focus)}, nil
 	case LastWords:
 		return Action{Speech: "我是好人，你们一定要找出狼人！"}, nil
 	case WolfChat:
@@ -43,7 +39,7 @@ func (Random) Act(_ context.Context, t Turn) (Action, error) {
 	if t.Kind.IsChoice() {
 		return Action{Target: pick(t.Candidates)}, nil
 	}
-	suspect := pick(others)
+	suspect := pick(slices.DeleteFunc(slices.Clone(t.Suspects), func(s string) bool { return s == Nobody }))
 	return Action{Speech: fmt.Sprintf(pick(speechLines), suspect), Suspect: suspect}, nil
 }
 

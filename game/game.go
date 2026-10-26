@@ -156,10 +156,31 @@ func (e Event) When() string {
 }
 
 // Notes is a player's own running memory, rewritten every turn: what they
-// make of each other player, and what they mean to do next.
+// believe about each other player and why, and what they mean to do next.
 type Notes struct {
-	Suspicions map[string]string `json:"suspicions,omitempty"`
-	Strategy   string            `json:"strategy,omitempty"`
+	Beliefs  map[string]Belief `json:"beliefs,omitempty"`
+	Strategy string            `json:"strategy,omitempty"`
+}
+
+// Belief is what a player thinks of someone: which side, and the things that
+// actually happened that make them think so.
+type Belief struct {
+	Side     string   `json:"side"`
+	Evidence []string `json:"evidence,omitempty"`
+}
+
+// Sides a belief may hold.
+var Sides = []string{"狼人", "好人", "不确定"}
+
+// Plan is the wolves' plan for a night and the day after it.
+type Plan struct {
+	Round  int    `json:"round"`
+	Victim string `json:"victim"`
+	// Faker is the wolf who claims to be the seer tomorrow, "" for nobody.
+	Faker string `json:"faker,omitempty"`
+	// Focus is who the pack pushes the vote onto tomorrow.
+	Focus string `json:"focus,omitempty"`
+	Notes string `json:"notes,omitempty"`
 }
 
 type State struct {
@@ -172,6 +193,8 @@ type State struct {
 	PoisonUsed   bool `json:"poisonUsed,omitempty"`
 	// Notes holds each player's latest notes, by name.
 	Notes map[string]Notes `json:"notes,omitempty"`
+	// Plan is the wolves' latest plan.
+	Plan *Plan `json:"plan,omitempty"`
 }
 
 // Add appends an event to the transcript and returns it.
@@ -235,14 +258,18 @@ func (s *State) Living(roles ...Role) []string {
 	return out
 }
 
-// VoteCandidates is who voter may vote out: anyone else alive, except that a
-// wolf never votes out another wolf.
+// VoteCandidates is who voter may vote out, or name as their suspect: anyone
+// else alive, except that a wolf never turns on another wolf.
 func (s *State) VoteCandidates(voter string) []string {
-	exclude := []string{voter}
-	if p := s.Player(voter); p != nil && p.Role == Werewolf {
-		exclude = s.Living(Werewolf)
+	return Without(s.Living(), s.Pack(voter)...)
+}
+
+// Pack is the living wolves if name is one of them, or just name otherwise.
+func (s *State) Pack(name string) []string {
+	if p := s.Player(name); p != nil && p.Role == Werewolf {
+		return s.Living(Werewolf)
 	}
-	return Without(s.Living(), exclude...)
+	return []string{name}
 }
 
 // Winner is "狼人" or "好人" once the game is decided, and "" before. Wolves

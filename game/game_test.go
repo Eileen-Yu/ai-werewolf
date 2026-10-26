@@ -64,6 +64,8 @@ func TestVoteCandidatesKeepWolvesOffEachOther(t *testing.T) {
 
 	assert.Equal(t, []string{"小红", "美玲"}, s.VoteCandidates("老王"))
 	assert.Equal(t, []string{"老王", "阿杰", "美玲"}, s.VoteCandidates("小红"))
+	assert.Equal(t, []string{"老王", "阿杰"}, s.Pack("阿杰"), "dead wolves are not in the pack")
+	assert.Equal(t, []string{"小红"}, s.Pack("小红"))
 }
 
 func TestRotate(t *testing.T) {

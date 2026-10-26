@@ -139,6 +139,47 @@ func (b *firstVotes) Act(ctx context.Context, t brain.Turn) (brain.Action, error
 	return brain.Random{}.Act(ctx, t)
 }
 
+func TestOnlyWolvesGetThePlanAndNeverSuspectEachOther(t *testing.T) {
+	b := &planWatcher{}
+	SetBrain(b)
+	client := startEngine(t)
+	startWorker(t, client)
+
+	playGame(t, client, "plan")
+
+	require.NotEmpty(t, b.turns)
+	for _, turn := range b.turns {
+		if turn.Me.Role != game.Werewolf {
+			assert.Nil(t, turn.Plan, "%s is not a wolf", turn.Me.Name)
+			assert.Empty(t, turn.Pack, "%s is not a wolf", turn.Me.Name)
+			continue
+		}
+		assert.Contains(t, turn.Pack, turn.Me.Name)
+		for _, wolf := range turn.Pack {
+			assert.NotContains(t, turn.Suspects, wolf, "%s may not suspect a teammate", turn.Me.Name)
+		}
+		if turn.Kind == brain.Speech {
+			require.NotNil(t, turn.Plan, "%s speaks on day %d without the plan", turn.Me.Name, turn.Round)
+			assert.Equal(t, turn.Round, turn.Plan.Round)
+		}
+	}
+}
+
+// planWatcher plays randomly and records every daytime speech turn.
+type planWatcher struct {
+	mu    sync.Mutex
+	turns []brain.Turn
+}
+
+func (b *planWatcher) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if t.Kind.Declares() {
+		b.turns = append(b.turns, t)
+	}
+	return brain.Random{}.Act(ctx, t)
+}
+
 func TestPlayersGetBackTheNotesTheyLastWrote(t *testing.T) {
 	b := &noteTaker{last: map[string]string{}}
 	SetBrain(b)
