@@ -6,8 +6,10 @@ import "github.com/Eileen-Yu/ai-werewolf/game"
 // is the same for every language.
 type text struct {
 	// rules is the system prompt: table size twice, names, lineup, then the
-	// player's name, role, persona and strategy.
-	rules        string
+	// player's name, role, persona, habit line and strategy.
+	rules string
+	// habit is the line for how the player decides, left out if they have none.
+	habit        string
 	strategies   map[game.Role]string
 	instructions map[TurnKind]string
 
@@ -71,7 +73,7 @@ var chineseText = text{
 胜负：狼人全部出局则好人胜利；所有村民出局，或者预言家、女巫、猎人全部出局，则狼人胜利。
 
 你是%s，身份是%s，性格：%s。
-策略：%s
+%s策略：%s
 
 铁律，违反会让你当场露馅，主持人也会驳回你的回答：
 1. 只能引用【公开记录】里真实出现过的话和事件。没发生过的事绝对不能编，不能提桌上没有的名字。
@@ -168,6 +170,7 @@ var chineseText = text{
 	public:       "\n【公开记录】所有人都看到的，这是唯一可以引用的历史。【】里是主持人记下的表态\n",
 	alive:        "存活",
 	you:          "（你）",
+	habit:        "决策习惯，判断、改主意和投票都照这个来，这比说话风格更重要：%s。\n",
 	host:         "主持人",
 	none:         "（无）\n",
 	beliefLine:   "- %s：%s。证据：%s\n",
@@ -242,7 +245,7 @@ By day everyone speaks once in order, then once more in a reply round, then ever
 Winning: the good side wins when every werewolf is out; the werewolves win when every villager is out, or when the seer, witch and hunter are all out.
 
 You are %s. Your role is %s. Your personality: %s.
-Strategy: %s
+%sStrategy: %s
 
 Hard rules. Break one and you give yourself away, and the host will reject your answer:
 1. Only refer to what actually appears in [Public record]. Never invent events or speeches, and never mention a name that is not at the table.
@@ -340,6 +343,7 @@ Write everything in English.`,
 	public:       "\n[Public record] What everyone has seen; the only history you may refer to. [...] is the stance the host recorded\n",
 	alive:        "alive",
 	you:          " (you)",
+	habit:        "How you decide. Judge, change your mind and vote this way; it matters more than how you talk: %s.\n",
 	host:         "Host",
 	none:         "(none)\n",
 	beliefLine:   "- %s: %s. Evidence: %s\n",

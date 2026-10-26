@@ -51,6 +51,7 @@ func TestPromptSeparatesWhatThePlayerKnows(t *testing.T) {
 	system, user := prompt(turn)
 
 	assert.Contains(t, system, "一局4人狼人杀，桌上只有这4个人：老王、小红、阿杰、美玲")
+	assert.Contains(t, system, "性格：推理小说迷。\n策略：", "no habit, no habit line")
 	assert.Contains(t, system, "配置："+game.Chinese.LineupSummary())
 	assert.Contains(t, system, chineseText.strategies[game.Werewolf])
 	assert.Contains(t, user, "- 老王（你）：存活")
@@ -261,6 +262,16 @@ func TestPromptForTheHunterNamesWhoIsAlreadyOut(t *testing.T) {
 // TestEnglishPromptsAreAllEnglish renders every kind of turn, with a record
 // that has something in every section, and finds no Chinese anywhere a
 // player would read it.
+func TestAPlayersHabitIsInTheirPrompt(t *testing.T) {
+	turn := Turn{Kind: Vote, Round: 1, Phase: game.Day, Me: game.Player{Name: "华妃", Persona: "宫斗戏精", Habit: "谁投过你就投谁"}}
+	system, _ := prompt(turn)
+	assert.Contains(t, system, "性格：宫斗戏精。\n决策习惯，判断、改主意和投票都照这个来，这比说话风格更重要：谁投过你就投谁。\n策略：")
+
+	turn.Lang, turn.Me = game.English, game.Player{Name: "Ruby", Persona: "emotional", Habit: "holds a grudge"}
+	system, _ = prompt(turn)
+	assert.Contains(t, system, "Your personality: emotional.\nHow you decide. Judge, change your mind and vote this way; it matters more than how you talk: holds a grudge.\nStrategy: ")
+}
+
 func TestEnglishPromptsAreAllEnglish(t *testing.T) {
 	han := regexp.MustCompile(`\p{Han}`)
 	base := Turn{

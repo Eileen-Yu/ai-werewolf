@@ -59,8 +59,11 @@ const (
 )
 
 type Player struct {
-	Name    string `json:"name"`
+	Name string `json:"name"`
+	// Persona is how the player talks; Habit is how they decide: who they
+	// suspect, when they change their mind, and how they vote.
 	Persona string `json:"persona"`
+	Habit   string `json:"habit,omitempty"`
 	Role    Role   `json:"role,omitempty"`
 	Alive   bool   `json:"alive"`
 	// Death is what everyone knows about how the player left the game, e.g.
@@ -68,32 +71,83 @@ type Player struct {
 	Death string `json:"death,omitempty"`
 }
 
-// DefaultPlayers is the cast used when a game is started without one.
-func DefaultPlayers(l Lang) []Player {
+// Cast picks the players for a game started without any, in a random seat
+// order. A Chinese game seats every pair of rivals and one of the loners, so
+// nobody who was written to play off someone sits down without them.
+func Cast(l Lang, rng *rand.Rand) []Player {
+	var cast []Player
 	if l == English {
-		return []Player{
-			{Name: "Walter", Persona: "a retired mystery-novel fan who loves logic and speaks slowly and carefully"},
-			{Name: "Ruby", Persona: "plays on instinct, emotional and quick to get worked up"},
-			{Name: "Jake", Persona: "a chatty programmer who argues with data and odds"},
-			{Name: "Mia", Persona: "a calm lawyer who is good at catching contradictions in what people say"},
-			{Name: "Dave", Persona: "an honest, easygoing truck driver who says things straight"},
-			{Name: "Kai", Persona: "a college freshman playing for the first time, a little nervous but very earnest"},
-			{Name: "Fiona", Persona: "a high-school teacher who likes to sum things up and make a case"},
-			{Name: "Carl", Persona: "a smooth businessman who reads people well and never commits fully"},
-			{Name: "Leo", Persona: "an esports player, quick, blunt, and likes to steer the table"},
+		cast = slices.Clone(englishCast)
+	} else {
+		for _, pair := range chineseRivals {
+			cast = append(cast, pair[:]...)
 		}
+		cast = append(cast, chineseLoners[rng.IntN(len(chineseLoners))])
 	}
-	return []Player{
-		{Name: "龙傲天", Persona: "自带主角光环，坚信全场都是来衬托自己的，说话霸气，总觉得自己早就看穿了一切"},
-		{Name: "楚雨荨", Persona: "高冷女主，嘴上一句\"无所谓\"，其实谁说过什么都记得清清楚楚，翻旧账一绝"},
-		{Name: "卡皮巴拉", Persona: "佛系玩家，情绪稳定到离谱，被踩也只会说\"都行，你开心就好\"，但心里门儿清"},
-		{Name: "华妃", Persona: "宫斗戏精，气场全开，阴阳怪气一流，口头禅\"贱人就是矫情\"，看谁不顺眼就带头踩"},
-		{Name: "柯南", Persona: "推理狂魔，口头禅\"真相只有一个\"，每轮都要复盘一遍谁说了什么"},
-		{Name: "懒羊羊", Persona: "永远没睡醒，发言很短，经常跟着别人投，但偶尔会突然说出关键的一句"},
-		{Name: "摸鱼王", Persona: "资深打工人，只想早点下班，谁拖时间就投谁，发言喜欢用职场黑话"},
-		{Name: "社恐小i", Persona: "重度社恐，说话小心翼翼，一被点名就紧张，但其实观察得很仔细"},
-		{Name: "韩立", Persona: "凡人流稳健派，谨小慎微，能不站队就不站队，见势不妙先跑"},
-	}
+	rng.Shuffle(len(cast), func(i, j int) { cast[i], cast[j] = cast[j], cast[i] })
+	return cast
+}
+
+var englishCast = []Player{
+	{Name: "Walter", Persona: "a retired mystery-novel fan who loves logic and speaks slowly and carefully",
+		Habit: "trusts only evidence: changes a read the moment the record contradicts it, even about someone trusted until now"},
+	{Name: "Ruby", Persona: "plays on instinct, emotional and quick to get worked up",
+		Habit: "votes on gut feeling, and holds a grudge against anyone who accused or voted for her"},
+	{Name: "Jake", Persona: "a chatty programmer who argues with data and odds",
+		Habit: "counts: votes for whoever the most pieces of evidence point at, and goes with the majority when it is close"},
+	{Name: "Mia", Persona: "a calm lawyer who is good at catching contradictions in what people say",
+		Habit: "suspects anyone whose story changed, and keeps pressing them until they explain it"},
+	{Name: "Dave", Persona: "an honest, easygoing truck driver who says things straight",
+		Habit: "takes people at their word until one is caught lying, and never trusts that one again"},
+	{Name: "Kai", Persona: "a college freshman playing for the first time, a little nervous but very earnest",
+		Habit: "tends to follow the most confident player, but never against their own private information"},
+	{Name: "Fiona", Persona: "a high-school teacher who likes to sum things up and make a case",
+		Habit: "picks one suspect a day and works to get the whole table voting together on them"},
+	{Name: "Carl", Persona: "a smooth businessman who reads people well and never commits fully",
+		Habit: "never leads: waits for others to commit, then joins the side that looks like it will win"},
+	{Name: "Leo", Persona: "an esports player, quick, blunt, and likes to steer the table",
+		Habit: "decides early, sticks to the target, and pushes the table to vote fast"},
+}
+
+// chineseRivals are written in pairs that clash: the two are seated together
+// or not at all. No persona names anyone else in the cast, since a name not
+// at the table may not be mentioned.
+var chineseRivals = [][2]Player{
+	{
+		{Name: "华妃", Persona: "宫斗戏精，气场全开，阴阳怪气一流，口头禅\"贱人就是矫情\"",
+			Habit: "记仇，报复心强：谁怀疑过你、投过你，你就把他当头号嫌疑，有机会就带头投他。除非有确凿的证据洗清他，否则不原谅"},
+		{Name: "安陵容", Persona: "表面温柔懂事，说话软软的，口头禅\"姐姐说这话，是在怀疑我吗？\"",
+			Habit: "别人一句无心的话能记三轮：笔记里记下谁说过对你不利的话，几轮之后再翻出来。从不当面冲突，投票时悄悄投给记恨的人"},
+	},
+	{
+		{Name: "柯南", Persona: "推理狂魔，口头禅\"真相只有一个\"，发言爱逐条复盘谁说了什么、投了谁",
+			Habit: "只认证据：每个判断都要对得上具体的发言、投票或死亡。证据指向你之前信任的人，也立刻改判断并公开说明。没有证据时不跟风"},
+		{Name: "派大星", Persona: "脑回路清奇，经常没听懂大家在讨论什么，口头禅\"所以狼人是我们中间的一个人吗？\"",
+			Habit: "不跟着逻辑走，全凭直觉：凭第一印象认定谁可疑，投票也凭感觉，别人的推理很难说服你。但你的秘密信息照样以它为准"},
+	},
+	{
+		{Name: "龙傲天", Persona: "自带主角光环，坚信全场都是来衬托自己的，说话霸气，总觉得早就看穿了一切",
+			Habit: "极度自信：很早就认定一个人是狼，之后很难改口，别人反驳只会让你更坚定。喜欢号召全场跟你投"},
+		{Name: "皇后", Persona: "端庄稳重，自称\"本宫\"，口头禅\"本宫只是觉得，此事未免太过巧合\"",
+			Habit: "暗中操盘：从不直接喊人投谁，只摆出\"客观分析\"，用暗示把票引向你想放逐的人。不当第一个点名的人，等别人先冲，再顺势收票"},
+	},
+	{
+		{Name: "摸鱼王", Persona: "资深打工人，满嘴职场黑话，什么对齐、拉通、颗粒度、闭环",
+			Habit: "只想早点下班：谁发言最长、最绕就怀疑谁。下判断很快，投票倾向人多的一边，好赶紧结束"},
+		{Name: "闪电", Persona: "极致慢性子，说话一个字一个字往外蹦，比如\"我……觉……得……\"，但意思要说完整",
+			Habit: "反应永远慢一拍：判断依据的总是上一轮的事，新情况要到下一轮才反应过来。认定的投票目标很少改"},
+	},
+}
+
+// chineseLoners play off the whole table rather than one rival; a game seats
+// one of them.
+var chineseLoners = []Player{
+	{Name: "卡皮巴拉", Persona: "佛系玩家，情绪稳定到离谱，被踩也只说\"都行，你开心就好\"",
+		Habit: "不记仇，也不被情绪带：别人攻击你，你不会因此怀疑他，只看他做了什么。投票不跟风，安安静静投给你判断最可疑的人"},
+	{Name: "懒羊羊", Persona: "永远没睡醒，平时发言就一两句",
+		Habit: "平时摆烂，跟着投大家最怀疑的人。但只要你的秘密信息或公开记录里有一条硬线索，就突然认真起来，坚持按它投，谁劝都没用"},
+	{Name: "光头强", Persona: "暴脾气，一急就破防，口头禅\"我都说了我不是狼！你们是不是有病啊！\"",
+		Habit: "一被怀疑就急：谁怀疑你，你就立刻反咬他、投他。越被怀疑越激动，说话越像在狡辩"},
 }
 
 // AssignRoles deals Lineup to the players in a random order.

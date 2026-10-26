@@ -28,8 +28,8 @@ var players brain.Brain = brain.Random{}
 // SetBrain chooses how every player thinks. Call it before starting the worker.
 func SetBrain(b brain.Brain) { players = b }
 
-// Game is the workflow input. A State with no players gets
-// game.DefaultPlayers, so `{}` is enough to start a game.
+// Game is the workflow input. A State with no players gets one drawn by
+// game.Cast, so `{}` is enough to start a game.
 type Game struct {
 	State game.State `json:"state"`
 	// Lang is what the game is played in: "zh" (the default) or "en". It
@@ -125,11 +125,9 @@ func (t *table) list(names []string) string { return t.s.Lang.List(names) }
 
 func (t *table) setup() error {
 	t.s.Round, t.s.Phase = 1, game.Night
-	if len(t.s.Players) == 0 {
-		t.s.Players = game.DefaultPlayers(t.s.Lang)
-	}
 	var dealt []game.Player
-	if err := t.ctx.CallActivity(AssignRolesActivity, workflow.WithActivityInput(t.s.Players)).Await(&dealt); err != nil {
+	in := deal{Players: t.s.Players, Lang: t.s.Lang}
+	if err := t.ctx.CallActivity(AssignRolesActivity, workflow.WithActivityInput(in)).Await(&dealt); err != nil {
 		return err
 	}
 	t.s.Players = dealt
@@ -548,12 +546,25 @@ func (t *table) narrate(e game.Event) {
 	}
 }
 
+// deal is who sits down, if the game was started with players, and the
+// language to pick a cast in if it was not.
+type deal struct {
+	Players []game.Player `json:"players,omitempty"`
+	Lang    game.Lang     `json:"lang,omitempty"`
+}
+
+// AssignRolesActivity picks a cast if there is none and deals the roles. It is
+// an activity because both are random, and the workflow must replay the same.
 func AssignRolesActivity(ctx workflow.ActivityContext) (any, error) {
-	var ps []game.Player
-	if err := ctx.GetInput(&ps); err != nil {
+	var in deal
+	if err := ctx.GetInput(&in); err != nil {
 		return nil, err
 	}
-	return game.AssignRoles(ps, rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))), nil
+	rng := rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
+	if len(in.Players) == 0 {
+		in.Players = game.Cast(in.Lang, rng)
+	}
+	return game.AssignRoles(in.Players, rng), nil
 }
 
 // ActActivity asks a player for their move. A move that is still invalid

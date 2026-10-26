@@ -182,8 +182,12 @@ func prompt(t Turn) (system, user string) {
 			dead = append(dead, s.Name)
 		}
 	}
+	var habit string
+	if t.Me.Habit != "" {
+		habit = fmt.Sprintf(tx.habit, t.Me.Habit)
+	}
 	system = fmt.Sprintf(tx.rules, len(names), len(names), l.List(names), l.LineupSummary(),
-		t.Me.Name, l.Say(string(t.Me.Role)), t.Me.Persona, tx.strategies[t.Me.Role])
+		t.Me.Name, l.Say(string(t.Me.Role)), t.Me.Persona, habit, tx.strategies[t.Me.Role])
 
 	var seats, secrets, public, claims, known strings.Builder
 	var thoughts []string

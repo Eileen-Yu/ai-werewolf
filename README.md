@@ -18,6 +18,7 @@ The game master's output is a god's-eye live feed: what everyone says out loud, 
 
 - **Standard nine-player game**: 3 werewolves, a seer, a witch, a hunter and 3 villagers. Wolves win by clearing a side.
 - **Players only know what they should**: nobody else's role is ever sent to the model. The filtering happens in code, not in the prompt.
+- **Characters who play differently, not just talk differently**: each has a way of deciding as well as a way of talking. One holds grudges and votes for whoever voted for her; another only follows evidence, even against someone he trusted. A Chinese game seats four pairs of rivals and one of three loners, in a random order.
 - **The wolves have a plan**: each night they agree who to kill, who fakes a seer claim tomorrow and who they vote out, then play it out by day.
 - **Players have memory**: everyone keeps notes on what they believe about each other player and why, updated every turn.
 - **Bad answers are sent back**: voting for someone not at the table, quoting someone who never spoke, or "there is no proof" as a reason all get the answer handed back to try again.

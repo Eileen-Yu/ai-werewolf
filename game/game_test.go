@@ -2,6 +2,7 @@ package game
 
 import (
 	"math/rand/v2"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,7 +10,8 @@ import (
 )
 
 func TestAssignRolesDealsTheLineup(t *testing.T) {
-	players := AssignRoles(DefaultPlayers(Chinese), rand.New(rand.NewPCG(1, 2)))
+	rng := rand.New(rand.NewPCG(1, 2))
+	players := AssignRoles(Cast(Chinese, rng), rng)
 	require.Len(t, players, len(Lineup))
 
 	counts := map[Role]int{}
@@ -18,6 +20,49 @@ func TestAssignRolesDealsTheLineup(t *testing.T) {
 		counts[p.Role]++
 	}
 	assert.Equal(t, map[Role]int{Werewolf: 3, Seer: 1, Witch: 1, Hunter: 1, Villager: 3}, counts)
+}
+
+func TestAChineseCastSeatsEveryRivalPairAndOneLoner(t *testing.T) {
+	seated := map[string]int{}
+	for seed := range uint64(50) {
+		cast := Cast(Chinese, rand.New(rand.NewPCG(seed, 1)))
+		require.Len(t, cast, len(Lineup))
+		names := map[string]bool{}
+		for _, p := range cast {
+			names[p.Name] = true
+			seated[p.Name]++
+		}
+		assert.Len(t, names, len(Lineup), "nobody is seated twice")
+		for _, pair := range chineseRivals {
+			assert.True(t, names[pair[0].Name] && names[pair[1].Name], "%s and %s sit down together", pair[0].Name, pair[1].Name)
+		}
+		loners := 0
+		for _, p := range chineseLoners {
+			if names[p.Name] {
+				loners++
+			}
+		}
+		assert.Equal(t, 1, loners)
+	}
+	for _, p := range chineseLoners {
+		assert.Positive(t, seated[p.Name], "%s gets a seat in some game", p.Name)
+	}
+	assert.Len(t, Cast(English, rand.New(rand.NewPCG(1, 2))), len(Lineup))
+}
+
+func TestNoCharacterNamesAnyoneInTheCast(t *testing.T) {
+	everyone := slices.Clone(englishCast)
+	for _, pair := range chineseRivals {
+		everyone = append(everyone, pair[:]...)
+	}
+	everyone = append(everyone, chineseLoners...)
+	for _, p := range everyone {
+		assert.NotEmpty(t, p.Habit, "%s has a way of deciding", p.Name)
+		for _, other := range everyone {
+			assert.NotContains(t, p.Persona+p.Habit, other.Name,
+				"%s's character names %s, who may not be at the table, or makes them say their own name", p.Name, other.Name)
+		}
+	}
 }
 
 func TestLineupSummary(t *testing.T) {

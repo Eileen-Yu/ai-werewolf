@@ -44,6 +44,8 @@ The system prompt asks the player to think in a fixed order, and each step is a 
 
 The system prompt also lists reasoning points where rules combine in ways that are easy to get wrong. A seer checking someone as good and the witch saving that same person do not contradict each other; they back each other up and make both more believable. When someone reports a check on you, you know your own role: if they got it right, that is strong evidence they are the real seer. The player killed at night is not necessarily good, because wolves can kill their own. "There is no proof" is not evidence, because no claim can be proven on the spot.
 
+Each character has two parts. `Persona` is how they talk. `Habit` is how they decide: who they suspect, what makes them change their mind, and how they vote. The prompt says the habit matters more than the talk, because nine personas alone play like one model in nine voices. The grudge holder votes for whoever voted for them; the detective drops a trusted player the moment the evidence turns. A game started without players gets a cast from `game.Cast`. In Chinese the characters come in rival pairs that are seated together or not at all, plus one of three loners. No character's text names another character, since a name not at the table may not be mentioned. The draw happens in the role-dealing activity, so a replay gets the same cast.
+
 The god's-eye feed prints each player's observations and changed reads, such as "rethinks: Walter unsure→werewolf, because: …", so you can watch how a read builds up.
 
 ## Checking answers
