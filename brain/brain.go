@@ -26,6 +26,8 @@ type Turn struct {
 	Kind       TurnKind     `json:"kind"`
 	Round      int          `json:"round"`
 	Me         game.Player  `json:"me"`
+	Players    []string     `json:"players"` // everyone at the table, dead or alive
+	Alive      []string     `json:"alive"`
 	Transcript []game.Event `json:"transcript"`
 	Candidates []string     `json:"candidates"`
 }

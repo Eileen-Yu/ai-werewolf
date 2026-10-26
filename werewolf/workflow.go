@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand/v2"
 	"strings"
 	"time"
@@ -129,12 +130,14 @@ func (t *table) night() error {
 
 	wolves := s.Living(game.Werewolf)
 	targets := game.Without(s.Living(), wolves...)
-	for _, w := range wolves {
-		line, err := t.speak(brain.WolfChat, w, targets)
-		if err != nil {
-			return err
+	if len(wolves) > 1 { // a lone wolf has nobody to plot with
+		for _, w := range wolves {
+			line, err := t.speak(brain.WolfChat, w, targets)
+			if err != nil {
+				return err
+			}
+			t.add(w, line, wolves...)
 		}
-		t.add(w, line, wolves...)
 	}
 	kills, err := t.chooseAll(brain.Kill, wolves, func(string) []string { return targets })
 	if err != nil {
@@ -221,10 +224,16 @@ var retry = workflow.WithActivityRetryPolicy(&workflow.RetryPolicy{
 })
 
 func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brain.Turn {
+	var everyone []string
+	for _, p := range t.s.Players {
+		everyone = append(everyone, p.Name)
+	}
 	return brain.Turn{
 		Kind:       kind,
 		Round:      t.s.Round,
 		Me:         *t.s.Player(name),
+		Players:    everyone,
+		Alive:      t.s.Living(),
 		Transcript: t.s.VisibleTo(name),
 		Candidates: candidates,
 	}
@@ -305,5 +314,9 @@ func ChooseActivity(ctx workflow.ActivityContext) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return game.MatchCandidate(reply, t.Candidates), nil
+	pick := game.MatchCandidate(reply, t.Candidates)
+	if pick == "" {
+		log.Printf("%s's %s reply names no candidate, counted as abstaining: %q", t.Me.Name, t.Kind, reply)
+	}
+	return pick, nil
 }
