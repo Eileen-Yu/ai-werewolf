@@ -160,18 +160,19 @@ func TestCheck(t *testing.T) {
 }
 
 func TestCheckRejectsWhatIsNotOnTheRecord(t *testing.T) {
+	seats := []Seat{{Name: "小红"}, {Name: "老王"}, {Name: "大刘"}}
 	turn := Turn{
-		Kind: Speech, Round: 1, Me: game.Player{Name: "小红"},
-		Seats:    []Seat{{Name: "小红"}, {Name: "老王"}, {Name: "大刘"}},
-		Suspects: []string{"老王", "大刘", Nobody},
-		Spoken:   []string{"老王"}, Waiting: []string{"大刘"},
+		Kind: Speech, Round: 1, Me: game.Player{Name: "小红"}, Seats: seats,
+		Transcript: []game.Event{{Round: 1, Phase: game.Day, Speaker: "老王", Text: "我是村民"}},
+		Suspects:   []string{"老王", "大刘", Nobody},
+		Spoken:     []string{"老王"}, Waiting: []string{"大刘"},
 	}
 	ok := Action{Speech: "老王说过他是村民，我不信", Suspect: "老王"}
 	seer := &game.Claim{Role: game.Seer, Target: "老王", Result: "狼人"}
 
 	assert.NoError(t, turn.Check(ok))
 	assert.NoError(t, turn.Check(Action{Speech: "我是预言家", Suspect: "老王", Claim: seer}))
-	assert.ErrorContains(t, turn.Check(Action{Speech: "大刘说过他是好人", Suspect: "老王"}), "大刘今天还没发言")
+	assert.ErrorContains(t, turn.Check(Action{Speech: "大刘说过他是好人", Suspect: "老王"}), "大刘还没有公开发过言")
 	assert.ErrorContains(t, turn.Check(Action{Speech: "我是狼人", Suspect: "老王", Claim: &game.Claim{Role: game.Werewolf}}), "claim.role")
 	assert.ErrorContains(t, turn.Check(Action{Speech: "我查了小李", Suspect: "老王", Claim: &game.Claim{Role: game.Seer, Target: "小李", Result: "好人"}}), "小李")
 	assert.ErrorContains(t, turn.Check(Action{Speech: "我查了老王", Suspect: "老王", Claim: &game.Claim{Role: game.Seer, Target: "老王", Result: "可疑"}}), "好人或狼人")
@@ -179,6 +180,20 @@ func TestCheckRejectsWhatIsNotOnTheRecord(t *testing.T) {
 
 	later := turn
 	later.Round = 2
-	assert.NoError(t, later.Check(Action{Speech: "大刘说过他是好人，昨天的事", Suspect: "老王"}), "on day 2 anyone may have spoken before")
+	later.Transcript = append(later.Transcript, game.Event{Round: 1, Phase: game.Day, Speaker: "大刘", Text: "我是好人"})
+	assert.NoError(t, later.Check(Action{Speech: "大刘说过他是好人，昨天的事", Suspect: "老王"}), "大刘 spoke yesterday")
 	assert.ErrorContains(t, later.Check(Action{Speech: "大刘刚才很可疑", Suspect: "老王"}), "大刘今天还没发言")
+
+	firstNight := Turn{
+		Kind: WolfChat, Round: 1, Phase: game.Night, Me: game.Player{Name: "小红"}, Seats: seats,
+		Transcript: []game.Event{{Round: 1, Phase: game.Night, Text: "你们是狼人同伴：小红、老王。", Audience: []string{"小红", "老王"}}},
+	}
+	assert.ErrorContains(t, firstNight.Check(Action{Speech: "我觉得大刘的发言让人疑惑"}), "大刘还没有公开发过言")
+	assert.NoError(t, firstNight.Check(Action{Speech: "今晚刀大刘"}))
+	_, user := prompt(firstNight)
+	assert.Contains(t, user, "到现在为止还没有任何人公开发过言")
+	_, user = prompt(later)
+	assert.NotContains(t, user, "还没有公开发过言")
+	_, user = prompt(turn)
+	assert.Contains(t, user, "还没有公开发过言的人：大刘。")
 }

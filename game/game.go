@@ -141,6 +141,11 @@ func (e Event) Said() string {
 	return e.Text + "【" + Stance(e.Suspect, e.Claim) + "】"
 }
 
+// IsPublicSpeech reports whether a player said this for everyone to hear.
+func (e Event) IsPublicSpeech() bool {
+	return e.Speaker != "" && len(e.Audience) == 0
+}
+
 func (e Event) VisibleTo(name string) bool {
 	return len(e.Audience) == 0 || slices.Contains(e.Audience, name)
 }

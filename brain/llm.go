@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"slices"
 	"strings"
 
 	dapr "github.com/dapr/go-sdk/client"
@@ -185,6 +186,12 @@ func prompt(t Turn) (system, user string) {
 		fmt.Fprintf(&b, "你是这一轮第%d个发言。已经发言：%s。还没发言：%s。\n", len(t.Spoken)+1, orNobody(t.Spoken), orNobody(t.Waiting))
 	}
 	if t.Kind.Speaks() {
+		switch silent := t.Silent(); {
+		case nobodySpoke(t):
+			b.WriteString("到现在为止还没有任何人公开发过言，你不能评价任何人的发言或观点。\n")
+		case len(silent) > 0:
+			fmt.Fprintf(&b, "还没有公开发过言的人：%s。你不能评价他们说过什么。\n", strings.Join(silent, "、"))
+		}
 		b.WriteString(selfCheck)
 	}
 
@@ -222,6 +229,10 @@ const selfCheck = `【回答前自检】
 - 我有没有把别人声称的身份或查验结果当成事实来说？
 - 我说的和我之前公开说过的一致吗？和我的身份策略一致吗？
 `
+
+func nobodySpoke(t Turn) bool {
+	return !slices.ContainsFunc(t.Transcript, game.Event.IsPublicSpeech)
+}
 
 func notes(t Turn) string {
 	var b strings.Builder

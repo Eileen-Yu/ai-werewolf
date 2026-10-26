@@ -100,9 +100,9 @@ type Action struct {
 // Claimable is what a player may claim to be. A wolf claims one of these too.
 var Claimable = []game.Role{game.Seer, game.Witch, game.Hunter, game.Villager}
 
-// earlyCues are ways of quoting a speech that, on the first day, cannot have
-// been given yet by anyone still waiting to speak.
-var earlyCues = []string{"说过", "说的", "提到", "的发言", "发言里", "发言中"}
+// quoteCues are ways of quoting what someone said, which cannot follow the
+// name of someone who has not said anything in public yet.
+var quoteCues = []string{"说过", "说的", "提到", "的发言", "发言里", "发言中", "的观点", "的说法"}
 
 // Check reports everything wrong with an action for this turn, in words
 // that can be handed back to the player.
@@ -120,7 +120,7 @@ func (t Turn) Check(a Action) error {
 	if t.Kind.Declares() && a.Claim != nil {
 		problems = append(problems, t.ClaimProblems(*a.Claim)...)
 	}
-	if t.Kind == Speech {
+	if t.Kind.Speaks() {
 		problems = append(problems, t.unspokenProblems(a.Speech)...)
 	}
 	for _, name := range t.UnknownNames(a.Notes) {
@@ -147,23 +147,44 @@ func (t Turn) ClaimProblems(c game.Claim) []string {
 	return problems
 }
 
-// unspokenProblems catches a speech quoting someone who has not spoken yet:
-// today, anyone still waiting; on the first day, nobody has said anything.
+// unspokenProblems catches a speech quoting someone who has not spoken: anyone
+// who has never said anything in public, and, during the day's speeches,
+// anyone still waiting for their turn today.
 func (t Turn) unspokenProblems(speech string) []string {
-	cues := []string{"刚才"}
-	if t.Round == 1 {
-		cues = append(cues, earlyCues...)
-	}
 	var problems []string
-	for _, w := range t.Waiting {
-		for _, cue := range cues {
-			if strings.Contains(speech, w+cue) {
-				problems = append(problems, fmt.Sprintf("%s今天还没发言，你不能说\"%s%s\"", w, w, cue))
+	for _, name := range t.Silent() {
+		for _, cue := range quoteCues {
+			if strings.Contains(speech, name+cue) {
+				problems = append(problems, fmt.Sprintf("%s还没有公开发过言，你不能说\"%s%s\"", name, name, cue))
 				break
 			}
 		}
 	}
+	if t.Kind == Speech {
+		for _, w := range t.Waiting {
+			if strings.Contains(speech, w+"刚才") {
+				problems = append(problems, fmt.Sprintf("%s今天还没发言，你不能说\"%s刚才\"", w, w))
+			}
+		}
+	}
 	return problems
+}
+
+// Silent is everyone else at the table who has not said anything in public.
+func (t Turn) Silent() []string {
+	spoke := map[string]bool{}
+	for _, e := range t.Transcript {
+		if e.IsPublicSpeech() {
+			spoke[e.Speaker] = true
+		}
+	}
+	var silent []string
+	for _, name := range t.others() {
+		if !spoke[name] {
+			silent = append(silent, name)
+		}
+	}
+	return silent
 }
 
 // UnknownNames lists the names in notes' suspicions that are not other
