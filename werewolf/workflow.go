@@ -232,7 +232,7 @@ func (t *table) wolvesHunt() (string, error) {
 	case a.Faker != game.Nobody && a.Faker != "":
 		plan.Faker = a.Faker
 		day = fmt.Sprintf(t.h.faker, a.Faker)
-	case a.Hook != "":
+	case a.Hook != "" && a.Hook != game.Nobody:
 		plan.Hook = a.Hook
 		day = fmt.Sprintf(t.h.hook, a.Hook)
 	}

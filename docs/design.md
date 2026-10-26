@@ -57,7 +57,7 @@ The game master checks every answer. If it is not valid, all the problems are se
 - `target` and `suspect` must be on the list given; for example, you cannot vote for yourself.
 - `claim` may only claim seer, witch, hunter or villager. Anyone it names must be at the table, and a seer's result must be good or werewolf.
 - Notes may not name anyone not at the table, and a read must be werewolf, good or unsure.
-- The wolf plan: tomorrow's vote target must be a living good player who is not tonight's victim. What else it needs depends on the pack's tactic. A counter-claim names a wolf as faker, who must claim seer in their speech that day; the hook names a wolf as the hook; deep cover names neither.
+- The wolf plan: tomorrow's vote target must be a living good player who is not tonight's victim. What else it needs depends on the pack's tactic. A counter-claim names a wolf as faker, who must claim seer in their speech that day; the hook names a wolf as the hook; deep cover names neither. Only the first night's plan must name one: after that the pack may name nobody, so it can change course once its faker is out.
 - No speech, night talk and wolf plan included, may quote someone who has never spoken in public ("said", "mentioned", "'s speech", "'s view"). In the day's speeches, nobody may say what someone still waiting for their turn "just" said. The prompt also lists who has not spoken in public yet, and on Night 1 it says outright that nobody has spoken.
 - Day speeches and last words may not use "no evidence", "no proof" or "nobody else confirmed it" as a reason: no claim can be proven on the spot, so that is true of everyone.
 - A speech may not refer to the speaker by their own name. Players speak of themselves as "I".

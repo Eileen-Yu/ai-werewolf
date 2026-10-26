@@ -178,11 +178,12 @@ func (t Turn) ClaimProblems(c game.Claim) []string {
 func (t Turn) planProblems(a Action) []string {
 	tx, l := t.text(), t.Lang
 	var problems []string
-	if t.Tactic == game.Counterclaim && !slices.Contains(t.Pack, a.Faker) {
-		problems = append(problems, fmt.Sprintf(tx.badFaker, l.List(t.Pack), a.Faker))
+	named := t.PlanNames()
+	if t.Tactic == game.Counterclaim && !slices.Contains(named, a.Faker) {
+		problems = append(problems, fmt.Sprintf(tx.badFaker, l.List(l.SayAll(named)), a.Faker))
 	}
-	if t.Tactic == game.Hook && !slices.Contains(t.Pack, a.Hook) {
-		problems = append(problems, fmt.Sprintf(tx.badHook, l.List(t.Pack), a.Hook))
+	if t.Tactic == game.Hook && !slices.Contains(named, a.Hook) {
+		problems = append(problems, fmt.Sprintf(tx.badHook, l.List(l.SayAll(named)), a.Hook))
 	}
 	if !slices.Contains(t.Suspects, a.Focus) {
 		problems = append(problems, fmt.Sprintf(tx.badFocus, l.List(l.SayAll(t.Suspects)), a.Focus))
@@ -197,6 +198,16 @@ func (t Turn) planProblems(a Action) []string {
 // seer today.
 func (t Turn) MustFakeSeer() bool {
 	return t.Plan != nil && t.Plan.Faker == t.Me.Name
+}
+
+// PlanNames is who a wolf plan may name as the faker or the hook. The first
+// night's plan must name a wolf, so the pack plays its tactic; after that the
+// pack may name nobody, once the faker is out or the hook is no use.
+func (t Turn) PlanNames() []string {
+	if t.Round <= 1 {
+		return t.Pack
+	}
+	return append(slices.Clone(t.Pack), game.Nobody)
 }
 
 // IsHook reports whether the pack's plan has this wolf side with the good
@@ -281,7 +292,7 @@ func (t Turn) Normalize(a Action) Action {
 	if t.Kind == WolfPlan {
 		a.Focus = closest(a.Focus, t.Suspects)
 		a.Faker = closest(a.Faker, append(slices.Clone(t.Pack), game.Nobody))
-		a.Hook = closest(a.Hook, t.Pack)
+		a.Hook = closest(a.Hook, append(slices.Clone(t.Pack), game.Nobody))
 	}
 	if a.Claim != nil {
 		c := *a.Claim

@@ -188,7 +188,7 @@ func prompt(t Turn) (system, user string) {
 	}
 	strategy := tx.strategies[t.Me.Role]
 	if t.Me.Role == game.Werewolf {
-		strategy += tx.tactics[t.Tactic]
+		strategy += tx.tactics[t.Tactic] + tx.adapt
 	}
 	system = fmt.Sprintf(tx.rules, len(names), len(names), l.List(names), l.LineupSummary(),
 		t.Me.Name, l.Say(string(t.Me.Role)), t.Me.Persona, habit, strategy)
@@ -299,9 +299,9 @@ func prompt(t Turn) (system, user string) {
 	if t.Kind == WolfPlan {
 		switch t.Tactic {
 		case game.Counterclaim:
-			fmt.Fprintf(&b, tx.fakerOnly, l.List(t.Pack))
+			fmt.Fprintf(&b, tx.fakerOnly, l.List(l.SayAll(t.PlanNames())))
 		case game.Hook:
-			fmt.Fprintf(&b, tx.hookOnly, l.List(t.Pack))
+			fmt.Fprintf(&b, tx.hookOnly, l.List(l.SayAll(t.PlanNames())))
 		}
 		fmt.Fprintf(&b, tx.focusOnly, l.List(l.SayAll(t.Suspects)))
 	}

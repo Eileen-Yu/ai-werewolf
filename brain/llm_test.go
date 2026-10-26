@@ -352,6 +352,16 @@ func TestCheckHoldsTheWolfPlanToTheGame(t *testing.T) {
 	plan.Tactic = game.DeepCover
 	assert.NoError(t, plan.Check(Action{Target: "阿芳", Focus: "老王", Speech: "大家潜水"}), "deep cover names neither")
 
+	later := plan
+	later.Round = 2
+	later.Tactic = game.Counterclaim
+	assert.NoError(t, later.Check(later.Normalize(Action{Target: "阿芳", Faker: "无", Focus: "老王", Speech: "悍跳的已经出局，改抓破绽"})), "after night 1 the pack may stop claiming")
+	later.Tactic = game.Hook
+	assert.NoError(t, later.Check(later.Normalize(Action{Target: "阿芳", Hook: "无", Focus: "老王", Speech: "不倒钩了"})), "after night 1 the pack may drop the hook")
+	assert.ErrorContains(t, later.Check(Action{Target: "阿芳", Hook: "老王", Focus: "老王", Speech: "老王倒钩"}), "hook", "the hook is still a wolf")
+	_, planPrompt := prompt(Turn{Kind: WolfPlan, Round: 2, Phase: game.Night, Me: plan.Me, Pack: plan.Pack, Tactic: game.Counterclaim, Candidates: plan.Candidates, Suspects: plan.Suspects})
+	assert.Contains(t, planPrompt, "faker 只能是：阿杰、小宇、无。")
+
 	day := Turn{
 		Kind: Speech, Round: 2, Phase: game.Day, Me: game.Player{Name: "小宇", Role: game.Werewolf},
 		Seats: []Seat{{Name: "小宇"}, {Name: "老王"}}, Suspects: []string{"老王", game.Nobody},

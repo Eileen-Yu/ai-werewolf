@@ -12,7 +12,9 @@ type text struct {
 	habit      string
 	strategies map[game.Role]string
 	// tactics is, for a wolf, how the pack plays this game.
-	tactics      map[game.Tactic]string
+	tactics map[game.Tactic]string
+	// adapt lets the pack drop its tactic after the first night.
+	adapt        string
 	instructions map[TurnKind]string
 
 	// What Check hands back to the player.
@@ -135,6 +137,7 @@ var chineseText = text{
 		game.Hook: "本局狼队的打法是倒钩：计划里指定一只狼当倒钩，他白天装成最坚定的好人：站边真预言家，同伴暴露了就跟着踩，甚至投他，用一个同伴换来好人的信任，留到后面关键的时候再带偏票。" +
 			"其他狼不跳预言家，也不要和倒钩的狼互相维护。只有倒钩的狼可以怀疑和投票给狼同伴，其他狼不能。",
 	},
+	adapt: "第一夜的计划必须按这个打法来。之后局势变了，比如悍跳的狼已经出局或被识破、倒钩已经没用，可以不再派人，改打别的：抓好人真实的破绽、他们自己说过却没做到的话，比编造更有效。",
 	instructions: map[TurnKind]string{
 		Speech:   "白天发言环节，轮到你了。",
 		Rebuttal: "回应环节：所有人都已经发过一次言。回应别人对你的怀疑，或者质疑某个人的说法（比如对跳的预言家、前后矛盾的人）。不超过80字。",
@@ -157,8 +160,8 @@ var chineseText = text{
 	badRole:        "claim.role 只能是预言家、女巫、猎人、村民之一，你给的是 %q",
 	badClaimTarget: "claim.target %q 不是桌上的其他玩家",
 	badResult:      "预言家的 claim.result 只能是好人或狼人，你给的是 %q",
-	badFaker:       "本局要悍跳，faker 只能是狼人之一（%s），你给的是 %q",
-	badHook:        "本局要倒钩，hook 只能是狼人之一（%s），你给的是 %q",
+	badFaker:       "本局要悍跳，faker 只能是：%s，你给的是 %q",
+	badHook:        "本局要倒钩，hook 只能是：%s，你给的是 %q",
 	badFocus:       "focus 必须是这些好人阵营的候选之一：%s，你给的是 %q",
 	focusIsVictim:  "%s今晚就会被杀，明天不可能再投票放逐他：focus 要换一个人",
 	mustFake:       "狼队计划要你今天悍跳预言家：claim.role 必须是预言家，并报一个查验结果",
@@ -322,6 +325,7 @@ Write everything in English.`,
 		game.Hook: "This game the pack plays the hook: the plan names one werewolf as the hook, who plays the staunchest good player at the table, backs the real seer, and when a teammate is exposed piles on and even votes them out, trading a teammate for the good side's trust to steer a vote later when it counts. " +
 			"The others do not claim seer and do not defend the hook. Only the hook may suspect or vote for a teammate.",
 	},
+	adapt: " The first night's plan must play it. After that, when things change, say the faker is out or has been seen through, or the hook is no longer of use, you may name nobody and play something else: a good player's real slip, something they said they would do and did not, works better than anything made up.",
 	instructions: map[TurnKind]string{
 		Speech:   "It is the day's speeches and your turn to speak.",
 		Rebuttal: "Reply round: everyone has spoken once. Answer suspicion aimed at you, or challenge someone's story (a counter-claimed seer, someone who contradicts themselves). At most 40 words.",
@@ -344,8 +348,8 @@ Write everything in English.`,
 	badRole:        "claim.role must be one of seer, witch, hunter, villager; you gave %q",
 	badClaimTarget: "claim.target %q is not another player at the table",
 	badResult:      "a seer's claim.result must be good or werewolf; you gave %q",
-	badFaker:       "this game the pack counter-claims, so faker must be one of the werewolves (%s); you gave %q",
-	badHook:        "this game the pack plays the hook, so hook must be one of the werewolves (%s); you gave %q",
+	badFaker:       "this game the pack counter-claims, so faker must be one of: %s; you gave %q",
+	badHook:        "this game the pack plays the hook, so hook must be one of: %s; you gave %q",
 	badFocus:       "focus must be one of these players on the good side: %s; you gave %q",
 	focusIsVictim:  "%s will be killed tonight and cannot be voted out tomorrow: pick someone else as focus",
 	mustFake:       "the pack's plan has you claim seer today: claim.role must be seer, with a check result",
