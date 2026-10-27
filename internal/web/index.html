@@ -308,7 +308,8 @@ function speakLine(l, lang) {
   const exact = all.filter(x => tag(x) === u.lang);
   const voices = exact.length ? exact : all.filter(x => tag(x).startsWith(lang === "en" ? "en" : "zh"));
   const h = hash(l.speaker || "");
-  if (voices.length) u.voice = voices[l.speaker ? h % voices.length : 0];
+  // The host keeps the first voice; players share the rest when there are any.
+  if (voices.length) u.voice = !l.speaker || voices.length === 1 ? voices[0] : voices[1 + h % (voices.length - 1)];
   if (l.speaker) {
     u.pitch = 0.7 + (h % 7) / 10;
     u.rate = 0.95 + ((h >> 3) % 4) / 10;
