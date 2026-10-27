@@ -269,6 +269,7 @@ func (t *table) wolvesHunt() (string, error) {
 }
 
 // witchActs lets the witch, told tonight's victim, use at most one potion.
+// She may save herself on the first night only.
 func (t *table) witchActs(victim string) (saved bool, poisoned string, err error) {
 	s := t.s
 	witches := s.Living(game.Witch)
@@ -296,7 +297,7 @@ func (t *table) witchActs(victim string) (saved bool, poisoned string, err error
 
 	switch {
 	case s.AntidoteUsed || victim == "":
-	case victim == w:
+	case victim == w && s.Round > 1:
 		t.add("", t.h.selfVictim, w)
 	default:
 		pick, err := t.choose(brain.Save, w, []string{victim, game.Pass})

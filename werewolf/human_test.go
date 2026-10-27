@@ -61,8 +61,12 @@ func TestAPersonPlaysTheSeatTheyTook(t *testing.T) {
 		assert.Equal(t, "Eileen", v.You)
 		assert.Nil(t, v.Pending)
 		assert.True(t, slices.ContainsFunc(v.Log, func(l Line) bool { return strings.Contains(l.Text, "本局MVP") }), "the MVP is announced")
+		wolf := func(name string) bool {
+			return slices.ContainsFunc(res.Players, func(p game.Player) bool { return p.Name == name && p.Role == game.Werewolf })
+		}
 		for _, l := range v.Log {
-			assert.False(t, l.Private && l.Speaker != "" && l.Speaker != "Eileen" && !slices.Contains(v.Pack, l.Speaker), "the person saw %s's private line: %s", l.Speaker, l.Text)
+			assert.False(t, l.Private && l.Speaker != "" && l.Speaker != "Eileen" && !(wolf("Eileen") && wolf(l.Speaker)),
+				"the person saw %s's private line: %s", l.Speaker, l.Text)
 		}
 		return
 	}

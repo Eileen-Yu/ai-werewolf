@@ -74,7 +74,7 @@ var chineseText = text{
 角色能力：
 - 狼人：每晚一起商量杀一个人，可以杀任何活着的人，包括自己和同伴（叫自刀）。
 - 预言家：每晚查验一个人是好人还是狼人。
-- 女巫：有一瓶解药和一瓶毒药，各只能用一次，同一晚最多用一瓶。每晚会知道谁被狼人杀了，可以用解药救他（不能救自己），也可以用毒药毒死任何一个人。
+- 女巫：有一瓶解药和一瓶毒药，各只能用一次，同一晚最多用一瓶。每晚会知道谁被狼人杀了，可以用解药救他（只有第1夜可以救自己），也可以用毒药毒死任何一个人。
 - 猎人：出局时可以开枪带走一个人；被女巫毒死时不能开枪。
 - 村民：没有特殊能力。
 流程：天亮后只公布昨晚谁死了，不公布死因（可能被狼人杀，可能被女巫毒死，也可能被出局的猎人开枪带走；被救的人不会死）。猎人开枪也不公布，被带走的人只会出现在死亡名单里。
@@ -269,7 +269,7 @@ Lineup: %s.
 Roles:
 - Werewolf: each night the werewolves agree on one person to kill. They may kill anyone alive, including themselves or a teammate (a self-kill).
 - Seer: each night checks one person and learns whether they are good or a werewolf.
-- Witch: has one antidote and one poison, each usable once, and at most one per night. Each night she learns who the werewolves killed and may save them with the antidote (never herself), or poison anyone.
+- Witch: has one antidote and one poison, each usable once, and at most one per night. Each night she learns who the werewolves killed and may save them with the antidote (herself only on the first night), or poison anyone.
 - Hunter: when out of the game, may shoot one person and take them out too; not if the witch poisoned them.
 - Villager: no power.
 Flow: at dawn only who died is announced, never how (killed by werewolves, poisoned by the witch, or shot by a hunter who went out; a saved player does not die). A hunter's shot is not announced either: the player shot simply appears among the dead.

@@ -49,8 +49,7 @@ func TestWitchSavingTheVictimMakesAPeacefulNight(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
 
-	// The witch cannot save herself, so replay any game where the wolves
-	// happened to pick her.
+	// Replay any game where the first night had nobody to save.
 	var b *savingWitch
 	for i := 0; i < 20 && (b == nil || b.kinds[brain.Save] == 0); i++ {
 		b = &savingWitch{}
@@ -61,6 +60,58 @@ func TestWitchSavingTheVictimMakesAPeacefulNight(t *testing.T) {
 	assert.Contains(t, b.firstDawn, "天亮了，昨晚是平安夜。")
 	assert.Equal(t, 1, b.kinds[brain.Save])
 	assert.Zero(t, b.kinds[brain.Poison], "the witch who saved has no second potion that night")
+}
+
+func TestTheWitchMaySaveHerselfOnlyOnTheFirstNight(t *testing.T) {
+	client := startEngine(t)
+	startWorker(t, client)
+
+	// Who the wolves kill is random, so play until the witch has been their
+	// victim both on the first night and, with the antidote unused, later.
+	b := &selfSavingWitch{}
+	SetBrain(b)
+	for i := 0; i < 200 && (b.savedFirstNight == "" || b.toldLater == 0); i++ {
+		playGame(t, client, fmt.Sprintf("self-save-%d", i))
+	}
+
+	require.NotEmpty(t, b.savedFirstNight, "the wolves never killed the witch on the first night")
+	assert.True(t, b.spokeAfter, "the witch who saved herself was alive to speak on Day 1")
+	require.Positive(t, b.toldLater, "the wolves never killed the witch later while she still had the antidote")
+	assert.Zero(t, b.offeredLater, "the witch was offered to save herself after the first night")
+}
+
+// selfSavingWitch plays randomly except that the witch saves only herself
+// and never poisons, so her antidote lasts until the wolves come for her.
+type selfSavingWitch struct {
+	mu              sync.Mutex
+	savedFirstNight string // the game's witch, once she has saved herself on Night 1
+	spokeAfter      bool
+	toldLater       int // later nights the host told her she cannot save herself
+	offeredLater    int
+}
+
+func (b *selfSavingWitch) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	self := t.Me.Role == game.Witch && len(t.Candidates) > 0 && t.Candidates[0] == t.Me.Name
+	switch {
+	case t.Kind == brain.Save && self && t.Round == 1:
+		b.savedFirstNight, b.spokeAfter = t.Me.Name, false
+		return brain.Action{Target: t.Me.Name}, nil
+	case t.Kind == brain.Save && self:
+		b.offeredLater++
+		return brain.Action{Target: t.Me.Name}, nil
+	case t.Kind == brain.Save, t.Kind == brain.Poison:
+		if t.Kind == brain.Poison && t.Round > 1 && slices.ContainsFunc(t.Transcript, func(e game.Event) bool {
+			return e.Round == t.Round && strings.Contains(e.Text, "女巫只有第1夜可以自救")
+		}) {
+			b.toldLater++
+		}
+		return brain.Action{Target: game.Pass}, nil
+	case t.Kind == brain.Speech && t.Round == 1 && t.Me.Name == b.savedFirstNight:
+		b.spokeAfter = true
+	}
+	return brain.Random{}.Act(ctx, t)
 }
 
 // savingWitch plays randomly except that the witch always saves and never
@@ -244,7 +295,11 @@ func TestOnlyWolvesGetThePlanAndAnyWolfMayTurnOnATeammate(t *testing.T) {
 		SetBrain(b)
 		g := newGame()
 		g.Tactic = tactic
-		play(t, client, "plan-"+string(tactic), g)
+		// The wolves win before anyone speaks if every power role dies on
+		// the first night, so play until there are speeches to check.
+		for i := 0; i < 5 && len(b.turns) == 0; i++ {
+			play(t, client, fmt.Sprintf("plan-%s-%d", tactic, i), g)
+		}
 		require.NotEmpty(t, b.turns)
 		checkWolvesMayTurnOnEachOther(t, b.turns)
 	}
