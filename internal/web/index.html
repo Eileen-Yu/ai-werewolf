@@ -64,6 +64,7 @@
           <div class="dim" id="pack"></div>
           <div class="seats" id="seats" style="margin-top:10px"></div>
         </div>
+        <div class="card" id="votes" hidden></div>
         <div class="card" id="turnCard" hidden>
           <div id="turnTitle" style="font-weight:600"></div>
           <div class="dim" id="countdown"></div>
@@ -86,7 +87,8 @@ const UI = {
     kinds: { speech: "轮到你发言", rebuttal: "第二轮：回应和质疑", wolf_chat: "狼队夜聊", wolf_plan: "你来定今晚的计划",
       last_words: "留下遗言", vote: "投票放逐", inspect: "今晚查验谁", save: "要用解药救他吗", poison: "要用毒药吗", shoot: "开枪带走谁" },
     target: "选择", speech: "发言", planSpeech: "给队友的计划说明", suspect: "你怀疑谁（会记录在案）",
-    claim: "声称身份（可选）", noClaim: "不声称", claimTarget: "查验/用药对象", claimResult: "查验结果",
+    claim: "声称身份（可选）", noClaim: "不声称", claimChecked: "查验了谁", claimResult: "查验结果", claimPotion: "救了/毒了谁",
+    votes: w => `${w}票型`, abstain: "弃票", ballots: n => `${n}票`,
     faker: "谁来悍跳预言家", hook: "谁来倒钩（白天踩队友）", focus: "白天集中投谁（可选）", none: "（不选）",
     over: "游戏结束", winner: w => `${w}胜利`, mvp: "MVP", failed: "游戏出错：", host: "主持人", again: "再来一局",
   },
@@ -98,7 +100,8 @@ const UI = {
     kinds: { speech: "Your turn to speak", rebuttal: "Second round: answer and challenge", wolf_chat: "Wolf chat", wolf_plan: "Set tonight's plan",
       last_words: "Your last words", vote: "Vote someone out", inspect: "Who to check tonight", save: "Use the antidote on them?", poison: "Use the poison?", shoot: "Who to shoot" },
     target: "Pick", speech: "What you say", planSpeech: "The plan, for your pack", suspect: "Who you suspect (goes on the record)",
-    claim: "Claim a role (optional)", noClaim: "No claim", claimTarget: "Who you checked or used a potion on", claimResult: "What you saw",
+    claim: "Claim a role (optional)", noClaim: "No claim", claimChecked: "Who you checked", claimResult: "What you saw", claimPotion: "Who you saved or poisoned",
+    votes: w => `${w} votes`, abstain: "Abstained", ballots: n => `${n} vote${n === 1 ? "" : "s"}`,
     faker: "Who fakes the seer", hook: "Who plays the hook (turns on a packmate by day)", focus: "Who the pack votes tomorrow (optional)", none: "(none)",
     over: "Game over", winner: w => `The ${w} side wins`, mvp: "MVP", failed: "The game failed: ", host: "Host", again: "Play again",
   },
@@ -154,6 +157,7 @@ function render(v) {
   $("role").className = "role" + (v.pack ? " wolf" : "");
   $("pack").textContent = v.pack ? t.pack + v.pack.join(", ") : "";
   $("seats").innerHTML = v.seats.map(s => `<span class="seat${s.death ? " dead" : ""}${s.name === v.you ? " me" : ""}" title="${esc(s.death || "")}">${esc(s.name)}</span>`).join("");
+  renderVotes(v.lastVote, t);
 
   const log = $("log"), atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
   for (const l of v.log.slice(logCount)) {
@@ -169,6 +173,24 @@ function render(v) {
   $("waiting").hidden = !!v.pending;
   if (!v.pending) { $("turnCard").hidden = true; shownEvent = null; return; }
   if (v.pending.event !== shownEvent) showTurn(v.pending, t, w);
+}
+
+// renderVotes shows a day's votes grouped by who they went to, most votes first.
+function renderVotes(b, t) {
+  const c = $("votes");
+  c.hidden = !b;
+  if (!b) return;
+  const by = new Map();
+  for (const x of b.votes) {
+    const k = x.target || "";
+    if (!by.has(k)) by.set(k, []);
+    by.get(k).push(x.voter);
+  }
+  const rows = [...by].sort(([p, x], [q, y]) => (p === "") - (q === "") || y.length - x.length);
+  c.innerHTML = `<div style="font-weight:600">${esc(t.votes(b.when))}</div>` + rows.map(([target, voters]) =>
+    `<div class="line"><span class="who">${esc(target || t.abstain)}</span>` +
+    (target ? `<span class="dim">${t.ballots(voters.length)}</span>` : "") +
+    `<div class="dim">← ${voters.map(esc).join(", ")}</div></div>`).join("");
 }
 
 function showTurn(p, t, w) {
@@ -189,16 +211,29 @@ function showTurn(p, t, w) {
     h += `<label>${t.suspect}</label><select name="suspect">${opts(turn.suspects || [])}</select>`;
     h += `<label>${t.claim}</label><div class="row"><select name="claimRole"><option value="">${t.noClaim}</option>${opts(["seer", "witch", "hunter", "villager"])}</select>`;
     h += `<select name="claimTarget">${opts(others, true)}</select><select name="claimResult">${opts(["good", "werewolf"], true)}</select></div>`;
-    h += `<div class="dim">${t.claimTarget} · ${t.claimResult}</div>`;
+    h += `<div class="dim" id="claimHint"></div>`;
   }
   if (speaks) h += `<label>${k === "wolf_plan" ? t.planSpeech : t.speech}</label><textarea name="speech"></textarea>`;
   h += `<button type="submit">${t.submit}</button>`;
   f.innerHTML = h;
+  // A seer claim names who was checked and what they were; a witch claim names
+  // who got a potion; other claims name nobody.
+  const named = r => r === "seer" || r === "witch";
+  if (declares) {
+    const sync = () => {
+      const r = f.elements.claimRole.value;
+      f.elements.claimTarget.hidden = !named(r);
+      f.elements.claimResult.hidden = r !== "seer";
+      $("claimHint").textContent = r === "seer" ? `${t.claimChecked} · ${t.claimResult}` : r === "witch" ? t.claimPotion : "";
+    };
+    f.elements.claimRole.onchange = sync;
+    sync();
+  }
   f.onsubmit = async e => {
     e.preventDefault();
     const d = Object.fromEntries(new FormData(f)), a = {};
     for (const key of ["target", "speech", "suspect", "faker", "hook", "focus"]) if (d[key]) a[key] = d[key].trim();
-    if (d.claimRole) a.claim = { role: d.claimRole, target: d.claimTarget || "", result: d.claimResult || "" };
+    if (d.claimRole) a.claim = { role: d.claimRole, target: named(d.claimRole) ? d.claimTarget || "" : "", result: d.claimRole === "seer" ? d.claimResult || "" : "" };
     f.querySelector("button").disabled = true;
     try { await api(`/api/games/${encodeURIComponent(gameId)}/moves`, { event: p.event, action: a }); $("turnCard").hidden = true; }
     catch (err) { $("turnErr").textContent = err.message; f.querySelector("button").disabled = false; }

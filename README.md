@@ -4,29 +4,36 @@
 
 A game of Werewolf where LLM agents lie, form alliances, hold grudges, accuse their rivals, and now and then vote out the only person telling the truth.
 
-The cast includes Florida Man, Karen, Discord Mod, Sigma Chad and other internet personalities who should not be trusted with a group decision. In Chinese it is 华妃, 安陵容, 柯南, 派大星 and friends.
+The cast includes Florida Man, Karen, Discord Mod, Sigma Chad and other internet personalities who should not be trusted with a group decision. The Chinese cast is its own kind of chaos: 华妃 and 安陵容 carry their palace feud to the village, 柯南 insists there is only one truth while 派大星 asks whether the werewolf might be one of us, 摸鱼王 just wants the vote over before clocking off, and 闪电 is still… finishing… his… first… sentence.
 
 And the game master? A [Dapr Workflow](https://docs.dapr.io/developing-applications/building-blocks/workflow/) running on [Diagrid Catalyst](https://www.diagrid.io/catalyst). Kill the process mid-argument, start it again, and the game carries on exactly where it stopped. No forgotten accusations, and no LLM call made twice.
 
 ## A perfectly normal day in the village
 
-Condensed from a real game; the quotes are what the players said.
+Adapted from a real game.
 
 ```text
-[Night 1] Chronically Online Girl (werewolf), to the pack:
-          I'll claim seer in my very first speech and say I checked LinkedIn Influencer as a werewolf.
+[Day 1] Chronically Online Girl (werewolf):
+  I'm the seer. I checked LinkedIn Influencer: werewolf.
 
-[Day 1]   Chronically Online Girl (werewolf) claims seer: LinkedIn Influencer is a werewolf.
-[Day 1]   LinkedIn Influencer (the real seer):
-          Speaking seventh means I couldn't counterclaim before her fourth-seat accusation.
-[Day 1]   Host: LinkedIn Influencer is voted out, 7 votes to 1.
+[Day 1] LinkedIn Influencer (actual seer):
+  I'm the seer. Claiming first doesn't fix a false result.
+  Leadership means updating when the competing account arrives.
 
-[Day 2]   NPC Steve (witch), accused by the fake seer:
-          I'm the witch. I saved Sigma Chad on Night 1.
-[Day 2]   Host: Chronically Online Girl is voted out, 4 votes to 3.
+[Day 1] Sigma Chad (villager):
+  I don't outsource my reads to the NPC crowd.
+
+[Day 1] Karen (werewolf):
+  That's my vote, and I expect my complaint entered in full.
+
+[Day 1] Host:
+  LinkedIn Influencer is voted out.
+
+[Day 1] LinkedIn Influencer (last words):
+  Leadership lesson: consensus isn't verification.
 ```
 
-Yes, they voted out the real seer. The village worked it out a day later, and the two wolves left still won: on Day 3 they voted out Gym Bro for doing exactly what Gym Bro had said makes a player suspicious, voting differently from what he said he would.
+*The real seer was voted out. He turned it into a leadership lesson.*
 
 The game master's terminal is a god's-eye feed of the chaos: every public accusation, every private thought, and every read that shifts over the game.
 

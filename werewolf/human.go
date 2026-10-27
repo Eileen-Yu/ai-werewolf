@@ -35,7 +35,9 @@ type View struct {
 	When    string       `json:"when"`
 	Seats   []brain.Seat `json:"seats"`
 	Log     []Line       `json:"log"`
-	Pending *Pending     `json:"pending,omitempty"`
+	// LastVote is how everyone voted on the latest day.
+	LastVote *LastVote `json:"lastVote,omitempty"`
+	Pending  *Pending  `json:"pending,omitempty"`
 	// Words are the game's own words in the game's language, for the page.
 	Words map[string]string `json:"words"`
 }
@@ -46,6 +48,12 @@ type Line struct {
 	Speaker string `json:"speaker,omitempty"`
 	Text    string `json:"text"`
 	Private bool   `json:"private,omitempty"`
+}
+
+// LastVote is a day's votes. An empty Target is an abstention.
+type LastVote struct {
+	When  string      `json:"when"`
+	Votes []game.Vote `json:"votes"`
 }
 
 // Pending is a move the game is waiting on the human for. The move is raised
@@ -143,6 +151,9 @@ func (t *table) publish() {
 	}
 	if me.Role == game.Werewolf {
 		v.Pack = t.s.Living(game.Werewolf)
+	}
+	if b := t.s.LastVote; b != nil {
+		v.LastVote = &LastVote{When: l.When(b.Round, game.Day), Votes: b.Votes}
 	}
 	for _, p := range t.s.Players {
 		v.Seats = append(v.Seats, brain.Seat{Name: p.Name, Death: p.Death})

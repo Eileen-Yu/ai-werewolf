@@ -386,6 +386,7 @@ func (t *table) day() error {
 		}
 		tally = append(tally, fmt.Sprintf(t.h.vote, v.Voter, target))
 	}
+	s.LastVote = &game.Ballot{Round: s.Round, Votes: votes}
 	t.add("", fmt.Sprintf(t.h.votes, strings.Join(tally, t.h.comma)))
 
 	out, ok := game.Tally(votes)

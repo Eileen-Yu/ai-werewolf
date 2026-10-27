@@ -383,6 +383,8 @@ type State struct {
 	Tactic Tactic `json:"tactic,omitempty"`
 	// Plan is the wolves' latest plan.
 	Plan *Plan `json:"plan,omitempty"`
+	// LastVote is the latest day's vote.
+	LastVote *Ballot `json:"lastVote,omitempty"`
 }
 
 // Add appends an event to the transcript and returns it.
@@ -474,6 +476,12 @@ func (s *State) Winner() string {
 type Vote struct {
 	Voter  string `json:"voter"`
 	Target string `json:"target,omitempty"`
+}
+
+// Ballot is every vote cast on one day.
+type Ballot struct {
+	Round int    `json:"round"`
+	Votes []Vote `json:"votes"`
 }
 
 // Tally returns the target with strictly the most votes. Abstentions (an

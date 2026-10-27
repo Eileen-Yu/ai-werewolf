@@ -87,6 +87,23 @@ func TestAnAIPlaysForAPersonWhoRunsOutOfTime(t *testing.T) {
 	v, _, err := ReadView(meta)
 	require.NoError(t, err)
 	assert.True(t, slices.ContainsFunc(v.Log, func(l Line) bool { return l.Private && strings.Contains(l.Text, "ran out of time") }), "the person is told an AI played for them")
+
+	if !slices.ContainsFunc(v.Log, func(l Line) bool { return l.When == "Day 1" }) {
+		return // the game ended on the first night, before any vote
+	}
+	require.NotNil(t, v.LastVote, "the page is shown the latest day's votes")
+	assert.Regexp(t, `^Day \d+$`, v.LastVote.When)
+	require.NotEmpty(t, v.LastVote.Votes)
+	seated := func(name string) bool {
+		return slices.ContainsFunc(res.Players, func(p game.Player) bool { return p.Name == name })
+	}
+	voters := map[string]bool{}
+	for _, x := range v.LastVote.Votes {
+		assert.True(t, seated(x.Voter), "%s voted but is not at the table", x.Voter)
+		assert.False(t, voters[x.Voter], "%s voted twice", x.Voter)
+		voters[x.Voter] = true
+		assert.True(t, x.Target == "" || seated(x.Target), "a vote went to %s, who is not at the table", x.Target)
+	}
 }
 
 func TestAGameRefusesAPersonInASeatThatDoesNotExist(t *testing.T) {
