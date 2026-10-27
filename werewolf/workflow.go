@@ -409,7 +409,13 @@ func (t *table) election() error {
 	s := t.s
 	alive := s.Living()
 	t.add("", t.h.election)
-	runs, err := t.chooseAll(brain.Run, alive, func(v string) []string { return []string{v, game.Pass} })
+	// The seer always runs: their checks are worth the most with the badge.
+	runs, err := t.chooseAll(brain.Run, alive, func(v string) []string {
+		if s.Player(v).Role == game.Seer {
+			return []string{v}
+		}
+		return []string{v, game.Pass}
+	})
 	if err != nil {
 		return err
 	}
@@ -439,6 +445,7 @@ func (t *table) election() error {
 		if err != nil {
 			return err
 		}
+		s.Ballots = append(s.Ballots, game.Ballot{Round: s.Round, Votes: votes, Election: true})
 		t.add("", fmt.Sprintf(t.h.sheriffVotes, t.tallyLine(votes)))
 		won, ok := game.Tally(votes, "")
 		if !ok {
@@ -515,7 +522,7 @@ func (t *table) day() error {
 	if err != nil {
 		return err
 	}
-	s.LastVote = &game.Ballot{Round: s.Round, Votes: votes, Sheriff: s.Sheriff}
+	s.Ballots = append(s.Ballots, game.Ballot{Round: s.Round, Votes: votes, Sheriff: s.Sheriff})
 	t.add("", fmt.Sprintf(t.h.votes, t.tallyLine(votes)))
 
 	out, ok := game.Tally(votes, s.Sheriff)
@@ -580,6 +587,7 @@ func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brai
 		Transcript: t.s.VisibleTo(name),
 		Notes:      t.s.Notes[name],
 		Candidates: candidates,
+		Ballots:    t.s.Ballots,
 	}
 	if kind.Declares() {
 		turn.Suspects = append(t.s.VoteCandidates(name), game.Nobody)

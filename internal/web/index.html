@@ -225,7 +225,7 @@ function showTurn(p, t, w) {
   const choice = ["vote", "wolf_plan", "inspect", "save", "poison", "shoot", "run", "sheriff_vote", "badge"].includes(k);
   const speaks = !choice || k === "wolf_plan", declares = ["speech", "rebuttal", "campaign"].includes(k);
   let h = "";
-  if (k === "run") h += `<label>${t.target}</label><select name="target"><option value="${esc(turn.me.name)}">${t.run}</option><option value="pass">${t.noRun}</option></select>`;
+  if (k === "run") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${x === "pass" ? t.noRun : t.run}</option>`).join("")}</select>`;
   else if (k === "badge") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${esc(x === "pass" ? t.tearBadge : w(x))}</option>`).join("")}</select>`;
   else if (choice) h += `<label>${t.target}</label><select name="target">${opts(turn.candidates || [])}</select>`;
   if (k === "wolf_plan" && turn.tactic === "counterclaim") h += `<label>${t.faker}</label><select name="faker">${opts([...(turn.pack || []), "nobody"])}</select>`;

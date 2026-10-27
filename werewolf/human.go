@@ -101,7 +101,7 @@ func (t *table) askHuman(turn brain.Turn) move {
 		Deadline: t.ctx.CurrentTimeUTC().Add(HumanTimeout),
 		Turn:     turn,
 	}
-	p.Turn.Transcript, p.Turn.Notes = nil, game.Notes{} // the page has the log already
+	p.Turn.Transcript, p.Turn.Notes, p.Turn.Ballots = nil, game.Notes{}, nil // the page has the log and votes already
 	t.pending = p
 	t.publish()
 	return &humanMove{t: t, turn: turn, wait: t.ctx.WaitForExternalEvent(p.Event, HumanTimeout)}
@@ -154,7 +154,7 @@ func (t *table) publish() {
 	if me.Role == game.Werewolf {
 		v.Pack = t.s.Living(game.Werewolf)
 	}
-	if b := t.s.LastVote; b != nil {
+	if b := t.s.LastExile(); b != nil {
 		v.LastVote = &LastVote{When: l.When(b.Round, game.Day), Votes: b.Votes, Sheriff: b.Sheriff}
 	}
 	for _, p := range t.s.Players {

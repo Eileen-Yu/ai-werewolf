@@ -87,6 +87,8 @@ type Turn struct {
 	Plan *game.Plan `json:"plan,omitempty"`
 	// Tactic is, for a wolf, how the pack plays this game.
 	Tactic game.Tactic `json:"tactic,omitempty"`
+	// Ballots is every vote so far, which everyone saw.
+	Ballots []game.Ballot `json:"ballots,omitempty"`
 }
 
 // Action is a player's move.
@@ -136,7 +138,7 @@ func (t Turn) Check(a Action) error {
 	if t.Kind == WolfPlan {
 		problems = append(problems, t.planProblems(a)...)
 	}
-	if t.Kind == Speech && t.MustFakeSeer() && (a.Claim == nil || a.Claim.Role != game.Seer) {
+	if (t.Kind == Speech || t.Kind == Campaign) && t.MustFakeSeer() && (a.Claim == nil || a.Claim.Role != game.Seer) {
 		problems = append(problems, tx.mustFake)
 	}
 	if t.Kind.Speaks() {

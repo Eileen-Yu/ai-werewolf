@@ -394,8 +394,8 @@ type State struct {
 	Tactic Tactic `json:"tactic,omitempty"`
 	// Plan is the wolves' latest plan.
 	Plan *Plan `json:"plan,omitempty"`
-	// LastVote is the latest day's vote.
-	LastVote *Ballot `json:"lastVote,omitempty"`
+	// Ballots is every vote so far, the sheriff election included, in order.
+	Ballots []Ballot `json:"ballots,omitempty"`
 	// Sheriff holds the badge: elected on the first day, passed on or torn
 	// up when they go. "" when nobody holds it.
 	Sheriff string `json:"sheriff,omitempty"`
@@ -492,12 +492,26 @@ type Vote struct {
 	Target string `json:"target,omitempty"`
 }
 
-// Ballot is every vote cast on one day.
+// Ballot is every vote cast in one vote: a day's vote to send someone out,
+// or the sheriff election.
 type Ballot struct {
 	Round int    `json:"round"`
 	Votes []Vote `json:"votes"`
 	// Sheriff is who held the badge that day, their vote counting one and a half.
 	Sheriff string `json:"sheriff,omitempty"`
+	// Election marks the vote for sheriff.
+	Election bool `json:"election,omitempty"`
+}
+
+// LastExile is the latest day's vote to send someone out, or nil before the
+// first one.
+func (s *State) LastExile() *Ballot {
+	for i := len(s.Ballots) - 1; i >= 0; i-- {
+		if !s.Ballots[i].Election {
+			return &s.Ballots[i]
+		}
+	}
+	return nil
 }
 
 // Tally returns the target with strictly the most votes, the sheriff's vote

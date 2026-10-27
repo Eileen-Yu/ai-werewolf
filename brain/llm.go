@@ -243,6 +243,7 @@ func prompt(t Turn) (system, user string) {
 	b.WriteString(tx.notes + orNone(tx, notes(t)))
 	b.WriteString(tx.thoughts + orNone(tx, strings.Join(thoughts, "")))
 	b.WriteString(tx.claims + orNone(tx, claims.String()))
+	b.WriteString(tx.ballots + orNone(tx, ballots(t, tx)))
 	b.WriteString(tx.public + orNone(tx, public.String()))
 
 	fmt.Fprintf(&b, tx.now, l.When(t.Round, t.Phase), tx.instructions[t.Kind])
@@ -267,7 +268,7 @@ func prompt(t Turn) (system, user string) {
 			day = fmt.Sprintf(tx.hook, p.Hook)
 		}
 		fmt.Fprintf(&b, tx.planLine, day, p.Focus)
-		if t.MustFakeSeer() && t.Kind == Speech {
+		if t.MustFakeSeer() && (t.Kind == Speech || t.Kind == Campaign) {
 			b.WriteString(tx.mustFakeLine)
 		}
 		if t.IsHook() {
@@ -417,4 +418,52 @@ func request(component string, msgs []*dapr.ConversationMessageAlpha2) dapr.Conv
 
 func content(s string) []*dapr.ConversationMessageContentAlpha2 {
 	return []*dapr.ConversationMessageContentAlpha2{{Text: &s}}
+}
+
+// ballots lists every vote so far twice: vote by vote, who went for whom; and
+// player by player, how each voted from one vote to the next, so a bloc that
+// keeps voting together stands out.
+func ballots(t Turn, tx *text) string {
+	l := t.Lang
+	var b strings.Builder
+	steps := map[string][]string{}
+	for _, ballot := range t.Ballots {
+		when := l.When(ballot.Round, game.Day)
+		label, short := fmt.Sprintf(tx.exileBallot, when), when
+		if ballot.Election {
+			label, short = fmt.Sprintf(tx.electionBallot, when), tx.electionShort
+		}
+		var targets []string
+		groups := map[string][]string{}
+		for _, v := range ballot.Votes {
+			if _, ok := groups[v.Target]; !ok {
+				targets = append(targets, v.Target)
+			}
+			voter := v.Voter
+			if voter == ballot.Sheriff {
+				voter = fmt.Sprintf(tx.sheriffVoter, voter)
+			}
+			groups[v.Target] = append(groups[v.Target], voter)
+			step := fmt.Sprintf(tx.voteStep, short, v.Target)
+			if v.Target == "" {
+				step = fmt.Sprintf(tx.abstainStep, short)
+			}
+			steps[v.Voter] = append(steps[v.Voter], step)
+		}
+		parts := make([]string, len(targets))
+		for i, target := range targets {
+			if target == "" {
+				parts[i] = fmt.Sprintf(tx.abstainedBy, l.List(groups[target]))
+			} else {
+				parts[i] = fmt.Sprintf(tx.votedFor, target, l.List(groups[target]))
+			}
+		}
+		fmt.Fprintf(&b, tx.ballotLine, label, strings.Join(parts, tx.ballotSep))
+	}
+	for _, s := range t.Seats {
+		if len(steps[s.Name]) > 0 {
+			fmt.Fprintf(&b, tx.ballotLine, s.Name, strings.Join(steps[s.Name], tx.stepSep))
+		}
+	}
+	return b.String()
 }

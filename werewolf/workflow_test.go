@@ -611,13 +611,15 @@ func TestAGameRefusesAnUnknownLanguage(t *testing.T) {
 }
 
 // turnRecorder plays randomly and records every turn it is given.
-// campaigner runs the first two living seats for sheriff and has every voter
-// back the first of them. A sheriff on the way out passes the badge to the
-// first name offered, or tears it up if tear is set.
+// campaigner runs the first two living seats for sheriff, and the seer, who
+// always runs, and has every voter back the first runner. A sheriff on the way
+// out passes the badge to the first name offered, or tears it up if tear is
+// set.
 type campaigner struct {
 	tear  bool
 	mu    sync.Mutex
 	turns []brain.Turn
+	ran   []string
 }
 
 func (b *campaigner) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
@@ -626,7 +628,10 @@ func (b *campaigner) Act(ctx context.Context, t brain.Turn) (brain.Action, error
 	b.mu.Unlock()
 	switch t.Kind {
 	case brain.Run:
-		if slices.Contains(firstLiving(t.Seats, 2), t.Me.Name) {
+		if t.Me.Role == game.Seer || slices.Contains(firstLiving(t.Seats, 2), t.Me.Name) {
+			b.mu.Lock()
+			b.ran = append(b.ran, t.Me.Name)
+			b.mu.Unlock()
 			return brain.Action{Target: t.Me.Name}, nil
 		}
 		return brain.Action{Target: game.Pass}, nil
@@ -676,8 +681,17 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 			switch turn.Kind {
 			case brain.Run:
 				assert.Equal(t, 1, turn.Round, "the election is on the first day only")
-				assert.Equal(t, []string{turn.Me.Name, game.Pass}, turn.Candidates)
-				runners = firstLiving(turn.Seats, 2)
+				if turn.Me.Role == game.Seer {
+					assert.Equal(t, []string{turn.Me.Name}, turn.Candidates, "the seer always runs")
+				} else {
+					assert.Equal(t, []string{turn.Me.Name, game.Pass}, turn.Candidates)
+				}
+				runners = nil
+				for _, s := range turn.Seats {
+					if slices.Contains(b.ran, s.Name) {
+						runners = append(runners, s.Name)
+					}
+				}
 			case brain.Campaign:
 				assert.Contains(t, runners, turn.Me.Name, "only a candidate campaigns")
 			case brain.SheriffVote:

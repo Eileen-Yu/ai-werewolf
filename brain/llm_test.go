@@ -135,6 +135,23 @@ func TestOnlyAGoodPlayerWhoSuspectsSomeoneIsToldToReadItBothWays(t *testing.T) {
 	}
 }
 
+func TestThePromptListsEveryVoteByVoteAndByPlayer(t *testing.T) {
+	turn := Turn{
+		Kind: Speech, Round: 2, Phase: game.Day, Me: game.Player{Name: "小红"},
+		Seats: []Seat{{Name: "小红"}, {Name: "老王"}, {Name: "阿杰"}},
+		Ballots: []game.Ballot{
+			{Round: 1, Election: true, Votes: []game.Vote{{Voter: "老王", Target: "阿杰"}, {Voter: "小红", Target: ""}}},
+			{Round: 1, Sheriff: "阿杰", Votes: []game.Vote{{Voter: "小红", Target: "老王"}, {Voter: "老王", Target: "小红"}, {Voter: "阿杰", Target: "老王"}}},
+		},
+	}
+	_, user := prompt(turn)
+	assert.Contains(t, user, "- 第1天警长投票：投阿杰的：老王；弃票：小红\n")
+	assert.Contains(t, user, "- 第1天放逐投票：投老王的：小红、阿杰（警长，1.5票）；投小红的：老王\n")
+	assert.Contains(t, user, "- 小红：警长票弃票，第1天投老王\n")
+	assert.Contains(t, user, "- 老王：警长票投阿杰，第1天投小红\n")
+	assert.Less(t, strings.Index(user, "【票型】"), strings.Index(user, "【公开记录】"), "the votes come before the speeches")
+}
+
 func TestTheSheriffIsMarkedAndToldToCallTheVote(t *testing.T) {
 	seats := []Seat{{Name: "小红", Sheriff: true}, {Name: "老王"}}
 	speech := Turn{Kind: Speech, Round: 2, Phase: game.Day, Me: game.Player{Name: "小红"}, Seats: seats}
@@ -232,7 +249,8 @@ func TestOnlyAWolfIsToldTheTactic(t *testing.T) {
 	for _, role := range []game.Role{game.Seer, game.Villager} {
 		turn := Turn{Kind: Speech, Round: 1, Phase: game.Day, Me: game.Player{Name: "小红", Role: role}, Tactic: game.Hook}
 		system, _ := prompt(turn)
-		assert.NotContains(t, system, "倒钩", role)
+		assert.NotContains(t, system, chineseText.tactics[game.Hook], role)
+		assert.NotContains(t, system, "本局狼队的打法", role)
 	}
 }
 
@@ -329,12 +347,12 @@ func TestPromptForTheHunterNamesWhoIsAlreadyOut(t *testing.T) {
 func TestAPlayersHabitIsInTheirPrompt(t *testing.T) {
 	turn := Turn{Kind: Vote, Round: 1, Phase: game.Day, Me: game.Player{Name: "华妃", Persona: "宫斗戏精", Habit: "谁投过你就投谁"}}
 	system, user := prompt(turn)
-	assert.Contains(t, system, "性格：宫斗戏精。\n决策习惯，判断、改主意和投票都照这个来，这比说话风格更重要：谁投过你就投谁。\n策略：")
-	assert.Contains(t, user, "别忘了你的决策习惯：谁投过你就投谁。", "and again right where they act")
+	assert.Contains(t, system, "性格：宫斗戏精。\n你的习惯倾向：谁投过你就投谁。这只是倾向，不是死规定：局势和证据明确时，以局势为准。")
+	assert.Contains(t, user, "你的习惯倾向是：谁投过你就投谁。但这一轮先看局势", "and again right where they act")
 
 	turn.Lang, turn.Me = game.English, game.Player{Name: "Ruby", Persona: "emotional", Habit: "holds a grudge"}
 	system, _ = prompt(turn)
-	assert.Contains(t, system, "Your personality: emotional.\nHow you decide. Judge, change your mind and vote this way; it matters more than how you talk: holds a grudge.\nStrategy: ")
+	assert.Contains(t, system, "Your personality: emotional.\nYour lean: holds a grudge. It is a lean, not a rule: when the situation and the evidence are clear, go with them.")
 }
 
 func TestARivalryOnTheSameTeamIsBanterNotSabotage(t *testing.T) {
@@ -376,6 +394,10 @@ func TestEnglishPromptsAreAllEnglish(t *testing.T) {
 		Spoken:     []string{"Dave"},
 		Pack:       []string{"Mia"},
 		Plan:       &game.Plan{Round: 2, Victim: "Ruby", Faker: "Mia", Focus: "Dave"},
+		Ballots: []game.Ballot{
+			{Round: 1, Election: true, Votes: []game.Vote{{Voter: "Dave", Target: "Mia"}, {Voter: "Ruby"}}},
+			{Round: 1, Sheriff: "Mia", Votes: []game.Vote{{Voter: "Mia", Target: "Ruby"}, {Voter: "Dave"}}},
+		},
 	}
 	for _, kind := range []TurnKind{Speech, Rebuttal, WolfChat, WolfPlan, LastWords, Vote, Inspect, Save, Poison, Shoot, Run, Campaign, SheriffVote, Badge} {
 		turn := base
@@ -383,6 +405,7 @@ func TestEnglishPromptsAreAllEnglish(t *testing.T) {
 		system, user := prompt(turn)
 		assert.False(t, han.MatchString(system), "%s system prompt: %q", kind, han.FindAllString(system, 5))
 		assert.False(t, han.MatchString(user), "%s prompt: %q", kind, han.FindAllString(user, 5))
+		assert.NotContains(t, user, "：", "%s prompt has a full-width colon", kind)
 
 		err := turn.Check(Action{
 			Target: "Walter", Suspect: "Walter", Faker: "Dave", Focus: "Ruby", Claim: &game.Claim{Role: "mayor"},
@@ -445,6 +468,13 @@ func TestCheckHoldsTheWolfPlanToTheGame(t *testing.T) {
 	_, user := prompt(day)
 	assert.Contains(t, user, "狼队今天的计划：小宇悍跳预言家，票投老王。")
 	assert.Contains(t, user, "你就是要悍跳的人")
+
+	campaign := day
+	campaign.Kind = Campaign
+	assert.ErrorContains(t, campaign.Check(Action{Speech: "我是村民", Suspect: "老王"}), "悍跳预言家", "the faker claims in the campaign too")
+	assert.NoError(t, campaign.Check(Action{Speech: "我是预言家，老王是狼", Suspect: "老王", Claim: seer}))
+	_, user = prompt(campaign)
+	assert.Contains(t, user, "你就是要悍跳的人")
 }
 
 func TestCheckRejectsWhatIsNotOnTheRecord(t *testing.T) {
@@ -488,4 +518,10 @@ func TestCheckRejectsWhatIsNotOnTheRecord(t *testing.T) {
 	assert.NotContains(t, user, "还没有公开发过言")
 	_, user = prompt(turn)
 	assert.Contains(t, user, "还没有公开发过言的人：大刘。")
+}
+
+func TestDeepCoverWolvesPushRatherThanFollow(t *testing.T) {
+	assert.NotContains(t, chineseText.tactics[game.DeepCover], "跟着主流投票")
+	assert.Contains(t, chineseText.tactics[game.DeepCover], "潜水不等于不说话")
+	assert.NotContains(t, englishText.tactics[game.DeepCover], "votes with the majority")
 }
