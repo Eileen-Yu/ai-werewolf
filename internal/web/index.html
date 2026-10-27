@@ -96,7 +96,12 @@ const UI = {
     claim: "声称身份（可选）", noClaim: "不声称", claimChecked: "查验了谁", claimResult: "查验结果", claimPotion: "救了/毒了谁",
     votes: w => `${w}票型`, abstain: "弃票", ballots: n => `${n}票`,
     faker: "谁来悍跳预言家", hook: "谁来倒钩（白天踩队友）", focus: "白天集中投谁（可选）", none: "（不选）",
-    voiceOn: "🔊 语音朗读：开", voiceOff: "🔇 语音朗读：关", mic: "🎤 语音输入", micStop: "⏹ 停止录音", micErr: "语音输入出错：", voiceReady: "语音朗读已开启，之后的发言会读出来。",
+    voiceOn: "🔊 语音朗读：开", voiceOff: "🔇 语音朗读：关", mic: "🎤 语音输入", micStop: "⏹ 停止录音", micErr: "语音输入出错：",
+    micErrors: { "no-speech": "没听到声音。确认系统设置里选的输入设备是你在用的麦克风、没有静音，点 🎤 之后马上开始说。",
+      "not-allowed": "浏览器没有麦克风权限：点地址栏左边的图标，允许使用麦克风后再试。",
+      "audio-capture": "找不到麦克风：检查麦克风有没有连上、系统设置里有没有选它。",
+      network: "语音识别连不上网络：Chrome 需要联网把录音发给 Google 识别。" },
+    voiceReady: "语音朗读已开启，之后的发言会读出来。",
     over: "游戏结束", winner: w => `${w}胜利`, mvp: "MVP", failed: "游戏出错：", host: "主持人", again: "再来一局",
   },
   en: {
@@ -112,7 +117,12 @@ const UI = {
     claim: "Claim a role (optional)", noClaim: "No claim", claimChecked: "Who you checked", claimResult: "What you saw", claimPotion: "Who you saved or poisoned",
     votes: w => `${w} votes`, abstain: "Abstained", ballots: n => `${n} vote${n === 1 ? "" : "s"}`,
     faker: "Who fakes the seer", hook: "Who plays the hook (turns on a packmate by day)", focus: "Who the pack votes tomorrow (optional)", none: "(none)",
-    voiceOn: "🔊 Read aloud: on", voiceOff: "🔇 Read aloud: off", mic: "🎤 Speak", micStop: "⏹ Stop", micErr: "Voice input failed: ", voiceReady: "Read aloud is on. New lines will be read out.",
+    voiceOn: "🔊 Read aloud: on", voiceOff: "🔇 Read aloud: off", mic: "🎤 Speak", micStop: "⏹ Stop", micErr: "Voice input failed: ",
+    micErrors: { "no-speech": "Heard nothing. Check that your system's input device is the microphone you are using and is not muted, and start talking right after clicking 🎤.",
+      "not-allowed": "The browser has no microphone access: click the icon left of the address bar, allow the microphone, then try again.",
+      "audio-capture": "No microphone found: check it is plugged in and selected in your system settings.",
+      network: "Speech recognition cannot reach the network: Chrome sends the recording to Google to transcribe it." },
+    voiceReady: "Read aloud is on. New lines will be read out.",
     over: "Game over", winner: w => `The ${w} side wins`, mvp: "MVP", failed: "The game failed: ", host: "Host", again: "Play again",
   },
 };
@@ -335,9 +345,10 @@ function addMic(f, lang, t) {
     rec.lang = lang === "en" ? "en-US" : "zh-CN";
     rec.continuous = true; rec.interimResults = true;
     rec.onresult = e => { box.value = before + [...e.results].map(x => x[0].transcript).join(""); };
-    rec.onerror = e => { $("turnErr").textContent = t.micErr + e.error; };
+    rec.onerror = e => { $("turnErr").textContent = t.micErrors[e.error] || t.micErr + e.error; };
     rec.onend = () => { rec = null; b.textContent = t.mic; if (window.speechSynthesis) speechSynthesis.resume(); };
     if (window.speechSynthesis) speechSynthesis.pause();
+    $("turnErr").textContent = "";
     rec.start();
     b.textContent = t.micStop;
   };
