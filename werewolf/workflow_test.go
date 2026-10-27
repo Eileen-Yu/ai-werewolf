@@ -302,10 +302,14 @@ func TestOnlyTheHookMayTurnOnATeammate(t *testing.T) {
 func TestThePackIsDealtATacticOnlyTheWolvesAreTold(t *testing.T) {
 	dealt := map[game.Tactic]bool{}
 	for seed := range uint64(30) {
-		dealt[deal{}.fill(rand.New(rand.NewPCG(seed, 1))).Tactic] = true
+		d, err := deal{}.fill(rand.New(rand.NewPCG(seed, 1)))
+		require.NoError(t, err)
+		dealt[d.Tactic] = true
 	}
 	assert.Len(t, dealt, len(game.Tactics), "every tactic gets dealt")
-	assert.Equal(t, game.Hook, deal{Tactic: game.Hook}.fill(rand.New(rand.NewPCG(1, 2))).Tactic, "a pinned tactic is kept")
+	pinned, err := deal{Tactic: game.Hook}.fill(rand.New(rand.NewPCG(1, 2)))
+	require.NoError(t, err)
+	assert.Equal(t, game.Hook, pinned.Tactic, "a pinned tactic is kept")
 
 	client := startEngine(t)
 	startWorker(t, client)

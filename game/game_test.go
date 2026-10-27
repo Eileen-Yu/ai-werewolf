@@ -231,3 +231,54 @@ func TestEnglish(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, Chinese, got)
 }
+
+func TestAHumanTakesTheSeatOfTheCharacterTheyPick(t *testing.T) {
+	cast := Cast(Chinese, rand.New(rand.NewPCG(1, 2)))
+	seated, err := SeatHuman(cast, " Eileen ", "华妃", Chinese)
+	require.NoError(t, err)
+	require.Len(t, seated, len(cast))
+
+	i := slices.IndexFunc(seated, func(p Player) bool { return p.Human })
+	require.GreaterOrEqual(t, i, 0)
+	assert.Equal(t, "Eileen", seated[i].Name)
+	assert.Empty(t, seated[i].Rivalry)
+	assert.NotEmpty(t, seated[i].Persona, "an AI covering a timed-out move needs someone to be")
+	assert.Equal(t, slices.IndexFunc(cast, func(p Player) bool { return p.Name == "华妃" }), i, "the person sits where the character sat")
+	for _, p := range seated {
+		assert.NotContains(t, p.Rivalry, "华妃", "%s's rivalry names someone who is not at the table", p.Name)
+	}
+	assert.Empty(t, seated[slices.IndexFunc(seated, func(p Player) bool { return p.Name == "安陵容" })].Rivalry)
+	assert.False(t, slices.ContainsFunc(cast, func(p Player) bool { return p.Human }), "the cast passed in is left alone")
+}
+
+func TestAnyLonerCanBeReplacedEvenIfAnotherWasDrawn(t *testing.T) {
+	cast := Cast(Chinese, rand.New(rand.NewPCG(1, 2)))
+	var missing string
+	for _, l := range chineseLoners {
+		if !slices.ContainsFunc(cast, func(p Player) bool { return p.Name == l.Name }) {
+			missing = l.Name
+			break
+		}
+	}
+	require.NotEmpty(t, missing)
+	seated, err := SeatHuman(cast, "Eileen", missing, Chinese)
+	require.NoError(t, err)
+	for _, l := range chineseLoners {
+		assert.False(t, slices.ContainsFunc(seated, func(p Player) bool { return p.Name == l.Name }), "the person took the loner's seat, so no loner is left")
+	}
+}
+
+func TestAHumanSeatRefusesWhatCannotBeSeated(t *testing.T) {
+	cast := Cast(English, rand.New(rand.NewPCG(1, 2)))
+	for name, replaces := range map[string]string{
+		"":        "Karen",
+		"Eileen":  "华妃",
+		"Karen":   "Gym Bro",
+		"Florida": "Karen",
+	} {
+		_, err := SeatHuman(cast, name, replaces, English)
+		assert.Error(t, err, "%q replacing %q", name, replaces)
+	}
+	_, err := SeatHuman(cast, "Karen", "Karen", English)
+	assert.NoError(t, err, "a person may take the name of the character they replace")
+}

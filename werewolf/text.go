@@ -12,6 +12,7 @@ type host struct {
 	tactic                                                            string
 	tactics                                                           map[game.Tactic]string
 	revealed, comma, semicolon, result, silence                       string
+	mvp, takeover                                                     string
 
 	// The god's-eye feed: asides, thoughts and secret lines.
 	observed, rejudged, judged, fromNothing, thinks, onlyFor, narrator string
@@ -67,6 +68,8 @@ var chineseHost = host{
 	semicolon:   "；",
 	result:      "%s胜利，共%d轮",
 	silence:     "（沉默）",
+	mvp:         "本局MVP：%s！%s",
+	takeover:    "你超时了，这一手由AI代打。",
 
 	observed:    "观察",
 	rejudged:    "改判",
@@ -120,6 +123,8 @@ var englishHost = host{
 	semicolon:   "; ",
 	result:      "the %s side wins after %d rounds",
 	silence:     "(silence)",
+	mvp:         "MVP of the game: %s! %s",
+	takeover:    "You ran out of time, so an AI played this move for you.",
 
 	observed:    "observes",
 	rejudged:    "rethinks",

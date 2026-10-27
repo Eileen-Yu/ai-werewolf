@@ -20,6 +20,8 @@ The game master's output is a god's-eye live feed: what everyone says out loud, 
 - **Players only know what they should**: nobody else's role is ever sent to the model. The filtering happens in code, not in the prompt.
 - **Characters who play differently, not just talk differently**: each has a way of deciding as well as a way of talking. One holds grudges and votes for whoever voted for her; another only follows evidence, even against someone he trusted. An English game seats nine internet archetypes, from Florida Man to Discord Mod, who each have a named rival at the table. A Chinese game seats four pairs of rivals and one of three loners. Seats are in a random order.
 - **The wolves play a different game each time**: the host deals the pack one of three plays, and only the wolves are told. In a counter-claim, one wolf fakes a seer claim and the pack backs him. In deep cover, nobody claims anything and the wolves never vote as a bloc. In the hook, one wolf plays the staunchest good player, even voting out an exposed teammate to be trusted later. Each night the pack agrees who to kill and how to play the day.
+- **Take a seat yourself**: from a web page, play in place of any character, under your own name. Your role is dealt like anyone's, and you see only what that seat sees. If you take more than three minutes over a move, an AI plays it for you and the game goes on.
+- **An MVP every game**: when the game is over, an LLM judge reads the whole record, with every role revealed, and names the most valuable player with a reason. Games with random players pick one by rule: the winning side's most important role still standing.
 - **Players have memory**: everyone keeps notes on what they believe about each other player and why, updated every turn.
 - **Bad answers are sent back**: voting for someone not at the table, quoting someone who never spoke, or "there is no proof" as a reason all get the answer handed back to try again.
 - **A game master you cannot kill**: state and history live in the workflow Catalyst hosts. If the process dies, another one carries on.
@@ -103,6 +105,16 @@ Leave out `--data` for a game in Chinese. When the game is over, get the result 
 diagrid workflow get game-1 --project werewolf --id werewolf
 ```
 
+### Play a seat yourself
+
+Add `-web :8080` when you start the game master:
+
+```bash
+diagrid dev run --project werewolf --id werewolf --approve -- ./bin/werewolf gm -brain llm -web :8080
+```
+
+Open <http://localhost:8080>, pick a language, your name and whose seat to take, and start. The page shows what your seat sees and asks for your move when it is your turn: a speech with who you suspect and, if you like, a role claim, or a pick for a vote, a check, a potion or a shot. The game master's terminal is still the god's-eye feed, so keep it out of sight while you play.
+
 ### 6. Try killing the game master
 
 While a game is running, press Ctrl+C in the game master's terminal, wait a moment, and run the command from step 4 again. The game carries on from where it stopped, and nothing earlier is repeated.
@@ -119,6 +131,8 @@ go run ./cmd/werewolf start -engine localhost:4001 -lang en    # start a game an
 
 Killing processes works here too: stop `gm` and start it again, or stop the engine as well and start both again.
 
+To play a seat yourself, add `-web :8080` to the `gm` command and open <http://localhost:8080>; skip the `start` command.
+
 Local mode only has random players. LLM players need the Conversation API that Catalyst provides.
 
 ## Configuration
@@ -132,6 +146,7 @@ The `--data` for `diagrid workflow start` is JSON, and every field is optional:
 | `lang` | `"zh"` | `"zh"` for Chinese, `"en"` for English |
 | `phaseDelay` | `0` | Pause between phases, in nanoseconds: `2000000000` is 2 seconds. A longer pause makes it easier to kill something mid-game |
 | `tactic` | dealt at random | Pins the pack's play, to show one off: `"counterclaim"`, `"deep_cover"` or `"hook"` |
+| `human` | none | Seats a person: `{"name":"Eileen","replaces":"Karen"}`. The web page sets this for you; the person plays from the page |
 
 ```bash
 diagrid workflow start GameWorkflow --project werewolf --id werewolf --instance-id game-2 \
@@ -145,6 +160,8 @@ diagrid workflow start GameWorkflow --project werewolf --id werewolf --instance-
 | `werewolf gm` | `-brain random\|llm` | Random or LLM players. Default `random` |
 | | `-llm-component <name>` | Name of the conversation component. Default `llm` |
 | | `-engine <address>` | Use a local engine; leave it out to use Dapr (Catalyst) |
+| | `-web <address>` | Serve the page a person plays a seat from, e.g. `:8080`. Default: no page |
+| | `-human-timeout <duration>` | How long a person has for a move before an AI plays it. Default `3m` |
 | `werewolf start` | `-engine <address>` | As above |
 | | `-lang zh\|en` | Language of the game. Default `zh` |
 | | `-delay <duration>` | Pause between phases. Default `2s` |

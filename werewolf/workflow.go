@@ -41,17 +41,25 @@ type Game struct {
 	// Tactic pins how the pack plays, for a demo; left out, one is dealt at
 	// random. It only takes effect when the game is dealt.
 	Tactic game.Tactic `json:"tactic,omitempty"`
+	// Human seats a person in place of one of the cast, to play from the
+	// web page. It only takes effect when the game is dealt.
+	Human *Human `json:"human,omitempty"`
 }
 
 type Result struct {
 	Winner  string        `json:"winner"`
 	Rounds  int           `json:"rounds"`
 	Players []game.Player `json:"players"`
+	MVP     brain.MVP     `json:"mvp"`
 }
 
 // Summary is the result in a line, for the person who started the game.
 func (r Result) Summary(l game.Lang) string {
-	return fmt.Sprintf(hostFor(l).result, l.Say(r.Winner), r.Rounds)
+	s := fmt.Sprintf(hostFor(l).result, l.Say(r.Winner), r.Rounds)
+	if r.MVP.Name != "" {
+		s += "\n" + fmt.Sprintf(hostFor(l).mvp, r.MVP.Name, r.MVP.Reason)
+	}
+	return s
 }
 
 // ReadResult decodes a finished game's result.
@@ -71,6 +79,7 @@ func Register(r *workflow.Registry) error {
 		r.AddWorkflow(GameWorkflow),
 		r.AddActivity(AssignRolesActivity),
 		r.AddActivity(ActActivity),
+		r.AddActivity(JudgeActivity),
 	)
 }
 
@@ -89,11 +98,14 @@ func GameWorkflow(ctx *workflow.WorkflowContext) (any, error) {
 			return nil, fmt.Errorf("unknown tactic %q: use one of %v", g.Tactic, game.Tactics)
 		}
 		g.State.Tactic = g.Tactic
+		if h := g.Human; h != nil && !slices.Contains(game.Characters(lang), h.Replaces) {
+			return nil, fmt.Errorf("a human can replace one of %v, not %q", game.Characters(lang), h.Replaces)
+		}
 	}
 	t := &table{ctx: ctx, s: &g.State, h: hostFor(g.State.Lang), delay: g.PhaseDelay}
 
 	if g.State.Round == 0 {
-		if err := t.setup(); err != nil {
+		if err := t.setup(g.Human); err != nil {
 			return nil, fmt.Errorf("setup: %w", err)
 		}
 	}
@@ -112,7 +124,15 @@ func GameWorkflow(ctx *workflow.WorkflowContext) (any, error) {
 			roles = append(roles, fmt.Sprintf(t.h.revealed, p.Name, t.say(string(p.Role))))
 		}
 		t.add("", fmt.Sprintf(t.h.gameOver, t.say(winner), strings.Join(roles, t.h.comma)))
-		return Result{Winner: winner, Rounds: g.State.Round, Players: g.State.Players}, nil
+		var mvp brain.MVP
+		final := brain.Final{Lang: g.State.Lang, Winner: winner, Players: g.State.Players, Log: g.State.Log}
+		if err := ctx.CallActivity(JudgeActivity, workflow.WithActivityInput(final), retry).Await(&mvp); err != nil {
+			return nil, fmt.Errorf("judge: %w", err)
+		}
+		if mvp.Name != "" {
+			t.add("", fmt.Sprintf(t.h.mvp, mvp.Name, mvp.Reason))
+		}
+		return Result{Winner: winner, Rounds: g.State.Round, Players: g.State.Players, MVP: mvp}, nil
 	}
 
 	g.State.Round++
@@ -125,15 +145,18 @@ type table struct {
 	s     *game.State
 	h     *host
 	delay time.Duration
+	// asked counts the human's moves this round, to name the event for each.
+	asked   int
+	pending *Pending
 }
 
 func (t *table) say(word string) string     { return t.s.Lang.Say(word) }
 func (t *table) list(names []string) string { return t.s.Lang.List(names) }
 
-func (t *table) setup() error {
+func (t *table) setup(human *Human) error {
 	t.s.Round, t.s.Phase = 1, game.Night
 	var dealt deal
-	in := deal{Players: t.s.Players, Lang: t.s.Lang, Tactic: t.s.Tactic}
+	in := deal{Players: t.s.Players, Lang: t.s.Lang, Tactic: t.s.Tactic, Human: human}
 	if err := t.ctx.CallActivity(AssignRolesActivity, workflow.WithActivityInput(in)).Await(&dealt); err != nil {
 		return err
 	}
@@ -438,7 +461,10 @@ func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brai
 	return turn
 }
 
-func (t *table) act(turn brain.Turn) workflow.Task {
+func (t *table) act(turn brain.Turn) move {
+	if turn.Me.Human {
+		return t.askHuman(turn)
+	}
 	return t.ctx.CallActivity(ActActivity, workflow.WithActivityInput(turn), retry)
 }
 
@@ -471,7 +497,7 @@ func (t *table) choose(kind brain.TurnKind, name string, candidates []string) (s
 // chooseAll asks every voter at once and waits for them all, so votes are
 // cast without seeing each other's.
 func (t *table) chooseAll(kind brain.TurnKind, voters []string, candidates func(voter string) []string) ([]game.Vote, error) {
-	tasks := make([]workflow.Task, len(voters))
+	tasks := make([]move, len(voters))
 	for i, v := range voters {
 		tasks[i] = t.act(t.turn(kind, v, candidates(v)))
 	}
@@ -545,6 +571,7 @@ func (t *table) who(name string) string {
 // narrate prints an event. It is skipped on replay so a resumed game does not
 // print its history twice.
 func (t *table) narrate(e game.Event) {
+	t.publish()
 	if t.ctx.IsReplaying() {
 		return
 	}
@@ -566,6 +593,7 @@ type deal struct {
 	Players []game.Player `json:"players,omitempty"`
 	Lang    game.Lang     `json:"lang,omitempty"`
 	Tactic  game.Tactic   `json:"tactic,omitempty"`
+	Human   *Human        `json:"human,omitempty"`
 }
 
 // AssignRolesActivity picks a cast and a tactic if there are none, and deals
@@ -576,27 +604,29 @@ func AssignRolesActivity(ctx workflow.ActivityContext) (any, error) {
 	if err := ctx.GetInput(&in); err != nil {
 		return nil, err
 	}
-	return in.fill(rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))), nil
+	return in.fill(rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64())))
 }
 
-func (d deal) fill(rng *rand.Rand) deal {
+func (d deal) fill(rng *rand.Rand) (deal, error) {
 	if len(d.Players) == 0 {
 		d.Players = game.Cast(d.Lang, rng)
+	}
+	if d.Human != nil {
+		seated, err := game.SeatHuman(d.Players, d.Human.Name, d.Human.Replaces, d.Lang)
+		if err != nil {
+			return d, err
+		}
+		d.Players = seated
 	}
 	if d.Tactic == "" {
 		d.Tactic = game.Tactics[rng.IntN(len(game.Tactics))]
 	}
 	d.Players = game.AssignRoles(d.Players, rng)
-	return d
+	return d, nil
 }
 
-// ActActivity asks a player for their move. A move that is still invalid
-// after the brain's own re-asking is not allowed to stall the game: a bad
-// pick counts as abstaining, an empty speech as silence, a bad suspect as
-// suspecting nobody; a bad claim is dropped, and so are bad beliefs. A wolf
-// plan's bad seer claimant means nobody claims and a bad focus means none.
-// The rest is let through: a speech that quotes someone yet to speak, or a
-// faker who does not claim, is a slip, not a broken move.
+// ActActivity asks a player for their move and settles it, so an invalid
+// move does not stall the game.
 func ActActivity(ctx workflow.ActivityContext) (any, error) {
 	var t brain.Turn
 	if err := ctx.GetInput(&t); err != nil {
@@ -609,6 +639,18 @@ func ActActivity(ctx workflow.ActivityContext) (any, error) {
 	if err := t.Check(a); err != nil {
 		log.Printf("%s's %s move is invalid, playing it as a pass: %v", t.Me.Name, t.Kind, err)
 	}
+	return settle(t, a), nil
+}
+
+// settle makes a move playable, whoever made it. A move that is still invalid
+// after the brain's own re-asking, or a person's move the page let through,
+// is not allowed to stall the game: a bad pick counts as abstaining, an empty
+// speech as silence, a bad suspect as suspecting nobody; a bad claim is
+// dropped, and so are bad beliefs. A wolf plan's bad seer claimant means
+// nobody claims and a bad focus means none. The rest is let through: a
+// speech that quotes someone yet to speak, or a faker who does not claim, is
+// a slip, not a broken move.
+func settle(t brain.Turn, a brain.Action) brain.Action {
 	if t.Kind.IsChoice() && !slices.Contains(t.Candidates, a.Target) {
 		a.Target = ""
 	}
@@ -635,5 +677,23 @@ func ActActivity(ctx workflow.ActivityContext) (any, error) {
 			a.Focus = ""
 		}
 	}
-	return a, nil
+	return a
+}
+
+// JudgeActivity names the finished game's MVP. A brain that cannot judge, or
+// a judge that fails or names nobody at the table, leaves it to the rules,
+// so a game always ends with one.
+func JudgeActivity(ctx workflow.ActivityContext) (any, error) {
+	var f brain.Final
+	if err := ctx.GetInput(&f); err != nil {
+		return nil, err
+	}
+	if j, ok := players.(brain.Judge); ok {
+		mvp, err := j.MVP(ctx.Context(), f)
+		if err == nil && mvp.Name != "" {
+			return mvp, nil
+		}
+		log.Printf("the judge could not name an MVP, going by the rules: %v", err)
+	}
+	return brain.Rules(f), nil
 }

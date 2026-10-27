@@ -1,0 +1,232 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 狼人杀 · Werewolf</title>
+<style>
+  :root { color-scheme: dark; --bg:#14161c; --card:#1d2029; --line:#2c303b; --dim:#8b90a0; --accent:#e0a84a; --wolf:#d9534f; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.55 system-ui, -apple-system, "PingFang SC", sans-serif; background:var(--bg); color:#e6e6ea; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 22px; margin: 0 0 16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  label { display:block; margin:10px 0 4px; color:var(--dim); font-size:13px; }
+  input, select, textarea, button { font:inherit; color:inherit; background:#11131a; border:1px solid var(--line); border-radius:6px; padding:8px 10px; width:100%; }
+  textarea { min-height: 110px; resize: vertical; }
+  button { background:var(--accent); color:#14161c; border:none; font-weight:600; cursor:pointer; width:auto; padding:9px 18px; margin-top:12px; }
+  button:disabled { opacity:.5; cursor:default; }
+  .grid { display:grid; grid-template-columns: 1fr 360px; gap:16px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .seats { display:flex; flex-wrap:wrap; gap:6px; }
+  .seat { padding:4px 10px; border:1px solid var(--line); border-radius:999px; font-size:13px; }
+  .seat.dead { opacity:.4; text-decoration: line-through; }
+  .seat.me { border-color:var(--accent); color:var(--accent); }
+  #log { max-height: 70vh; overflow-y:auto; }
+  .line { padding:6px 0; border-bottom:1px solid var(--line); }
+  .line .when { color:var(--dim); font-size:12px; margin-right:6px; }
+  .line .who { font-weight:600; margin-right:4px; }
+  .line.host .who { color:var(--dim); }
+  .line.private { background: rgba(224,168,74,.07); }
+  .line.mine .who { color:var(--accent); }
+  .role { font-size:18px; font-weight:700; color:var(--accent); }
+  .role.wolf { color:var(--wolf); }
+  .dim { color:var(--dim); font-size:13px; }
+  .err { color:var(--wolf); margin-top:8px; white-space: pre-wrap; }
+  .row { display:flex; gap:8px; } .row > * { flex:1; }
+  .mvp { font-size:17px; } .mvp b { color:var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">AI 狼人杀</h1>
+
+  <section id="setup" class="card" hidden>
+    <label>Language / 语言</label>
+    <select id="lang"><option value="zh">中文</option><option value="en">English</option></select>
+    <label id="nameLabel"></label>
+    <input id="name" maxlength="20">
+    <label id="replacesLabel"></label>
+    <select id="replaces"></select>
+    <label id="tacticLabel"></label>
+    <select id="tactic"></select>
+    <button id="startBtn"></button>
+    <div id="setupErr" class="err"></div>
+  </section>
+
+  <section id="table" hidden>
+    <div class="grid">
+      <div class="card"><div id="log"></div></div>
+      <div>
+        <div class="card">
+          <div class="dim" id="when"></div>
+          <div><span id="youAre"></span> <span id="role" class="role"></span></div>
+          <div class="dim" id="pack"></div>
+          <div class="seats" id="seats" style="margin-top:10px"></div>
+        </div>
+        <div class="card" id="turnCard" hidden>
+          <div id="turnTitle" style="font-weight:600"></div>
+          <div class="dim" id="countdown"></div>
+          <form id="turnForm"></form>
+          <div id="turnErr" class="err"></div>
+        </div>
+        <div class="card" id="waiting"></div>
+        <div class="card" id="result" hidden></div>
+      </div>
+    </div>
+  </section>
+</main>
+<script>
+const UI = {
+  zh: {
+    title: "AI 狼人杀", name: "你的名字", replaces: "替换哪个角色的座位", tactic: "狼队打法", random: "随机", start: "开始游戏",
+    tactics: { counterclaim: "悍跳", deep_cover: "潜水", hook: "倒钩" },
+    youAre: n => `${n}，你是`, pack: "狼队：", waiting: "等待其他玩家……", dead: "你已出局，继续观战。", submit: "提交",
+    timeLeft: s => `剩余 ${s} 秒，超时由AI代打`,
+    kinds: { speech: "轮到你发言", rebuttal: "第二轮：回应和质疑", wolf_chat: "狼队夜聊", wolf_plan: "你来定今晚的计划",
+      last_words: "留下遗言", vote: "投票放逐", inspect: "今晚查验谁", save: "要用解药救他吗", poison: "要用毒药吗", shoot: "开枪带走谁" },
+    target: "选择", speech: "发言", planSpeech: "给队友的计划说明", suspect: "你怀疑谁（会记录在案）",
+    claim: "声称身份（可选）", noClaim: "不声称", claimTarget: "查验/用药对象", claimResult: "查验结果",
+    faker: "谁来悍跳预言家", hook: "谁来倒钩（白天踩队友）", focus: "白天集中投谁（可选）", none: "（不选）",
+    over: "游戏结束", winner: w => `${w}胜利`, mvp: "MVP", failed: "游戏出错：", host: "主持人", again: "再来一局",
+  },
+  en: {
+    title: "AI Werewolf", name: "Your name", replaces: "Whose seat to take", tactic: "Pack tactic", random: "Random", start: "Start game",
+    tactics: { counterclaim: "Counterclaim", deep_cover: "Deep cover", hook: "Hook" },
+    youAre: n => `${n}, you are`, pack: "Your pack: ", waiting: "Waiting for the others…", dead: "You are out. Keep watching.", submit: "Submit",
+    timeLeft: s => `${s}s left before an AI plays this for you`,
+    kinds: { speech: "Your turn to speak", rebuttal: "Second round: answer and challenge", wolf_chat: "Wolf chat", wolf_plan: "Set tonight's plan",
+      last_words: "Your last words", vote: "Vote someone out", inspect: "Who to check tonight", save: "Use the antidote on them?", poison: "Use the poison?", shoot: "Who to shoot" },
+    target: "Pick", speech: "What you say", planSpeech: "The plan, for your pack", suspect: "Who you suspect (goes on the record)",
+    claim: "Claim a role (optional)", noClaim: "No claim", claimTarget: "Who you checked or used a potion on", claimResult: "What you saw",
+    faker: "Who fakes the seer", hook: "Who plays the hook (turns on a packmate by day)", focus: "Who the pack votes tomorrow (optional)", none: "(none)",
+    over: "Game over", winner: w => `The ${w} side wins`, mvp: "MVP", failed: "The game failed: ", host: "Host", again: "Play again",
+  },
+};
+const $ = id => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+let gameId = params.get("game");
+let shownEvent = null, logCount = 0, view = null, timer = null;
+
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) } : {});
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+// ---- setup ----
+async function loadSetup() {
+  const lang = $("lang").value, t = UI[lang];
+  $("title").textContent = t.title;
+  $("nameLabel").textContent = t.name; $("replacesLabel").textContent = t.replaces;
+  $("tacticLabel").textContent = t.tactic; $("startBtn").textContent = t.start;
+  const { characters, tactics } = await api(`/api/characters?lang=${lang}`);
+  $("replaces").innerHTML = characters.map(c => `<option>${esc(c)}</option>`).join("");
+  $("tactic").innerHTML = `<option value="">${t.random}</option>` + tactics.map(x => `<option value="${x}">${t.tactics[x] || x}</option>`).join("");
+}
+$("lang").onchange = loadSetup;
+$("startBtn").onclick = async () => {
+  $("setupErr").textContent = "";
+  try {
+    const { id } = await api("/api/games", { lang: $("lang").value, name: $("name").value, replaces: $("replaces").value, tactic: $("tactic").value });
+    location.search = `?game=${encodeURIComponent(id)}`;
+  } catch (e) { $("setupErr").textContent = e.message; }
+};
+
+// ---- table ----
+async function poll() {
+  try {
+    const g = await api(`/api/games/${encodeURIComponent(gameId)}`);
+    if (g.view) render(g.view);
+    if (g.result || g.error) { finish(g); return; }
+  } catch (e) { $("waiting").textContent = e.message; }
+  setTimeout(poll, 1500);
+}
+
+function render(v) {
+  view = v;
+  const t = UI[v.lang] || UI.zh, w = k => v.words[k] || k;
+  document.title = $("title").textContent = t.title;
+  $("when").textContent = v.when;
+  $("youAre").textContent = t.youAre(v.you);
+  $("role").textContent = v.role;
+  $("role").className = "role" + (v.pack ? " wolf" : "");
+  $("pack").textContent = v.pack ? t.pack + v.pack.join(", ") : "";
+  $("seats").innerHTML = v.seats.map(s => `<span class="seat${s.death ? " dead" : ""}${s.name === v.you ? " me" : ""}" title="${esc(s.death || "")}">${esc(s.name)}</span>`).join("");
+
+  const log = $("log"), atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  for (const l of v.log.slice(logCount)) {
+    const d = document.createElement("div");
+    d.className = "line" + (l.speaker ? "" : " host") + (l.private ? " private" : "") + (l.speaker === v.you ? " mine" : "");
+    d.innerHTML = `<span class="when">${esc(l.when)}</span><span class="who">${esc(l.speaker || t.host)}:</span>${esc(l.text)}`;
+    log.appendChild(d);
+  }
+  logCount = v.log.length;
+  if (atBottom) log.scrollTop = log.scrollHeight;
+
+  $("waiting").textContent = v.alive ? t.waiting : t.dead;
+  $("waiting").hidden = !!v.pending;
+  if (!v.pending) { $("turnCard").hidden = true; shownEvent = null; return; }
+  if (v.pending.event !== shownEvent) showTurn(v.pending, t, w);
+}
+
+function showTurn(p, t, w) {
+  shownEvent = p.event;
+  const turn = p.turn, k = turn.kind, f = $("turnForm");
+  $("turnCard").hidden = false; $("turnErr").textContent = "";
+  $("turnTitle").textContent = t.kinds[k] || k;
+  const opts = (xs, blank) => (blank ? `<option value="">${t.none}</option>` : "") + xs.map(x => `<option value="${esc(x)}">${esc(w(x))}</option>`).join("");
+  const choice = ["vote", "wolf_plan", "inspect", "save", "poison", "shoot"].includes(k);
+  const speaks = !choice || k === "wolf_plan", declares = k === "speech" || k === "rebuttal";
+  let h = "";
+  if (choice) h += `<label>${t.target}</label><select name="target">${opts(turn.candidates || [])}</select>`;
+  if (k === "wolf_plan" && turn.tactic === "counterclaim") h += `<label>${t.faker}</label><select name="faker">${opts([...(turn.pack || []), "nobody"])}</select>`;
+  if (k === "wolf_plan" && turn.tactic === "hook") h += `<label>${t.hook}</label><select name="hook">${opts([...(turn.pack || []), "nobody"])}</select>`;
+  if (k === "wolf_plan") h += `<label>${t.focus}</label><select name="focus">${opts(turn.suspects || [], true)}</select>`;
+  if (declares) {
+    const others = turn.seats.map(s => s.name).filter(n => n !== turn.me.name);
+    h += `<label>${t.suspect}</label><select name="suspect">${opts(turn.suspects || [])}</select>`;
+    h += `<label>${t.claim}</label><div class="row"><select name="claimRole"><option value="">${t.noClaim}</option>${opts(["seer", "witch", "hunter", "villager"])}</select>`;
+    h += `<select name="claimTarget">${opts(others, true)}</select><select name="claimResult">${opts(["good", "werewolf"], true)}</select></div>`;
+    h += `<div class="dim">${t.claimTarget} · ${t.claimResult}</div>`;
+  }
+  if (speaks) h += `<label>${k === "wolf_plan" ? t.planSpeech : t.speech}</label><textarea name="speech"></textarea>`;
+  h += `<button type="submit">${t.submit}</button>`;
+  f.innerHTML = h;
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(f)), a = {};
+    for (const key of ["target", "speech", "suspect", "faker", "hook", "focus"]) if (d[key]) a[key] = d[key].trim();
+    if (d.claimRole) a.claim = { role: d.claimRole, target: d.claimTarget || "", result: d.claimResult || "" };
+    f.querySelector("button").disabled = true;
+    try { await api(`/api/games/${encodeURIComponent(gameId)}/moves`, { event: p.event, action: a }); $("turnCard").hidden = true; }
+    catch (err) { $("turnErr").textContent = err.message; f.querySelector("button").disabled = false; }
+  };
+  clearInterval(timer);
+  const tick = () => {
+    const s = Math.max(0, Math.round((new Date(p.deadline) - Date.now()) / 1000));
+    $("countdown").textContent = t.timeLeft(s);
+  };
+  tick(); timer = setInterval(tick, 1000);
+}
+
+function finish(g) {
+  clearInterval(timer);
+  $("turnCard").hidden = true; $("waiting").hidden = true;
+  const t = UI[(view && view.lang) || "zh"], r = $("result");
+  r.hidden = false;
+  if (g.error) { r.innerHTML = `<div class="err">${t.failed}${esc(g.error)}</div>`; return; }
+  const res = g.result, w = k => (view && view.words[k]) || k;
+  r.innerHTML = `<div style="font-weight:700">${t.over} · ${esc(t.winner(w(res.winner)))}</div>` +
+    (res.mvp && res.mvp.name ? `<p class="mvp">${t.mvp}: <b>${esc(res.mvp.name)}</b></p><p>${esc(res.mvp.reason)}</p>` : "") +
+    `<a href="/"><button>${t.again}</button></a>`;
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+if (gameId) { $("table").hidden = false; poll(); }
+else { $("setup").hidden = false; loadSetup(); }
+</script>
+</body>
+</html>

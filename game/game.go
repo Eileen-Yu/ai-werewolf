@@ -4,9 +4,11 @@
 package game
 
 import (
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"slices"
+	"strings"
 )
 
 type Role string
@@ -68,8 +70,10 @@ type Player struct {
 	// the same table. It shapes how they talk to each other, never which side
 	// they think anyone is on.
 	Rivalry string `json:"rivalry,omitempty"`
-	Role    Role   `json:"role,omitempty"`
-	Alive   bool   `json:"alive"`
+	// Human marks the seat a person plays from the web page.
+	Human bool `json:"human,omitempty"`
+	Role  Role `json:"role,omitempty"`
+	Alive bool `json:"alive"`
 	// Death is what everyone knows about how the player left the game, e.g.
 	// "died on Night 1": at night only that they died, not who killed them.
 	Death string `json:"death,omitempty"`
@@ -90,6 +94,65 @@ func Cast(l Lang, rng *rand.Rand) []Player {
 	}
 	rng.Shuffle(len(cast), func(i, j int) { cast[i], cast[j] = cast[j], cast[i] })
 	return cast
+}
+
+// Characters is everyone a game in l may seat, for a person to pick whose
+// seat to take.
+func Characters(l Lang) []string {
+	var pool []Player
+	if l == English {
+		pool = englishCast
+	} else {
+		for _, pair := range chineseRivals {
+			pool = append(pool, pair[:]...)
+		}
+		pool = append(pool, chineseLoners...)
+	}
+	names := make([]string, len(pool))
+	for i, p := range pool {
+		names[i] = p.Name
+	}
+	return names
+}
+
+// SeatHuman puts a person named name in the seat of the character replaces.
+// A loner who was not drawn this game stands in for the loner who was, so any
+// character can be picked. Rivalries that name the character who left are
+// dropped, since nobody by that name is at the table. If the person times out,
+// an AI plays their move with persona.
+func SeatHuman(cast []Player, name, replaces string, l Lang) ([]Player, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, errors.New("a human player needs a name")
+	}
+	i := slices.IndexFunc(cast, func(p Player) bool { return p.Name == replaces })
+	if i < 0 && slices.ContainsFunc(chineseLoners, func(p Player) bool { return p.Name == replaces }) {
+		i = slices.IndexFunc(cast, func(p Player) bool {
+			return slices.ContainsFunc(chineseLoners, func(loner Player) bool { return loner.Name == p.Name })
+		})
+	}
+	if i < 0 {
+		return nil, fmt.Errorf("no character %q to replace: pick one of %v", replaces, Characters(l))
+	}
+	gone := cast[i].Name
+	for _, p := range cast {
+		if p.Name != gone && (p.Name == name || strings.Contains(name, p.Name) || strings.Contains(p.Name, name)) {
+			return nil, fmt.Errorf("the name %q is too close to %s, who is also at the table", name, p.Name)
+		}
+	}
+	out := slices.Clone(cast)
+	out[i] = Player{Name: name, Persona: humanPersona[l], Human: true}
+	for j := range out {
+		if strings.Contains(out[j].Rivalry, gone) {
+			out[j].Rivalry = ""
+		}
+	}
+	return out, nil
+}
+
+var humanPersona = map[Lang]string{
+	Chinese: "真人玩家，这一手暂时由AI代打：稳健，按局势和证据判断",
+	English: "a human player whose move an AI is covering for: steady, goes by the evidence",
 }
 
 // englishCast is exactly nine, so every one of them sits down in every
