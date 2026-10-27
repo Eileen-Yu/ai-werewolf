@@ -60,6 +60,8 @@ func TestWitchSavingTheVictimMakesAPeacefulNight(t *testing.T) {
 	assert.Contains(t, b.firstDawn, "天亮了，昨晚是平安夜。")
 	assert.Equal(t, 1, b.kinds[brain.Save])
 	assert.Zero(t, b.kinds[brain.Poison], "the witch who saved has no second potion that night")
+	assert.Positive(t, b.wolvesTold, "the wolves were not told their victim survived")
+	assert.Zero(t, b.othersTold, "someone other than a wolf was told who the wolves killed")
 }
 
 func TestTheWitchMaySaveHerselfOnlyOnTheFirstNight(t *testing.T) {
@@ -117,9 +119,11 @@ func (b *selfSavingWitch) Act(ctx context.Context, t brain.Turn) (brain.Action, 
 // savingWitch plays randomly except that the witch always saves and never
 // poisons. It records what the first day's first speaker heard at dawn.
 type savingWitch struct {
-	mu        sync.Mutex
-	kinds     map[brain.TurnKind]int
-	firstDawn string
+	mu         sync.Mutex
+	kinds      map[brain.TurnKind]int
+	firstDawn  string
+	wolvesTold int // Day 1 turns where a wolf knows the night's victim survived
+	othersTold int
 }
 
 func (b *savingWitch) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
@@ -135,6 +139,13 @@ func (b *savingWitch) Act(ctx context.Context, t brain.Turn) (brain.Action, erro
 				if e.Phase == game.Day && e.Speaker == "" {
 					b.firstDawn += e.Text
 				}
+			}
+		}
+		if t.Phase == game.Day && slices.ContainsFunc(t.Transcript, func(e game.Event) bool { return strings.Contains(e.Text, "没有死") }) {
+			if t.Me.Role == game.Werewolf {
+				b.wolvesTold++
+			} else {
+				b.othersTold++
 			}
 		}
 	}

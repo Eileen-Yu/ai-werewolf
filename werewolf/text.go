@@ -4,15 +4,15 @@ import "github.com/Eileen-Yu/ai-werewolf/game"
 
 // host is everything the game master says, in one language.
 type host struct {
-	welcome, yourRole, pack, nightFalls, noKill, victim, potionsLeft  string
-	antidote, poison, noPotions, selfVictim, saved, poisoned          string
-	inspected, peaceful, died, dawnDead, shot, diedNow, order         string
-	rebuttals, stance, stances, vote, votes, abstain, tie             string
-	votedOut, exiled, plan, noFaker, faker, hook, undecided, gameOver string
-	tactic                                                            string
-	tactics                                                           map[game.Tactic]string
-	revealed, comma, semicolon, result, silence                       string
-	mvp, takeover                                                     string
+	welcome, yourRole, pack, nightFalls, noKill, victim, survived, potionsLeft string
+	antidote, poison, noPotions, selfVictim, saved, poisoned                   string
+	inspected, peaceful, died, dawnDead, shot, diedNow, order                  string
+	rebuttals, stance, stances, vote, votes, abstain, tie                      string
+	votedOut, exiled, plan, noFaker, faker, hook, undecided, gameOver          string
+	tactic                                                                     string
+	tactics                                                                    map[game.Tactic]string
+	revealed, comma, semicolon, result, silence                                string
+	mvp, takeover                                                              string
 
 	// The sheriff: the election, the badge's weight in a vote, and passing it on.
 	election, noRunners, allRun, runners, campaign, sheriffVotes string
@@ -36,6 +36,7 @@ var chineseHost = host{
 	nightFalls:  "%s，天黑请闭眼。",
 	noKill:      "今晚狼人没有杀人。",
 	victim:      "今晚被狼人杀的是%s。",
+	survived:    "你们刀的%s没有死：只可能是女巫用解药救了他。",
 	potionsLeft: "你还剩：%s。",
 	antidote:    "解药",
 	poison:      "毒药",
@@ -103,6 +104,7 @@ var englishHost = host{
 	nightFalls:  "%s falls. Everyone, close your eyes.",
 	noKill:      "The werewolves killed nobody tonight.",
 	victim:      "The werewolves killed %s tonight.",
+	survived:    "%s, whom you killed, did not die: only the witch's antidote could have saved them.",
 	potionsLeft: "You have left: %s.",
 	antidote:    "antidote",
 	poison:      "poison",

@@ -128,6 +128,7 @@ var chineseText = text{
 			"好人会翻票型：几个人每天都投同一个人、互相报好人、互相帮腔，一眼就是狼队。所以白天最多两只狼投同一个人，除非多这一票正好能决定谁出局；不要连续两天和同一个同伴同票；不要公开替同伴辩护，要表态就各说各的理由。" +
 			"一般要保护同伴。但有具体的理由时，你可以怀疑、甚至投出同伴：他已经被可信地坐实、反正活不下来；替他说话会把你自己也拖下水；踩他能换来你后面要用的信任；或者牺牲他能让狼队整体赢面更大。" +
 			"卖队友是证据逼出来的例外，不是你做身份的常规手段，更不能只因为私人恩怨。" +
+			"刀口没死说明女巫救了他，女巫知道他是你们的刀口，随时可能公开：不要给他报查杀，也不要带头踩他，否则她一句话就能拆穿你。" +
 			"真预言家是你们最大的威胁。女巫的解药可能救下你们的刀，猎人出局会开枪，所以要尽早找出神职并优先杀掉。" +
 			"被放逐时的遗言也要继续伪装、搅浑水，绝不能承认自己是狼人。" +
 			"自刀是一招险棋：刀自己或同伴，赌女巫用解药救下，既骗掉解药，被救的狼第二天还能以\"银水\"（被女巫救过的人）的身份获得信任。" +
@@ -155,7 +156,10 @@ var chineseText = text{
 		"如果场上有好几个都像狼的人，好人的票却分散在他们身上，宁可并到其中最有可能出局的那个，除非你有很强的证据说明那个人是好人。但不要为了跟大多数而放弃自己的判断。" +
 		"跨天追踪票型和站边：同一组人一次同票不算证据，但新的矛盾出现后仍然一直同票、互相报好人、互相帮腔，就是狼队配合的信号。这是证据，不是铁证，但足够拿来决定投票。" +
 		"昨天平票的话，先说清楚为什么平票。狼人每晚都会杀一个好人，好人人数不再多于狼人时狼人直接获胜，所以没有新证据却重复同样的分票，等于让狼人靠时间赢。考虑换目标，或者公开提出一个大家都能接受的共同目标。" +
-		"每一句\"这不能证明\"都要接一个结论：在现有的选择里，投谁最值得冒险。",
+		"每一句\"这不能证明\"都要接一个结论：在现有的选择里，投谁最值得冒险。" +
+		"但合票不等于跟风。全场很快一边倒时反而要多想一层：这个怀疑是不是只建立在一件事上？被怀疑的人的解释说得通吗？是谁最先带的节奏、谁一直在推？狼人最喜欢混进现成的共识，借好人的手推出好人。" +
+		"首日投票和大家不一样本身不算狼的证据：狼会投同伴做身份，好人也会独立判断出错。要附和别人，就说出你自己新的理由；说不出，就说明你只是在跟票。" +
+		"愿不愿意跟别人走，由你的性格决定：有人容易被说服，有人认死理，有人专门唱反调。",
 	adapt: "这个打法是狼队开局的倾向，不是整局的硬规定。第一夜的计划必须按这个打法来。之后局势变了，比如悍跳的狼已经出局或被识破、倒钩已经没用，可以不再派人，改打别的：抓好人真实的破绽、他们自己说过却没做到的话，比编造更有效。",
 	instructions: map[TurnKind]string{
 		Speech:   "白天发言环节，轮到你了。",
@@ -340,6 +344,7 @@ Write everything in English.`,
 			"Good players read the votes: a group that votes for the same person every day, vouches for each other and backs each other up is obviously the pack. So by day at most two werewolves vote for the same person, unless the extra vote is exactly what decides who goes; never vote with the same teammate two days running; never defend a teammate in public, and if you take a side, give your own reason. " +
 			"Protect your teammates as a rule. You may still suspect or vote out a teammate when there is a concrete reason: they are credibly exposed and will not survive anyway, defending them would expose you, turning on them buys trust you will need later, or losing them improves the pack's chances. " +
 			"Sacrificing a teammate is an exception the evidence forces, not your usual way to look good, and never just because you dislike them. " +
+			"If your victim did not die, the witch saved them and knows they were your kill, and may say so at any time: never report them as a werewolf or lead the charge against them, or one sentence from her exposes you. " +
 			"The real seer is your biggest threat. The witch's antidote can undo your kill and the hunter shoots when he goes, so find the power roles early and kill them first. " +
 			"In your last words, keep up the act and muddy the water; never admit to being a werewolf. " +
 			"A self-kill is a gamble: kill yourself or a teammate and bet the witch saves them, which wastes her antidote and makes the saved werewolf look trusted the next day. " +
@@ -367,7 +372,10 @@ Write everything in English.`,
 		"If several players look like werewolves and the good side's votes are split across them, rather join the one most likely to go, unless you have strong evidence that one is good. But do not drop your own reasoning just to follow the majority. " +
 		"Track votes and sides across days: one shared vote proves nothing, but a group that keeps voting together, vouching for each other and backing each other up after new contradictions come out is a sign of a pack working together. It is evidence, not proof, and it is enough to decide a vote on. " +
 		"If yesterday's vote was a tie, say why it tied. The werewolves kill a good player every night and win outright once good players no longer outnumber them, so repeating the same split without new evidence lets them win on time. Consider changing your target, or openly proposing one the table can agree on. " +
-		"Every \"that does not prove it\" needs a conclusion after it: of the choices you actually have, who is most worth the risk.",
+		"Every \"that does not prove it\" needs a conclusion after it: of the choices you actually have, who is most worth the risk. " +
+		"But joining a vote is not following the crowd. When the whole table swings one way fast, think twice: does the suspicion rest on a single fact? Does the suspect's explanation hold up? Who started the push, and who keeps driving it? Werewolves love to slip into a ready-made consensus and let good players vote out one of their own. " +
+		"Voting differently from everyone on Day 1 is not evidence on its own: werewolves vote for a teammate to look good, and good players misjudge on their own. If you agree with someone, give a new reason of your own; if you have none, you are only following the vote. " +
+		"How readily you go along with others is down to your character: some are easily persuaded, some dig in, some argue against whatever the table says.",
 	adapt: " This play is where the pack starts, not a rule for the whole game. The first night's plan must play it. After that, when things change, say the faker is out or has been seen through, or the hook is no longer of use, you may name nobody and play something else: a good player's real slip, something they said they would do and did not, works better than anything made up.",
 	instructions: map[TurnKind]string{
 		Speech:   "It is the day's speeches and your turn to speak.",

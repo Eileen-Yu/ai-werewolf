@@ -214,6 +214,9 @@ func (t *table) night() error {
 			}
 		}
 	}
+	if victim != "" && saved {
+		t.add("", fmt.Sprintf(t.h.survived, victim), s.Living(game.Werewolf)...)
+	}
 	slices.SortFunc(dead, func(a, b string) int { return seat(s, a) - seat(s, b) }) // table order, so the list gives away nothing
 	s.Phase = game.Day
 	if len(dead) == 0 {
