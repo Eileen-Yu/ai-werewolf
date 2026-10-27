@@ -32,11 +32,23 @@ func (Random) Act(_ context.Context, t Turn) (Action, error) {
 	case WolfChat:
 		return Action{Speech: fmt.Sprintf(pick(tx.wolfLines), pick(t.Candidates))}, nil
 	}
+	if t.Kind == Vote {
+		return Action{Target: pick(spare(t, t.Candidates))}, nil
+	}
 	if t.Kind.IsChoice() {
 		return Action{Target: pick(t.Candidates)}, nil
 	}
-	suspect := pick(slices.DeleteFunc(slices.Clone(t.Suspects), func(s string) bool { return s == game.Nobody }))
+	suspect := pick(spare(t, slices.DeleteFunc(slices.Clone(t.Suspects), func(s string) bool { return s == game.Nobody })))
 	return Action{Speech: fmt.Sprintf(pick(tx.speechLines), suspect), Suspect: suspect}, nil
+}
+
+// spare keeps a random wolf off its teammates: sacrificing one is a judgement
+// call, and picking at random is no judgement.
+func spare(t Turn, names []string) []string {
+	if others := game.Without(names, t.Pack...); len(others) > 0 {
+		return others
+	}
+	return names
 }
 
 func pick(xs []string) string {

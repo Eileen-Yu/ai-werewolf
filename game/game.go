@@ -73,7 +73,7 @@ type Player struct {
 	// Human marks the seat a person plays from the web page.
 	Human bool `json:"human,omitempty"`
 	Role  Role `json:"role,omitempty"`
-	Alive bool `json:"alive"`
+	Alive   bool   `json:"alive"`
 	// Death is what everyone knows about how the player left the game, e.g.
 	// "died on Night 1": at night only that they died, not who killed them.
 	Death string `json:"death,omitempty"`
@@ -447,21 +447,10 @@ func (s *State) Living(roles ...Role) []string {
 }
 
 // VoteCandidates is who voter may vote out, or name as their suspect: anyone
-// else alive, except that a wolf never turns on another wolf, unless the
-// pack's plan has him play the hook.
+// else alive. A wolf may turn on a teammate too; whether that is ever worth
+// it is for the wolf to judge, not for the rules.
 func (s *State) VoteCandidates(voter string) []string {
-	if s.Plan != nil && s.Plan.Round == s.Round && s.Plan.Hook == voter {
-		return Without(s.Living(), voter)
-	}
-	return Without(s.Living(), s.Pack(voter)...)
-}
-
-// Pack is the living wolves if name is one of them, or just name otherwise.
-func (s *State) Pack(name string) []string {
-	if p := s.Player(name); p != nil && p.Role == Werewolf {
-		return s.Living(Werewolf)
-	}
-	return []string{name}
+	return Without(s.Living(), voter)
 }
 
 // Winner is the winning side, string(Werewolf) or Good, once the game is

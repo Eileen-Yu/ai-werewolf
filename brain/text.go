@@ -116,7 +116,9 @@ var chineseText = text{
 必须点名：说清楚怀疑谁、相信谁、为什么。不超过120字。不要提到你是AI，不要写动作或旁白。
 不要说空话套话，比如"值得关注""转移注意力""大家要谨慎""再观察一下""缺乏证据"。每个怀疑都要有具体依据：某人的原话、他的投票、他跳身份的时机，或者别人的声明之间的矛盾。`,
 	strategies: map[game.Role]string{
-		game.Werewolf: "你和狼同伴要配合，白天按狼队计划和本局的打法执行。局势变了可以在夜里改计划，白天不要各打各的。" +
+		game.Werewolf: "你和狼同伴目标一致，要配合，但配合不等于投一样的票：故意分开投票的狼队更难被看穿。白天按狼队计划执行，局势变了在夜里改计划。" +
+			"一般要保护同伴。但有具体的理由时，你可以怀疑、甚至投出同伴：他已经被可信地坐实、反正活不下来；替他说话会把你自己也拖下水；踩他能换来你后面要用的信任；或者牺牲他能让狼队整体赢面更大。" +
+			"卖队友是证据逼出来的例外，不是你做身份的常规手段，更不能只因为私人恩怨。" +
 			"真预言家是你们最大的威胁。女巫的解药可能救下你们的刀，猎人出局会开枪，所以要尽早找出神职并优先杀掉。" +
 			"被放逐时的遗言也要继续伪装、搅浑水，绝不能承认自己是狼人。" +
 			"自刀是一招险棋：刀自己或同伴，赌女巫用解药救下，既骗掉解药，被救的狼第二天还能以\"银水\"（被女巫救过的人）的身份获得信任。" +
@@ -132,14 +134,14 @@ var chineseText = text{
 	},
 	tactics: map[game.Tactic]string{
 		game.Counterclaim: "本局狼队的打法是悍跳：计划里指定一只狼，当天第一次发言就跳预言家，报假的查验结果（比如给同伴报好人，给真预言家报狼人），和真预言家对跳争夺信任。" +
-			"其他狼帮他说话，白天一起找计划里要投的人的破绽，一起投他。不能怀疑或投票给狼同伴。",
+			"其他狼帮他说话，白天一起找计划里要投的人的破绽，一起投他。如果悍跳的狼已经被识破、保不住了，其他狼可以和他切割，像倒钩一样跟着踩他、投他。",
 		game.DeepCover: "本局狼队的打法是潜水：谁都不跳神职，全都装成普通村民。" +
 			"白天不要几只狼一起冲同一个人，也不要互相维护，免得被看出是一伙的；各自附和好人里已经冒出来的怀疑，跟着主流投票。" +
-			"计划里的 focus 是你们各自顺势推一把的人，不是一起冲的人。不能怀疑或投票给狼同伴。",
+			"计划里的 focus 是你们各自顺势推一把的人，不是一起冲的人。你们装的是互不相识的村民，所以同伴已经暴露、救不回来时，跟着大家投他反而更符合人设。",
 		game.Hook: "本局狼队的打法是倒钩：计划里指定一只狼当倒钩，他白天装成最坚定的好人：站边真预言家，同伴暴露了就跟着踩，甚至投他，用一个同伴换来好人的信任，留到后面关键的时候再带偏票。" +
-			"其他狼不跳预言家，也不要和倒钩的狼互相维护。只有倒钩的狼可以怀疑和投票给狼同伴，其他狼不能。",
+			"其他狼不跳预言家，也不要和倒钩的狼互相维护。倒钩是计划里主动牺牲同伴换信任的人；其他狼也可以踩同伴，但只在局势真的需要时。",
 	},
-	adapt: "第一夜的计划必须按这个打法来。之后局势变了，比如悍跳的狼已经出局或被识破、倒钩已经没用，可以不再派人，改打别的：抓好人真实的破绽、他们自己说过却没做到的话，比编造更有效。",
+	adapt: "这个打法是狼队开局的倾向，不是整局的硬规定。第一夜的计划必须按这个打法来。之后局势变了，比如悍跳的狼已经出局或被识破、倒钩已经没用，可以不再派人，改打别的：抓好人真实的破绽、他们自己说过却没做到的话，比编造更有效。",
 	instructions: map[TurnKind]string{
 		Speech:   "白天发言环节，轮到你了。",
 		Rebuttal: "回应环节：所有人都已经发过一次言。回应别人对你的怀疑，或者质疑某个人的说法（比如对跳的预言家、前后矛盾的人）。不超过80字。",
@@ -191,7 +193,7 @@ var chineseText = text{
 	habit:    "决策习惯，判断、改主意和投票都照这个来，这比说话风格更重要：%s。\n",
 	rivalry:  "宿敌：%s。宿敌只决定你们怎么互动（拌嘴、抬杠、抢话语权），不决定你认为谁是哪一边：怀疑宿敌也要有真实发生的依据，和怀疑别人一样。\n",
 	rivalTeammate: "你的宿敌%s也是狼人，是你的同伴。宿敌照当：夜里可以质疑他的指挥、和他争计划，白天可以公开互怼、和他保持距离，装作不是一伙的。" +
-		"但吵归吵，夜里最后要定下一个能执行的计划，白天以狼队获胜为先：不要因为讨厌他就拆台、投他或暴露他。只有本局打法或局势真的需要时，才能牺牲他。\n",
+		"但吵归吵，夜里最后要定下一个能执行的计划，白天以狼队获胜为先：不要因为讨厌他就拆台、投他或暴露他。牺牲他和牺牲任何同伴一样，要有具体的局势理由，不能是因为宿怨。\n",
 	host:         "主持人",
 	none:         "（无）\n",
 	beliefLine:   "- %s：%s。证据：%s\n",
@@ -307,7 +309,9 @@ Name names: say clearly who you suspect, who you trust, and why. At most 60 word
 No empty filler such as "worth watching", "deflecting", "let's be careful", "let's see more", "no proof". Every suspicion needs a concrete basis: what someone actually said, how they voted, when they claimed a role, or a contradiction between claims.
 Write everything in English.`,
 	strategies: map[game.Role]string{
-		game.Werewolf: "Work with your fellow werewolves and follow the pack's plan and this game's play by day. If things change, change the plan at night; never play separate games by day. " +
+		game.Werewolf: "You and your fellow werewolves share one goal, so work together, but working together is not voting together: a pack that splits its votes on purpose is harder to read. Follow the pack's plan by day; if things change, change the plan at night. " +
+			"Protect your teammates as a rule. You may still suspect or vote out a teammate when there is a concrete reason: they are credibly exposed and will not survive anyway, defending them would expose you, turning on them buys trust you will need later, or losing them improves the pack's chances. " +
+			"Sacrificing a teammate is an exception the evidence forces, not your usual way to look good, and never just because you dislike them. " +
 			"The real seer is your biggest threat. The witch's antidote can undo your kill and the hunter shoots when he goes, so find the power roles early and kill them first. " +
 			"In your last words, keep up the act and muddy the water; never admit to being a werewolf. " +
 			"A self-kill is a gamble: kill yourself or a teammate and bet the witch saves them, which wastes her antidote and makes the saved werewolf look trusted the next day. " +
@@ -323,14 +327,14 @@ Write everything in English.`,
 	},
 	tactics: map[game.Tactic]string{
 		game.Counterclaim: "This game the pack plays the counter-claim: the plan names one werewolf who claims seer in their very first speech and reports a fake check (a teammate as good, or the real seer as a werewolf) to fight the real seer for the table's trust. " +
-			"The rest of you back them up, and all go after and vote out the person the plan names. Never suspect or vote for a teammate.",
+			"The rest of you back them up, and all go after and vote out the person the plan names. If the faker is seen through and cannot be saved, the rest of you may cut them loose and pile on, as a hook would.",
 		game.DeepCover: "This game the pack plays deep cover: none of you claims a power role; you all pass as plain villagers. " +
 			"By day, never pile onto the same person together and never defend each other, or you will be read as a team; each of you echoes a suspicion a good player has already raised and votes with the majority. " +
-			"The plan's focus is someone each of you nudges along, not someone you charge together. Never suspect or vote for a teammate.",
+			"The plan's focus is someone each of you nudges along, not someone you charge together. You are playing strangers, so when a teammate is exposed and done for, voting them out with the table fits your cover.",
 		game.Hook: "This game the pack plays the hook: the plan names one werewolf as the hook, who plays the staunchest good player at the table, backs the real seer, and when a teammate is exposed piles on and even votes them out, trading a teammate for the good side's trust to steer a vote later when it counts. " +
-			"The others do not claim seer and do not defend the hook. Only the hook may suspect or vote for a teammate.",
+			"The others do not claim seer and do not defend the hook. The hook is the one the plan has trade a teammate for trust; the rest of you may turn on a teammate too, but only when the game calls for it.",
 	},
-	adapt: " The first night's plan must play it. After that, when things change, say the faker is out or has been seen through, or the hook is no longer of use, you may name nobody and play something else: a good player's real slip, something they said they would do and did not, works better than anything made up.",
+	adapt: " This play is where the pack starts, not a rule for the whole game. The first night's plan must play it. After that, when things change, say the faker is out or has been seen through, or the hook is no longer of use, you may name nobody and play something else: a good player's real slip, something they said they would do and did not, works better than anything made up.",
 	instructions: map[TurnKind]string{
 		Speech:   "It is the day's speeches and your turn to speak.",
 		Rebuttal: "Reply round: everyone has spoken once. Answer suspicion aimed at you, or challenge someone's story (a counter-claimed seer, someone who contradicts themselves). At most 40 words.",
@@ -382,7 +386,7 @@ Write everything in English.`,
 	habit:    "How you decide. Judge, change your mind and vote this way; it matters more than how you talk: %s.\n",
 	rivalry:  "Your rivalries: %s. A rivalry shapes how you talk to each other (banter, arguments, fights over who leads), never which side you think anyone is on: suspecting a rival takes real evidence, like suspecting anyone else.\n",
 	rivalTeammate: "Your rival %s is also a werewolf, on your team. Keep the rivalry going: at night challenge their lead and fight over the plan; by day bicker in public and keep your distance so you do not look like a team. " +
-		"But however much you argue, the night must end with a plan you can carry out, and by day the pack winning comes first: never sabotage them, vote for them or give them away because you dislike them. Sacrifice them only when this game's play or the state of the game truly calls for it.\n",
+		"But however much you argue, the night must end with a plan you can carry out, and by day the pack winning comes first: never sabotage them, vote for them or give them away because you dislike them. Sacrifice them only for the same concrete reasons as any teammate, never for the grudge.\n",
 	host:         "Host",
 	none:         "(none)\n",
 	beliefLine:   "- %s: %s. Evidence: %s\n",

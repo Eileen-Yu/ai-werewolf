@@ -1,8 +1,7 @@
 // Command werewolf runs an AI werewolf game on Dapr workflows.
 //
 //	werewolf engine   local workflow engine, for playing without Dapr
-//	werewolf gm       the game master worker, and with -web the page a person
-//	                  plays from
+//	werewolf gm       the game master worker
 //	werewolf start    deal a new game and wait for the result
 //
 // gm and start talk to Dapr (local daprd or Catalyst, via the usual
@@ -17,7 +16,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"time"
 
@@ -28,11 +26,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/Eileen-Yu/ai-werewolf/brain"
-	"github.com/Eileen-Yu/ai-werewolf/game"
-	"github.com/Eileen-Yu/ai-werewolf/internal/engine"
-	"github.com/Eileen-Yu/ai-werewolf/internal/web"
-	"github.com/Eileen-Yu/ai-werewolf/werewolf"
+	"github.com/eileenyu/catalyst-werewolf/brain"
+	"github.com/eileenyu/catalyst-werewolf/game"
+	"github.com/eileenyu/catalyst-werewolf/internal/engine"
+	"github.com/eileenyu/catalyst-werewolf/werewolf"
 )
 
 const usage = "usage: werewolf engine|gm|start [flags]"
@@ -88,10 +85,7 @@ func runGM(ctx context.Context, args []string) error {
 	engineAddr := fs.String("engine", "", "local engine address; empty means Dapr")
 	brainName := fs.String("brain", "random", "how players think: random or llm")
 	component := fs.String("llm-component", "llm", "Dapr conversation component for -brain llm")
-	webAddr := fs.String("web", "", `address to serve the page a person plays from, e.g. ":8080"; empty serves none`)
-	timeout := fs.Duration("human-timeout", werewolf.HumanTimeout, "how long a person has for a move before an AI plays it")
 	_ = fs.Parse(args)
-	werewolf.HumanTimeout = *timeout
 
 	conn, daprClient, closeConn, err := connect(ctx, *engineAddr)
 	if err != nil {
@@ -105,7 +99,7 @@ func runGM(ctx context.Context, args []string) error {
 		if daprClient == nil {
 			return errors.New("-brain llm needs Dapr for the conversation API; drop -engine")
 		}
-		werewolf.SetBrain(&brain.LLM{Client: daprClient, Component: *component})
+		werewolf.SetBrain(brain.LLM{Client: daprClient, Component: *component})
 	default:
 		return fmt.Errorf("unknown brain %q", *brainName)
 	}
@@ -114,24 +108,11 @@ func runGM(ctx context.Context, args []string) error {
 	if err := werewolf.Register(r); err != nil {
 		return err
 	}
-	client := workflow.NewClient(conn)
-	if err := client.StartWorker(ctx, r); err != nil {
+	if err := workflow.NewClient(conn).StartWorker(ctx, r); err != nil {
 		return fmt.Errorf("start worker: %w", err)
 	}
 	fmt.Printf("game master ready (brain: %s)\n", *brainName)
-	if *webAddr == "" {
-		<-ctx.Done()
-		return nil
-	}
-	srv := &http.Server{Addr: *webAddr, Handler: web.Handler(client), ReadHeaderTimeout: 10 * time.Second}
-	go func() {
-		<-ctx.Done()
-		_ = srv.Close()
-	}()
-	fmt.Printf("the page a person plays from is on %s\n", *webAddr)
-	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		return err
-	}
+	<-ctx.Done()
 	return nil
 }
 

@@ -10,7 +10,6 @@ This is for people who want to change the code: how the game master works, what 
 | `brain/` | How players think: `random` (free) and `llm` (Dapr Conversation API). The prompts are in `brain/text.go` |
 | `werewolf/` | The game master workflow. Each round is one execution, and continue-as-new moves on to the next. The host's lines are in `werewolf/text.go` |
 | `internal/engine/` | A local workflow engine (durabletask and SQLite), used only for local play and tests |
-| `internal/web/` | The page a person plays a seat from, and the JSON API behind it, served by `gm -web` |
 | `cmd/werewolf/` | The command line: `engine`, `gm` and `start` |
 
 Random numbers and LLM calls only happen inside activities, so the workflow itself is deterministic. That is what lets a killed game carry on: after a restart the workflow replays its history, and activities that already finished return their recorded result instead of calling the LLM again.
@@ -74,18 +73,6 @@ Before checking, the game master repairs a few common slips that are not worth a
 
 If an answer is still invalid after the re-asks, the pick counts as a pass, and invalid claims and note entries are dropped. A problem only with the content of a speech is logged, and the speech still counts.
 
-## A person at the table
-
-`game.SeatHuman` puts a person in the seat of the character they picked, in the role-dealing activity, before roles are dealt. A Chinese loner who was not drawn stands in for the loner who was, so any of the eleven can be picked. A rivalry that names the character who left is dropped, since nobody by that name is at the table. The seat is marked `Human`, and its persona is a plain one for the AI that covers a move the person runs out of time on.
-
-Every move goes through `table.act`, so that is the one place a human seat differs. For an AI it calls `ActActivity`; for the human seat it waits for an external event named `move-<round>-<n>`, with a timeout. If the event comes, the move is put through the same `settle` that `ActActivity` uses on an AI's answer, so a bad pick still counts as a pass and cannot stall the game. If the timeout fires first, the person is told privately and `ActActivity` plays the move. Votes are asked of everyone at once, and waiting on the person is one more task among them.
-
-The page cannot read the workflow's state, so the workflow publishes what the person may see as its custom status (`werewolf.View`): their role and pack, the seats, the record filtered by `VisibleTo` exactly as for an AI player, with thinking left out, and the move it is waiting on, if any, with its event name and deadline. It is rebuilt with every event, on replay too, because the status is set again by every run of the workflow. The page polls it. A move is posted to `gm`, which checks it against the pending turn (`web.Check`) so the person can be told and try again, and then raises the event. `web.Check` only asks what a form can get wrong; the style rules the AI players are held to, like never saying your own name, are not a person's business.
-
-## The MVP
-
-When the game is over, `JudgeActivity` names an MVP. A brain that implements `brain.Judge` is asked; the LLM one is sent the whole record with every role revealed and night secrets included, but not anyone's private thinking, and asked for a name and a reason that cites what happened. If it fails, or names someone not at the table, or the brain cannot judge, `brain.Rules` picks one: from the winning side, a survivor before the dead, and the seer, witch and hunter before the rest. The host announces the MVP as the last line, and it is in the workflow's result.
-
 ## Chinese and English
 
 The language is set when the roles are dealt, stored in the game state, and kept for every round after. `gm` needs no setting, and one `gm` can run Chinese and English games side by side. An unknown language fails the workflow.
@@ -104,7 +91,5 @@ go test ./...
 - The game master worker is killed mid-game and a new one takes over, and the game must still finish.
 - In random games, where the witch saves and poisons and the hunter shoots at random, no public host line may mention a kill, a potion, a shot or a power role, and every seat must show only when its player died or that they were voted out.
 - The hunter always shoots, and no public line may name the hunter; the player shot must be shown dying like anyone else, and only the hunter is told who he shot.
-
-`werewolf/human_test.go` plays games with a person in a seat, answering through events, and checks the AI never played a move the person answered, the person only saw what their seat may see, and the MVP is announced. Another game has the person never answer, and must still finish, with the AI covering every move. `internal/web/web_test.go` plays a whole game through the HTTP API, including a bad move the page must refuse and a move the game is no longer waiting for.
 
 There is also a full English game that checks no player's seats, record or host lines contain any Chinese characters, and a full Chinese game that checks the stored roles, phases and winner are in English. `brain/llm_test.go` checks the English prompts and error messages for every kind of turn the same way, which catches any string left untranslated.

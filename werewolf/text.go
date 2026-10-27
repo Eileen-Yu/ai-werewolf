@@ -1,18 +1,15 @@
 package werewolf
 
-import "github.com/Eileen-Yu/ai-werewolf/game"
+import "github.com/eileenyu/catalyst-werewolf/game"
 
 // host is everything the game master says, in one language.
 type host struct {
-	welcome, yourRole, pack, nightFalls, noKill, victim, potionsLeft  string
-	antidote, poison, noPotions, selfVictim, saved, poisoned          string
-	inspected, peaceful, died, dawnDead, shot, diedNow, order         string
-	rebuttals, stance, stances, vote, votes, abstain, tie             string
-	votedOut, exiled, plan, noFaker, faker, hook, undecided, gameOver string
-	tactic                                                            string
-	tactics                                                           map[game.Tactic]string
-	revealed, comma, semicolon, result, silence                       string
-	mvp, takeover                                                     string
+	welcome, yourRole, pack, nightFalls, noKill, victim, potionsLeft string
+	antidote, poison, noPotions, selfVictim, saved, poisoned         string
+	inspected, peaceful, died, dawnDead, shotHow, shot, order        string
+	rebuttals, stance, stances, vote, votes, abstain, tie            string
+	votedOut, exiled, plan, noFaker, faker, undecided, gameOver      string
+	revealed, comma, semicolon, result                               string
 
 	// The god's-eye feed: asides, thoughts and secret lines.
 	observed, rejudged, judged, fromNothing, thinks, onlyFor, narrator string
@@ -43,8 +40,8 @@ var chineseHost = host{
 	peaceful:    "天亮了，昨晚是平安夜。",
 	died:        "死亡",
 	dawnDead:    "天亮了，昨晚死亡的是：%s。",
-	shot:        "你开枪带走了%s。",
-	diedNow:     "%s死亡了。",
+	shotHow:     "被猎人开枪带走",
+	shot:        "%s是猎人，开枪带走了%s。",
 	order:       "今天的发言顺序：%s。",
 	rebuttals:   "回应环节：每人再说一次，可以回应怀疑或者质疑别人。",
 	stance:      "%s：%s",
@@ -58,18 +55,12 @@ var chineseHost = host{
 	plan:        "狼队计划（%s定）：今晚杀%s；明天%s，票投%s。打法：%s",
 	noFaker:     "不悍跳",
 	faker:       "%s悍跳预言家",
-	hook:        "%s倒钩",
-	tactic:      "本局狼队的打法是%s。",
-	tactics:     map[game.Tactic]string{game.Counterclaim: "悍跳", game.DeepCover: "潜水", game.Hook: "倒钩"},
 	undecided:   "未定",
 	gameOver:    "游戏结束，%s胜利！身份公开：%s",
 	revealed:    "%s=%s",
 	comma:       "，",
 	semicolon:   "；",
 	result:      "%s胜利，共%d轮",
-	silence:     "（沉默）",
-	mvp:         "本局MVP：%s！%s",
-	takeover:    "你超时了，这一手由AI代打。",
 
 	observed:    "观察",
 	rejudged:    "改判",
@@ -98,8 +89,8 @@ var englishHost = host{
 	peaceful:    "Day breaks. Nobody died last night.",
 	died:        "died",
 	dawnDead:    "Day breaks. Died last night: %s.",
-	shot:        "You shot %s.",
-	diedNow:     "%s has died.",
+	shotHow:     "shot by the hunter",
+	shot:        "%s is the hunter and shot %s.",
 	order:       "Today's speaking order: %s.",
 	rebuttals:   "Reply round: everyone speaks once more, to answer suspicion or challenge someone.",
 	stance:      "%s: %s",
@@ -113,18 +104,12 @@ var englishHost = host{
 	plan:        "Pack plan (set by %s): kill %s tonight; tomorrow %s, and vote out %s. How: %s",
 	noFaker:     "nobody claims seer",
 	faker:       "%s claims seer",
-	hook:        "%s plays the hook",
-	tactic:      "This game the pack plays %s.",
-	tactics:     map[game.Tactic]string{game.Counterclaim: "the counter-claim", game.DeepCover: "deep cover", game.Hook: "the hook"},
 	undecided:   "undecided",
 	gameOver:    "Game over: the %s side wins! Roles: %s",
 	revealed:    "%s=%s",
 	comma:       ", ",
 	semicolon:   "; ",
 	result:      "the %s side wins after %d rounds",
-	silence:     "(silence)",
-	mvp:         "MVP of the game: %s! %s",
-	takeover:    "You ran out of time, so an AI played this move for you.",
 
 	observed:    "observes",
 	rejudged:    "rethinks",

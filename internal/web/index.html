@@ -81,7 +81,7 @@ const UI = {
   zh: {
     title: "AI 狼人杀", name: "你的名字", replaces: "替换哪个角色的座位", tactic: "狼队打法", random: "随机", start: "开始游戏",
     tactics: { counterclaim: "悍跳", deep_cover: "潜水", hook: "倒钩" },
-    youAre: n => `${n}，你是`, pack: "狼队：", waiting: "等待其他玩家……", dead: "你已出局，继续观战。", submit: "提交",
+    youAre: "你是", pack: "狼队：", waiting: "等待其他玩家……", dead: "你已出局，继续观战。", submit: "提交",
     timeLeft: s => `剩余 ${s} 秒，超时由AI代打`,
     kinds: { speech: "轮到你发言", rebuttal: "第二轮：回应和质疑", wolf_chat: "狼队夜聊", wolf_plan: "你来定今晚的计划",
       last_words: "留下遗言", vote: "投票放逐", inspect: "今晚查验谁", save: "要用解药救他吗", poison: "要用毒药吗", shoot: "开枪带走谁" },
@@ -93,7 +93,7 @@ const UI = {
   en: {
     title: "AI Werewolf", name: "Your name", replaces: "Whose seat to take", tactic: "Pack tactic", random: "Random", start: "Start game",
     tactics: { counterclaim: "Counterclaim", deep_cover: "Deep cover", hook: "Hook" },
-    youAre: n => `${n}, you are`, pack: "Your pack: ", waiting: "Waiting for the others…", dead: "You are out. Keep watching.", submit: "Submit",
+    youAre: "You are", pack: "Your pack: ", waiting: "Waiting for the others…", dead: "You are out. Keep watching.", submit: "Submit",
     timeLeft: s => `${s}s left before an AI plays this for you`,
     kinds: { speech: "Your turn to speak", rebuttal: "Second round: answer and challenge", wolf_chat: "Wolf chat", wolf_plan: "Set tonight's plan",
       last_words: "Your last words", vote: "Vote someone out", inspect: "Who to check tonight", save: "Use the antidote on them?", poison: "Use the poison?", shoot: "Who to shoot" },
@@ -149,7 +149,7 @@ function render(v) {
   const t = UI[v.lang] || UI.zh, w = k => v.words[k] || k;
   document.title = $("title").textContent = t.title;
   $("when").textContent = v.when;
-  $("youAre").textContent = t.youAre(v.you);
+  $("youAre").textContent = `${v.you}，${t.youAre}`;
   $("role").textContent = v.role;
   $("role").className = "role" + (v.pack ? " wolf" : "");
   $("pack").textContent = v.pack ? t.pack + v.pack.join(", ") : "";

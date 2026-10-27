@@ -91,7 +91,7 @@ func (t *table) askHuman(turn brain.Turn) move {
 		Deadline: t.ctx.CurrentTimeUTC().Add(HumanTimeout),
 		Turn:     turn,
 	}
-	p.Turn.Transcript, p.Turn.Notes = nil, game.Notes{} // the page has the log already
+	p.Turn.Transcript, p.Turn.Notes = nil, nil // the page has the log already
 	t.pending = p
 	t.publish()
 	return &humanMove{t: t, turn: turn, wait: t.ctx.WaitForExternalEvent(p.Event, HumanTimeout)}

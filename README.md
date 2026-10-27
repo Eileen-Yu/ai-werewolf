@@ -1,34 +1,55 @@
-# AI Werewolf
+# AI Werewolf 🐺
 
-Nine LLM players sit down to a game of Werewolf, and the game master is a [Dapr Workflow](https://docs.dapr.io/developing-applications/building-blocks/workflow/) running on [Diagrid Catalyst](https://www.diagrid.io/catalyst).
+**Nine AI agents. Three werewolves. Zero trust issues resolved.**
 
-Players fake seer claims, knife their own teammates to bait the witch's antidote, and call each other out. You can kill the game master at any point in a game and start another one: the game picks up where it stopped. Nothing already said is generated again, and no LLM call is repeated.
+A game of Werewolf where LLM agents lie, form alliances, hold grudges, accuse their rivals, and now and then vote out the only person telling the truth.
+
+The cast includes Florida Man, Karen, Discord Mod, Sigma Chad and other internet personalities who should not be trusted with a group decision. In Chinese it is 华妃, 安陵容, 柯南, 派大星 and friends.
+
+And the game master? A [Dapr Workflow](https://docs.dapr.io/developing-applications/building-blocks/workflow/) running on [Diagrid Catalyst](https://www.diagrid.io/catalyst). Kill the process mid-argument, start it again, and the game carries on exactly where it stopped. No forgotten accusations, and no LLM call made twice.
+
+## A perfectly normal day in the village
+
+Condensed from a real game; the quotes are what the players said.
 
 ```text
-[Night 1]   Karen(werewolf) thinks: By targeting NPC Steve, we eliminate a potential threat. Claiming seer will protect us and distract from our true identities.
-[Night 1]   Discord Mod(witch) thinks: I need to use my antidote wisely, and since NPC Steve is dead, saving him is the best option to keep a good player in the game.
-[Day 1] Host: Day breaks. Nobody died last night.
-[Day 1] Karen(werewolf): I'm the seer. I checked Gym Bro, and he is good. We should focus on getting rid of Florida Man today. [claims seer, Gym Bro: good, suspects Florida Man]
-[Day 1] Florida Man(villager): Karen, I see your claim, but targeting me seems like an easy route for you. Gym Bro, what do you think of Karen's claim? [claims villager, suspects Karen]
+[Night 1] Chronically Online Girl (werewolf), to the pack:
+          I'll claim seer in my very first speech and say I checked LinkedIn Influencer as a werewolf.
+
+[Day 1]   Chronically Online Girl (werewolf) claims seer: LinkedIn Influencer is a werewolf.
+[Day 1]   LinkedIn Influencer (the real seer):
+          Speaking seventh means I couldn't counterclaim before her fourth-seat accusation.
+[Day 1]   Host: LinkedIn Influencer is voted out, 7 votes to 1.
+
+[Day 2]   NPC Steve (witch), accused by the fake seer:
+          I'm the witch. I saved Sigma Chad on Night 1.
+[Day 2]   Host: Chronically Online Girl is voted out, 4 votes to 3.
 ```
 
-The game master's output is a god's-eye live feed: what everyone says out loud, what they privately think, and how their read on each player changes over the game.
+Yes, they voted out the real seer. The village worked it out a day later, and the two wolves left still won: on Day 3 they voted out Gym Bro for doing exactly what Gym Bro had said makes a player suspicious, voting differently from what he said he would.
 
-## Features
+The game master's terminal is a god's-eye feed of the chaos: every public accusation, every private thought, and every read that shifts over the game.
 
-- **Standard nine-player game**: 3 werewolves, a seer, a witch, a hunter and 3 villagers. Wolves win by clearing a side.
-- **Players only know what they should**: nobody else's role is ever sent to the model. The filtering happens in code, not in the prompt.
-- **Characters who play differently, not just talk differently**: each has a way of deciding as well as a way of talking. One holds grudges and votes for whoever voted for her; another only follows evidence, even against someone he trusted. An English game seats nine internet archetypes, from Florida Man to Discord Mod, who each have a named rival at the table. A Chinese game seats four pairs of rivals and one of three loners. Seats are in a random order.
-- **The wolves play a different game each time**: the host deals the pack one of three plays, and only the wolves are told. In a counter-claim, one wolf fakes a seer claim and the pack backs him. In deep cover, nobody claims anything and the wolves never vote as a bloc. In the hook, one wolf plays the staunchest good player, even voting out an exposed teammate to be trusted later. Each night the pack agrees who to kill and how to play the day.
-- **Take a seat yourself**: from a web page, play in place of any character, under your own name. Your role is dealt like anyone's, and you see only what that seat sees. If you take more than three minutes over a move, an AI plays it for you and the game goes on.
-- **An MVP every game**: when the game is over, an LLM judge reads the whole record, with every role revealed, and names the most valuable player with a reason. Games with random players pick one by rule: the winning side's most important role still standing.
-- **Players have memory**: everyone keeps notes on what they believe about each other player and why, updated every turn.
-- **Bad answers are sent back**: voting for someone not at the table, quoting someone who never spoke, or "there is no proof" as a reason all get the answer handed back to try again.
-- **A game master you cannot kill**: state and history live in the workflow Catalyst hosts. If the process dies, another one carries on.
-- **Chinese or English**: one setting at the start of a game switches players, rules and speech.
-- **Free to try**: a local mode plays with random players, with no account and no API key.
+## What makes it interesting
+
+- **Personalities with consequences.** Characters do not just sound different; they decide differently. Some follow evidence, some follow the crowd, some hold grudges, and Karen revenge-votes whoever voted for her.
+- **Rivals, even on the same team.** Each character has a rival at the table. Rivals bicker, argue over strategy, and accuse each other, but only with real evidence, like anyone else. Two rival werewolves fight in public and over the plan at night, and still play as a team.
+- **Three ways to be evil.** The pack is secretly dealt a tactic each game: fake a seer claim together, stay in deep cover without voting as a bloc, or have one wolf earn the village's trust by turning on an exposed teammate. They may also kill one of their own at night, to bait the witch's antidote.
+- **Real memory, limited knowledge.** Everyone keeps notes on who they trust, who they suspect and why. Each player receives only the role information they are entitled to know, a werewolf their pack and a seer their checks, and that is enforced in code, not left to the prompt.
+- **No made-up alibis.** Voting for someone not at the table, quoting someone who never spoke, or "there is no proof" as a reason all get the answer sent back to try again.
+- **Take a seat yourself.** From a web page, play in place of any character under your own name. Your role is dealt like anyone's, and if you take more than three minutes over a move, an AI plays it for you.
+- **An MVP every game.** At the end an LLM judge reads the whole record, every role revealed, and names the most valuable player with a reason.
+- **Kill the game master. It comes back.** State and history live in the workflow Catalyst hosts. Finished turns and LLM calls are not repeated after a restart.
+- **Two casts.** English with internet archetypes, or Chinese with meme characters. Roles and seats are random every game.
+- **Try it without an API key.** Local mode plays with random players on a SQLite-backed engine. LLM games use Catalyst's Dapr Conversation API.
+
+Jump to the [Quick start](#quick-start-play-with-llms-on-catalyst) for an LLM game, or [Play locally](#play-locally-no-account-needed) to try it without an account.
+
+Trust nobody. Especially the one who says they're the seer.
 
 ## Rules
+
+A standard nine-player game: 3 werewolves, a seer, a witch, a hunter and 3 villagers.
 
 - **Night**: the werewolves talk in private and pick who to kill (they may pick one of their own). The witch learns who was killed and may save them or poison someone: each potion works once, at most one per night, and she cannot save herself. The seer checks one player.
 - **Dawn**: only who died is announced, not how. A hunter who is out may shoot one player, unless the witch poisoned him. The shot is not announced either: a hunter killed at night shoots before dawn, and the player he shot is simply on the list of the dead. A hunter voted out by day shoots after his last words, and the host only says who has died.

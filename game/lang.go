@@ -103,7 +103,7 @@ func (l Lang) List(names []string) string {
 	return strings.Join(names, "、")
 }
 
-// When is a time on the game clock, such as "Day 2", in this language.
+// When is a time on the game clock: "第2天", or "Day 2".
 func (l Lang) When(round int, p Phase) string {
 	if l == English {
 		s := l.Say(string(p))
@@ -112,7 +112,7 @@ func (l Lang) When(round int, p Phase) string {
 	return fmt.Sprintf("第%d%s", round, l.Say(string(p)))
 }
 
-// Death is how a player left, as everyone knows it, such as "died on
+// Death is how a player left, as everyone knows it: "第1夜死亡", or "died on
 // Night 1".
 func (l Lang) Death(when, how string) string {
 	if l == English {
@@ -121,7 +121,7 @@ func (l Lang) Death(when, how string) string {
 	return when + how
 }
 
-// LineupSummary describes Lineup in this language, such as
+// LineupSummary describes Lineup: "3狼人、1预言家、1女巫、1猎人、3村民", or
 // "3 werewolves, 1 seer, …".
 func (l Lang) LineupSummary() string {
 	counts := map[Role]int{}

@@ -123,7 +123,7 @@ func TestRemoveRecordsHowAndWhen(t *testing.T) {
 	assert.Equal(t, "第2夜死亡", s.Player("小红").Death)
 }
 
-func TestVoteCandidatesKeepWolvesOffEachOther(t *testing.T) {
+func TestAnyoneMayVoteForAnyoneElseAlive(t *testing.T) {
 	s := &State{Players: []Player{
 		{Name: "老王", Role: Werewolf, Alive: true},
 		{Name: "阿杰", Role: Werewolf, Alive: true},
@@ -132,10 +132,8 @@ func TestVoteCandidatesKeepWolvesOffEachOther(t *testing.T) {
 		{Name: "美玲", Role: Villager, Alive: true},
 	}}
 
-	assert.Equal(t, []string{"小红", "美玲"}, s.VoteCandidates("老王"))
+	assert.Equal(t, []string{"阿杰", "小红", "美玲"}, s.VoteCandidates("老王"), "a wolf may turn on a teammate")
 	assert.Equal(t, []string{"老王", "阿杰", "美玲"}, s.VoteCandidates("小红"))
-	assert.Equal(t, []string{"老王", "阿杰"}, s.Pack("阿杰"), "dead wolves are not in the pack")
-	assert.Equal(t, []string{"小红"}, s.Pack("小红"))
 }
 
 func TestRotate(t *testing.T) {
