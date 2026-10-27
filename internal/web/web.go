@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dapr/durabletask-go/api/protos"
 	"github.com/dapr/durabletask-go/workflow"
 
 	"github.com/Eileen-Yu/ai-werewolf/brain"
@@ -102,7 +101,7 @@ func (s *server) game(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusNotFound, err)
 		return
 	}
-	out := gameReply{Status: strings.TrimPrefix(protos.OrchestrationStatus(meta.RuntimeStatus).String(), "ORCHESTRATION_STATUS_")}
+	out := gameReply{Status: strings.TrimPrefix(meta.RuntimeStatus.String(), "ORCHESTRATION_STATUS_")}
 	if v, ok, err := werewolf.ReadView(meta); err != nil {
 		fail(w, http.StatusInternalServerError, err)
 		return

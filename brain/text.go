@@ -117,6 +117,7 @@ var chineseText = text{
 不要说空话套话，比如"值得关注""转移注意力""大家要谨慎""再观察一下""缺乏证据"。每个怀疑都要有具体依据：某人的原话、他的投票、他跳身份的时机，或者别人的声明之间的矛盾。`,
 	strategies: map[game.Role]string{
 		game.Werewolf: "你和狼同伴目标一致，要配合，但配合不等于投一样的票：故意分开投票的狼队更难被看穿。白天按狼队计划执行，局势变了在夜里改计划。" +
+			"好人会翻票型：几个人每天都投同一个人、互相报好人、互相帮腔，一眼就是狼队。所以白天最多两只狼投同一个人，除非多这一票正好能决定谁出局；不要连续两天和同一个同伴同票；不要公开替同伴辩护，要表态就各说各的理由。" +
 			"一般要保护同伴。但有具体的理由时，你可以怀疑、甚至投出同伴：他已经被可信地坐实、反正活不下来；替他说话会把你自己也拖下水；踩他能换来你后面要用的信任；或者牺牲他能让狼队整体赢面更大。" +
 			"卖队友是证据逼出来的例外，不是你做身份的常规手段，更不能只因为私人恩怨。" +
 			"真预言家是你们最大的威胁。女巫的解药可能救下你们的刀，猎人出局会开枪，所以要尽早找出神职并优先杀掉。" +
@@ -130,11 +131,13 @@ var chineseText = text{
 		game.Seer: "你的查验结果是好人阵营最重要的信息。查到狼人时应该果断表明身份、报出所有查验结果，带大家投票。" +
 			"如果有人和你对跳，用你的查验记录、他跳出来的时机和发言里的矛盾揭穿他。跳身份后你今晚很可能被杀，所以要把信息一次报完整。",
 		game.Villager: "你没有任何夜间信息，只能靠分析发言找狼。关注谁的发言前后矛盾、谁在跟风、谁在保护谁、谁的投票和发言不一致。" +
+			"同票一次不算证据，但同一组人连续几天投同一个人、互相报好人、互相帮腔，就是很强的狼队信号；连续平票时，想想改投哪边能打破僵局。" +
 			"如果有两个人都自称预言家，必须判断真假：谁的查验结果和其他人的声明、死亡和投票更吻合，谁跳得更自然。",
 	},
 	tactics: map[game.Tactic]string{
 		game.Counterclaim: "本局狼队的打法是悍跳：计划里指定一只狼，当天第一次发言就跳预言家，报假的查验结果（比如给同伴报好人，给真预言家报狼人），和真预言家对跳争夺信任。" +
-			"其他狼帮他说话，白天一起找计划里要投的人的破绽，一起投他。如果悍跳的狼已经被识破、保不住了，其他狼可以和他切割，像倒钩一样跟着踩他、投他。",
+			"悍跳的狼不要给同伴报好人：给狼报金水、金水再跟着他投票，等于把同伴亮出来。金水报给好人，查杀报给真预言家或者发言最有威胁的好人。" +
+			"其他狼最多一只站边悍跳的狼，另一只装中立甚至站边真预言家，投票时分开投。如果悍跳的狼已经被识破、保不住了，其他狼可以和他切割，像倒钩一样跟着踩他、投他。",
 		game.DeepCover: "本局狼队的打法是潜水：谁都不跳神职，全都装成普通村民。" +
 			"白天不要几只狼一起冲同一个人，也不要互相维护，免得被看出是一伙的；各自附和好人里已经冒出来的怀疑，跟着主流投票。" +
 			"计划里的 focus 是你们各自顺势推一把的人，不是一起冲的人。你们装的是互不相识的村民，所以同伴已经暴露、救不回来时，跟着大家投他反而更符合人设。",
@@ -148,7 +151,7 @@ var chineseText = text{
 		WolfChat: "现在是夜里，只有狼同伴能听到你说话。和同伴商量：今晚杀谁；白天怎么按本局的打法来打，票往谁身上引。",
 		WolfPlan: "夜聊结束，你代表狼队定下最终计划，同伴白天会照着执行，主持人也会检查你的计划和局势是否一致。" +
 			"target 是今晚要杀的人，优先杀可能是神职、或者发言最有威胁的人；也可以自刀，选自己或同伴。" +
-			"focus 是明天要把票引向的人：他明天必须还活着，所以不能是今晚要杀的人。" +
+			"focus 是明天要把票引向的人：他明天必须还活着，所以不能是今晚要杀的人。引票靠好人的票，不靠狼队一起投：speech 里说清楚谁投 focus、谁投别人。" +
 			"speech 写白天按本局打法的具体打法，不超过80字。",
 		LastWords: "你被投票放逐了，发表遗言，不超过80字。",
 		Vote:      "根据今天的发言、回应和主持人汇总的表态，投票放逐一人。",
@@ -257,7 +260,7 @@ var chineseText = text{
 		"随便，%s也行。",
 	},
 	lastWords:  "我是好人，你们一定要找出狼人！",
-	randomPlan: "今晚杀%s，白天一起投%s。",
+	randomPlan: "今晚杀%s，白天把票引向%s。",
 }
 
 var englishText = text{
@@ -310,6 +313,7 @@ No empty filler such as "worth watching", "deflecting", "let's be careful", "let
 Write everything in English.`,
 	strategies: map[game.Role]string{
 		game.Werewolf: "You and your fellow werewolves share one goal, so work together, but working together is not voting together: a pack that splits its votes on purpose is harder to read. Follow the pack's plan by day; if things change, change the plan at night. " +
+			"Good players read the votes: a group that votes for the same person every day, vouches for each other and backs each other up is obviously the pack. So by day at most two werewolves vote for the same person, unless the extra vote is exactly what decides who goes; never vote with the same teammate two days running; never defend a teammate in public, and if you take a side, give your own reason. " +
 			"Protect your teammates as a rule. You may still suspect or vote out a teammate when there is a concrete reason: they are credibly exposed and will not survive anyway, defending them would expose you, turning on them buys trust you will need later, or losing them improves the pack's chances. " +
 			"Sacrificing a teammate is an exception the evidence forces, not your usual way to look good, and never just because you dislike them. " +
 			"The real seer is your biggest threat. The witch's antidote can undo your kill and the hunter shoots when he goes, so find the power roles early and kill them first. " +
@@ -323,11 +327,13 @@ Write everything in English.`,
 		game.Seer: "Your checks are the good side's most important information. When you find a werewolf, claim seer firmly, report every check and lead the vote. " +
 			"If someone counter-claims, expose them with your check record, the timing of their claim and the contradictions in what they said. Once you claim you will probably be killed that night, so report everything at once.",
 		game.Villager: "You have no night information; you find werewolves by reading the table. Watch for who contradicts themselves, who just follows others, who protects whom, and whose vote does not match their words. " +
+			"Voting together once proves nothing, but the same group voting for the same person day after day, vouching for each other and backing each other up is a strong sign of the pack; after a tied vote, think about which side to switch to so the tie breaks. " +
 			"If two people both claim seer, you must decide which is real: whose checks fit the other claims, the deaths and the votes better, and whose claim came more naturally.",
 	},
 	tactics: map[game.Tactic]string{
-		game.Counterclaim: "This game the pack plays the counter-claim: the plan names one werewolf who claims seer in their very first speech and reports a fake check (a teammate as good, or the real seer as a werewolf) to fight the real seer for the table's trust. " +
-			"The rest of you back them up, and all go after and vote out the person the plan names. If the faker is seen through and cannot be saved, the rest of you may cut them loose and pile on, as a hook would.",
+		game.Counterclaim: "This game the pack plays the counter-claim: the plan names one werewolf who claims seer in their very first speech and reports a fake check to fight the real seer for the table's trust. " +
+			"The faker never reports a teammate as good: vouching for a werewolf who then votes with you gives them away. Report good players as good, and the real seer or the most dangerous good player as a werewolf. " +
+			"At most one of the others sides with the faker; another plays neutral or even backs the real seer, and you split your votes. If the faker is seen through and cannot be saved, the rest of you may cut them loose and pile on, as a hook would.",
 		game.DeepCover: "This game the pack plays deep cover: none of you claims a power role; you all pass as plain villagers. " +
 			"By day, never pile onto the same person together and never defend each other, or you will be read as a team; each of you echoes a suspicion a good player has already raised and votes with the majority. " +
 			"The plan's focus is someone each of you nudges along, not someone you charge together. You are playing strangers, so when a teammate is exposed and done for, voting them out with the table fits your cover.",
@@ -341,7 +347,7 @@ Write everything in English.`,
 		WolfChat: "It is night, and only your fellow werewolves can hear you. Agree on who to kill tonight and how to play the day the way this game's play calls for, and who to push the vote onto.",
 		WolfPlan: "The night chat is over. Set the pack's final plan; your teammates will follow it by day, and the host will check it against the game. " +
 			"target is who to kill tonight: ideally someone who may hold a power role, or whose speeches are most dangerous to you; you may also self-kill, picking yourself or a teammate. " +
-			"focus is who the pack steers the vote onto tomorrow: they must still be alive then, so not tonight's target. " +
+			"focus is who the pack steers the vote onto tomorrow: they must still be alive then, so not tonight's target. You steer with good players' votes, not by all voting together: say in speech who votes for focus and who votes elsewhere. " +
 			"speech is how you play the day this game's way, at most 40 words.",
 		LastWords: "You have been voted out. Give your last words, at most 40 words.",
 		Vote:      "Based on today's speeches, replies and the stances the host summed up, vote one person out.",
@@ -450,5 +456,5 @@ Write everything in English.`,
 		"Whatever, %s works.",
 	},
 	lastWords:  "I'm good! You have to find the werewolves!",
-	randomPlan: "Kill %s tonight, and all vote %s tomorrow.",
+	randomPlan: "Kill %s tonight, and steer the vote onto %s tomorrow.",
 }

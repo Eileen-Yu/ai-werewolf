@@ -7,6 +7,7 @@
 <style>
   :root { color-scheme: dark; --bg:#14161c; --card:#1d2029; --line:#2c303b; --dim:#8b90a0; --accent:#e0a84a; --wolf:#d9534f; }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body { margin:0; font:15px/1.55 system-ui, -apple-system, "PingFang SC", sans-serif; background:var(--bg); color:#e6e6ea; }
   main { max-width: 1100px; margin: 0 auto; padding: 20px; }
   h1 { font-size: 22px; margin: 0 0 16px; }
@@ -209,9 +210,9 @@ function showTurn(p, t, w) {
   if (declares) {
     const others = turn.seats.map(s => s.name).filter(n => n !== turn.me.name);
     h += `<label>${t.suspect}</label><select name="suspect">${opts(turn.suspects || [])}</select>`;
-    h += `<label>${t.claim}</label><div class="row"><select name="claimRole"><option value="">${t.noClaim}</option>${opts(["seer", "witch", "hunter", "villager"])}</select>`;
-    h += `<select name="claimTarget">${opts(others, true)}</select><select name="claimResult">${opts(["good", "werewolf"], true)}</select></div>`;
-    h += `<div class="dim" id="claimHint"></div>`;
+    h += `<label>${t.claim}</label><select name="claimRole"><option value="">${t.noClaim}</option>${opts(["seer", "witch", "hunter", "villager"])}</select>`;
+    h += `<div class="row" id="claimDetail"><div><label id="claimTargetLabel"></label><select name="claimTarget">${opts(others, true)}</select></div>`;
+    h += `<div id="claimResultBox"><label>${t.claimResult}</label><select name="claimResult">${opts(["good", "werewolf"], true)}</select></div></div>`;
   }
   if (speaks) h += `<label>${k === "wolf_plan" ? t.planSpeech : t.speech}</label><textarea name="speech"></textarea>`;
   h += `<button type="submit">${t.submit}</button>`;
@@ -222,9 +223,9 @@ function showTurn(p, t, w) {
   if (declares) {
     const sync = () => {
       const r = f.elements.claimRole.value;
-      f.elements.claimTarget.hidden = !named(r);
-      f.elements.claimResult.hidden = r !== "seer";
-      $("claimHint").textContent = r === "seer" ? `${t.claimChecked} · ${t.claimResult}` : r === "witch" ? t.claimPotion : "";
+      $("claimDetail").hidden = !named(r);
+      $("claimResultBox").hidden = r !== "seer";
+      $("claimTargetLabel").textContent = r === "seer" ? t.claimChecked : t.claimPotion;
     };
     f.elements.claimRole.onchange = sync;
     sync();

@@ -236,21 +236,24 @@ func (b *firstVotes) Act(ctx context.Context, t brain.Turn) (brain.Action, error
 	return brain.Random{}.Act(ctx, t)
 }
 
-func TestOnlyWolvesGetThePlanAndNeverSuspectEachOther(t *testing.T) {
+func TestOnlyWolvesGetThePlanAndAnyWolfMayTurnOnATeammate(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
-	for _, tactic := range []game.Tactic{game.Counterclaim, game.DeepCover} {
+	for _, tactic := range []game.Tactic{game.Counterclaim, game.DeepCover, game.Hook} {
 		b := &planWatcher{}
 		SetBrain(b)
 		g := newGame()
 		g.Tactic = tactic
 		play(t, client, "plan-"+string(tactic), g)
 		require.NotEmpty(t, b.turns)
-		checkWolvesStandTogether(t, b.turns)
+		checkWolvesMayTurnOnEachOther(t, b.turns)
 	}
 }
 
-func checkWolvesStandTogether(t *testing.T, turns []brain.Turn) {
+// checkWolvesMayTurnOnEachOther checks only wolves get the pack and the plan,
+// and that whether to name a teammate is every wolf's own call, whatever the
+// tactic: each living teammate is on every wolf's vote and suspect list.
+func checkWolvesMayTurnOnEachOther(t *testing.T, turns []brain.Turn) {
 	t.Helper()
 	for _, turn := range turns {
 		if turn.Me.Role != game.Werewolf {
@@ -259,44 +262,20 @@ func checkWolvesStandTogether(t *testing.T, turns []brain.Turn) {
 			continue
 		}
 		assert.Contains(t, turn.Pack, turn.Me.Name)
-		for _, wolf := range turn.Pack {
-			assert.NotContains(t, turn.Suspects, wolf, "%s may not suspect a teammate", turn.Me.Name)
-		}
 		if turn.Kind == brain.Speech {
 			require.NotNil(t, turn.Plan, "%s speaks on day %d without the plan", turn.Me.Name, turn.Round)
 			assert.Equal(t, turn.Round, turn.Plan.Round)
 		}
-	}
-}
-
-func TestOnlyTheHookMayTurnOnATeammate(t *testing.T) {
-	client := startEngine(t)
-	startWorker(t, client)
-	turnedOn := false
-	for i := range 6 {
-		b := &turnRecorder{}
-		SetBrain(b)
-		g := newGame()
-		g.Tactic = game.Hook
-		play(t, client, fmt.Sprintf("hook-%d", i), g)
-		for _, turn := range b.turns {
-			if turn.Me.Role != game.Werewolf || (turn.Kind != brain.Vote && !turn.Kind.Declares()) {
-				continue
-			}
-			names := turn.Suspects
-			if turn.Kind == brain.Vote {
-				names = turn.Candidates
-			}
-			for _, wolf := range game.Without(turn.Pack, turn.Me.Name) {
-				if slices.Contains(names, wolf) {
-					require.NotNil(t, turn.Plan, "%s may name %s with no plan", turn.Me.Name, wolf)
-					assert.Equal(t, turn.Me.Name, turn.Plan.Hook, "%s may name %s without being the hook", turn.Me.Name, wolf)
-					turnedOn = true
-				}
-			}
+		names := turn.Suspects
+		if turn.Kind == brain.Vote {
+			names = turn.Candidates
+		} else if !turn.Kind.Declares() {
+			continue
+		}
+		for _, wolf := range game.Without(turn.Pack, turn.Me.Name) {
+			assert.Contains(t, names, wolf, "%s may name teammate %s on a %s turn", turn.Me.Name, wolf, turn.Kind)
 		}
 	}
-	assert.True(t, turnedOn, "in six games the hook never had a teammate to turn on")
 }
 
 func TestThePackIsDealtATacticOnlyTheWolvesAreTold(t *testing.T) {

@@ -26,15 +26,15 @@ var HumanTimeout = 3 * time.Minute
 // View is the game as the human player sees it, kept in the workflow's custom
 // status for the web page to read.
 type View struct {
-	You     string       `json:"you"`
-	Lang    game.Lang    `json:"lang"`
-	Role    string       `json:"role"`
-	Pack    []string     `json:"pack,omitempty"`
-	Alive   bool         `json:"alive"`
-	Round   int          `json:"round"`
-	When    string       `json:"when"`
-	Seats   []brain.Seat `json:"seats"`
-	Log     []Line       `json:"log"`
+	You   string       `json:"you"`
+	Lang  game.Lang    `json:"lang"`
+	Role  string       `json:"role"`
+	Pack  []string     `json:"pack,omitempty"`
+	Alive bool         `json:"alive"`
+	Round int          `json:"round"`
+	When  string       `json:"when"`
+	Seats []brain.Seat `json:"seats"`
+	Log   []Line       `json:"log"`
 	// LastVote is how everyone voted on the latest day.
 	LastVote *LastVote `json:"lastVote,omitempty"`
 	Pending  *Pending  `json:"pending,omitempty"`
@@ -99,7 +99,7 @@ func (t *table) askHuman(turn brain.Turn) move {
 		Deadline: t.ctx.CurrentTimeUTC().Add(HumanTimeout),
 		Turn:     turn,
 	}
-	p.Turn.Transcript, p.Turn.Notes = nil, nil // the page has the log already
+	p.Turn.Transcript, p.Turn.Notes = nil, game.Notes{} // the page has the log already
 	t.pending = p
 	t.publish()
 	return &humanMove{t: t, turn: turn, wait: t.ctx.WaitForExternalEvent(p.Event, HumanTimeout)}

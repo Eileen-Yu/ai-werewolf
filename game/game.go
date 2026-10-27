@@ -73,7 +73,7 @@ type Player struct {
 	// Human marks the seat a person plays from the web page.
 	Human bool `json:"human,omitempty"`
 	Role  Role `json:"role,omitempty"`
-	Alive   bool   `json:"alive"`
+	Alive bool `json:"alive"`
 	// Death is what everyone knows about how the player left the game, e.g.
 	// "died on Night 1": at night only that they died, not who killed them.
 	Death string `json:"death,omitempty"`
