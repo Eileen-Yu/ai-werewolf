@@ -107,6 +107,7 @@ go test ./...
 `werewolf/workflow_test.go` runs an in-memory engine inside the test process and plays 10 full games with random players, covering the witch's and hunter's cases. Two more cases:
 
 - The witch is scripted to save the victim, and the night must pass with no death; the wolves, and only the wolves, are told their victim survived.
+- The pack kills its own plan-writer on the first night and the witch saves him: he lives to speak on Day 1, and the pack is told he survived.
 - The game master worker is killed mid-game and a new one takes over, and the game must still finish.
 - In random games, where the witch saves and poisons and the hunter shoots at random, no public host line may mention a kill, a potion, a shot or a power role, and every seat must show only when its player died or that they were voted out.
 - A scripted Day 1 election: only the living are asked to run, only candidates campaign, only the rest vote, the sheriff speaks last that day, every later turn shows the right sheriff, and a sheriff who is out passes the badge to someone alive or tears it up.

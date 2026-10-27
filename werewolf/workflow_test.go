@@ -64,6 +64,48 @@ func TestWitchSavingTheVictimMakesAPeacefulNight(t *testing.T) {
 	assert.Zero(t, b.othersTold, "someone other than a wolf was told who the wolves killed")
 }
 
+func TestAWolfWhoKillsHimselfAndIsSavedLivesOn(t *testing.T) {
+	client := startEngine(t)
+	startWorker(t, client)
+	b := &selfKillingPack{}
+	SetBrain(b)
+	playGame(t, client, "self-kill")
+
+	require.NotEmpty(t, b.victim, "the pack never planned a kill")
+	assert.Equal(t, b.victim, b.saved, "the witch was told the wolf was the victim and saved him")
+	assert.True(t, b.spokeDay1, "the wolf who killed himself and was saved spoke on Day 1")
+	assert.True(t, b.toldSurvived, "the pack was told its victim survived")
+}
+
+// selfKillingPack plays randomly except that on the first night the pack
+// kills whoever writes the plan, and the witch saves whoever she is told of.
+type selfKillingPack struct {
+	mu                      sync.Mutex
+	victim, saved           string
+	spokeDay1, toldSurvived bool
+}
+
+func (b *selfKillingPack) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	switch {
+	case t.Kind == brain.WolfPlan && t.Round == 1:
+		a, err := brain.Random{}.Act(ctx, t)
+		a.Target, b.victim = t.Me.Name, t.Me.Name
+		if a.Focus == t.Me.Name {
+			a.Focus = ""
+		}
+		return a, err
+	case t.Kind == brain.Save && t.Round == 1:
+		b.saved = t.Candidates[0]
+		return brain.Action{Target: t.Candidates[0]}, nil
+	case t.Kind == brain.Speech && t.Round == 1 && t.Me.Name == b.victim:
+		b.spokeDay1 = true
+		b.toldSurvived = slices.ContainsFunc(t.Transcript, func(e game.Event) bool { return strings.Contains(e.Text, b.victim+"没有死") })
+	}
+	return brain.Random{}.Act(ctx, t)
+}
+
 func TestTheWitchMaySaveHerselfOnlyOnTheFirstNight(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
