@@ -37,6 +37,7 @@
   .err { color:var(--wolf); margin-top:8px; white-space: pre-wrap; }
   .row { display:flex; gap:8px; } .row > * { flex:1; }
   .mvp { font-size:17px; } .mvp b { color:var(--accent); }
+  button.secondary { background:transparent; color:var(--accent); border:1px solid var(--accent); padding:5px 12px; margin:10px 8px 0 0; }
 </style>
 </head>
 <body>
@@ -65,6 +66,7 @@
           <div><span id="youAre"></span> <span id="role" class="role"></span></div>
           <div class="dim" id="pack"></div>
           <div class="seats" id="seats" style="margin-top:10px"></div>
+          <button id="voiceBtn" class="secondary" type="button"></button>
         </div>
         <div class="card" id="votes" hidden></div>
         <div class="card" id="turnCard" hidden>
@@ -94,6 +96,7 @@ const UI = {
     claim: "声称身份（可选）", noClaim: "不声称", claimChecked: "查验了谁", claimResult: "查验结果", claimPotion: "救了/毒了谁",
     votes: w => `${w}票型`, abstain: "弃票", ballots: n => `${n}票`,
     faker: "谁来悍跳预言家", hook: "谁来倒钩（白天踩队友）", focus: "白天集中投谁（可选）", none: "（不选）",
+    voiceOn: "🔊 语音朗读：开", voiceOff: "🔇 语音朗读：关", mic: "🎤 语音输入", micStop: "⏹ 停止录音", micErr: "语音输入出错：",
     over: "游戏结束", winner: w => `${w}胜利`, mvp: "MVP", failed: "游戏出错：", host: "主持人", again: "再来一局",
   },
   en: {
@@ -109,6 +112,7 @@ const UI = {
     claim: "Claim a role (optional)", noClaim: "No claim", claimChecked: "Who you checked", claimResult: "What you saw", claimPotion: "Who you saved or poisoned",
     votes: w => `${w} votes`, abstain: "Abstained", ballots: n => `${n} vote${n === 1 ? "" : "s"}`,
     faker: "Who fakes the seer", hook: "Who plays the hook (turns on a packmate by day)", focus: "Who the pack votes tomorrow (optional)", none: "(none)",
+    voiceOn: "🔊 Read aloud: on", voiceOff: "🔇 Read aloud: off", mic: "🎤 Speak", micStop: "⏹ Stop", micErr: "Voice input failed: ",
     over: "Game over", winner: w => `The ${w} side wins`, mvp: "MVP", failed: "The game failed: ", host: "Host", again: "Play again",
   },
 };
@@ -157,6 +161,7 @@ function render(v) {
   view = v;
   const t = UI[v.lang] || UI.zh, w = k => v.words[k] || k;
   document.title = $("title").textContent = t.title;
+  $("voiceBtn").textContent = voice.on ? t.voiceOn : t.voiceOff;
   $("when").textContent = v.when;
   $("youAre").textContent = `${v.you}，${t.youAre}`;
   $("role").textContent = v.role;
@@ -171,6 +176,7 @@ function render(v) {
     d.className = "line" + (l.speaker ? "" : " host") + (l.private ? " private" : "") + (l.speaker === v.you ? " mine" : "");
     d.innerHTML = `<span class="when">${esc(l.when)}</span><span class="who">${esc(l.speaker || t.host)}:</span>${esc(l.text)}`;
     log.appendChild(d);
+    if (l.speaker !== v.you) speakLine(l, v.lang);
   }
   logCount = v.log.length;
   if (atBottom) log.scrollTop = log.scrollHeight;
@@ -225,6 +231,7 @@ function showTurn(p, t, w) {
   if (speaks) h += `<label>${k === "wolf_plan" ? t.planSpeech : t.speech}</label><textarea name="speech"></textarea>`;
   h += `<button type="submit">${t.submit}</button>`;
   f.innerHTML = h;
+  if (speaks) addMic(f, view.lang, t);
   // A seer claim names who was checked and what they were; a witch claim names
   // who got a potion; other claims name nobody.
   const named = r => r === "seer" || r === "witch";
@@ -243,9 +250,10 @@ function showTurn(p, t, w) {
     const d = Object.fromEntries(new FormData(f)), a = {};
     for (const key of ["target", "speech", "suspect", "faker", "hook", "focus"]) if (d[key]) a[key] = d[key].trim();
     if (d.claimRole) a.claim = { role: d.claimRole, target: named(d.claimRole) ? d.claimTarget || "" : "", result: d.claimRole === "seer" ? d.claimResult || "" : "" };
-    f.querySelector("button").disabled = true;
+    stopMic();
+    f.querySelector("button[type=submit]").disabled = true;
     try { await api(`/api/games/${encodeURIComponent(gameId)}/moves`, { event: p.event, action: a }); $("turnCard").hidden = true; }
-    catch (err) { $("turnErr").textContent = err.message; f.querySelector("button").disabled = false; }
+    catch (err) { $("turnErr").textContent = err.message; f.querySelector("button[type=submit]").disabled = false; }
   };
   clearInterval(timer);
   const tick = () => {
@@ -257,6 +265,7 @@ function showTurn(p, t, w) {
 
 function finish(g) {
   clearInterval(timer);
+  stopMic();
   $("turnCard").hidden = true; $("waiting").hidden = true;
   const t = UI[(view && view.lang) || "zh"], r = $("result");
   r.hidden = false;
@@ -266,6 +275,72 @@ function finish(g) {
     (res.mvp && res.mvp.name ? `<p class="mvp">${t.mvp}: <b>${esc(res.mvp.name)}</b></p><p>${esc(res.mvp.reason)}</p>` : "") +
     `<a href="/"><button>${t.again}</button></a>`;
 }
+
+// ---- voice ----
+// Read-aloud uses the browser's speech synthesis and voice input its speech
+// recognition, so nothing is sent through the game master. Read-aloud starts
+// off: browsers only let a page speak after the person has clicked something.
+const voice = { on: false };
+const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null;
+
+$("voiceBtn").onclick = () => {
+  voice.on = !voice.on;
+  if (!voice.on) speechSynthesis.cancel();
+  const t = UI[(view && view.lang) || "zh"];
+  $("voiceBtn").textContent = voice.on ? t.voiceOn : t.voiceOff;
+};
+$("voiceBtn").hidden = !window.speechSynthesis;
+
+function hash(s) { let h = 7; for (const c of s) h = (h * 31 + c.codePointAt(0)) >>> 0; return h; }
+
+// speakLine reads a new line of the log aloud, each character with a voice,
+// pitch and pace of their own so the table can be followed by ear. Claim tags
+// like 【声称预言家…】 are for reading, not for saying.
+function speakLine(l, lang) {
+  if (!voice.on || !window.speechSynthesis) return;
+  const text = l.text.replace(/【[^】]*】|\[[^\]]*\]/g, "").trim();
+  if (!text) return;
+  const u = new SpeechSynthesisUtterance(l.speaker ? `${l.speaker}：${text}` : text);
+  u.lang = lang === "en" ? "en-US" : "zh-CN";
+  // Prefer the exact accent (Mandarin over Cantonese, say) when there is one.
+  const all = speechSynthesis.getVoices(), tag = x => x.lang.replace("_", "-");
+  const exact = all.filter(x => tag(x) === u.lang);
+  const voices = exact.length ? exact : all.filter(x => tag(x).startsWith(lang === "en" ? "en" : "zh"));
+  const h = hash(l.speaker || "");
+  if (voices.length) u.voice = voices[l.speaker ? h % voices.length : 0];
+  if (l.speaker) {
+    u.pitch = 0.7 + (h % 7) / 10;
+    u.rate = 0.95 + ((h >> 3) % 4) / 10;
+  }
+  speechSynthesis.speak(u);
+}
+
+// addMic puts a voice-input button under the speech box: what the person says
+// is typed into the box, where they can fix it before submitting. Read-aloud
+// pauses meanwhile, so the microphone does not pick it up.
+function addMic(f, lang, t) {
+  const box = f.elements.speech;
+  if (!box || !Recognition) return;
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "secondary"; b.textContent = t.mic;
+  box.after(b);
+  b.onclick = () => {
+    if (rec) { stopMic(); return; }
+    const before = box.value;
+    rec = new Recognition();
+    rec.lang = lang === "en" ? "en-US" : "zh-CN";
+    rec.continuous = true; rec.interimResults = true;
+    rec.onresult = e => { box.value = before + [...e.results].map(x => x[0].transcript).join(""); };
+    rec.onerror = e => { $("turnErr").textContent = t.micErr + e.error; };
+    rec.onend = () => { rec = null; b.textContent = t.mic; if (window.speechSynthesis) speechSynthesis.resume(); };
+    if (window.speechSynthesis) speechSynthesis.pause();
+    rec.start();
+    b.textContent = t.micStop;
+  };
+}
+
+function stopMic() { if (rec) rec.stop(); }
 
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
