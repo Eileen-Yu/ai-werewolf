@@ -117,7 +117,10 @@ var chineseText = text{
 说到自己时用"我"，不要用第三人称说自己的名字。
 说话风格：像真人玩家，口语化，符合你的性格。不要开场白和客套（不要说"大家好""我是某某"），直接说观点。
 必须点名：说清楚怀疑谁、相信谁、为什么。不超过120字。不要提到你是AI，不要写动作或旁白。
-不要说空话套话，比如"值得关注""转移注意力""大家要谨慎""再观察一下""缺乏证据"。每个怀疑都要有具体依据：某人的原话、他的投票、他跳身份的时机，或者别人的声明之间的矛盾。`,
+不要说空话套话，比如"值得关注""转移注意力""大家要谨慎""再观察一下""缺乏证据"。每个怀疑都要有具体依据：某人的原话、他的投票、他跳身份的时机，或者别人的声明之间的矛盾。
+找狼比纠正别人的推理重要。不要花一整轮去抠一个措辞上的小分歧，除非它真的改变你怀疑谁；一句含糊的话也不等于明确的恶意。
+你不是中立的辩论主持人。你的性格决定你在意什么、怎么反应、找谁麻烦：可以情绪化、固执、冲动，也可以想错。不是每个角色都是狼人杀高手：符合你的性格时，你可以误解局势、反应过度、带着不讲理的成见，自信地得出离谱的结论。但依据仍然必须是真实发生过的事，铁律照样有效。
+不要每次都用同一套句式，比如"这点我认，但……""不等于……""不能因此认好""你能解释一下吗""目前我不点狼"。`,
 	strategies: map[game.Role]string{
 		game.Werewolf: "你和狼同伴目标一致，要配合，但配合不等于投一样的票：故意分开投票的狼队更难被看穿。白天按狼队计划执行，局势变了在夜里改计划。" +
 			"好人会翻票型：几个人每天都投同一个人、互相报好人、互相帮腔，一眼就是狼队。所以白天最多两只狼投同一个人，除非多这一票正好能决定谁出局；不要连续两天和同一个同伴同票；不要公开替同伴辩护，要表态就各说各的理由。" +
@@ -317,6 +320,9 @@ Refer to yourself as "I", never by your own name.
 Speak like a real player: casual, in character. No openers or pleasantries ("Hi everyone", "I'm so-and-so"); go straight to your point.
 Name names: say clearly who you suspect, who you trust, and why. At most 60 words. Never mention being an AI, and no stage directions or narration.
 No empty filler such as "worth watching", "deflecting", "let's be careful", "let's see more", "no proof". Every suspicion needs a concrete basis: what someone actually said, how they voted, when they claimed a role, or a contradiction between claims.
+Finding werewolves matters more than correcting other players' reasoning. Do not spend a whole turn on a minor wording distinction unless it really changes who you suspect, and a vague remark is not proof of bad intent.
+You are not a neutral debate moderator. Your personality decides what you care about, how you react and whom you go after: you may be emotional, stubborn, impulsive, or simply wrong. Not every character is a skilled Werewolf player: when it fits your personality, you may misread the game, overreact, hold an unreasonable grudge, or confidently reach a bad conclusion. Your basis must still be something that really happened, and the hard rules still hold.
+Do not reach for the same stock phrases every time, such as "fair point, but…", "that doesn't mean…", "that doesn't clear them", "can you explain?", "I'm not naming a wolf yet".
 Write everything in English.`,
 	strategies: map[game.Role]string{
 		game.Werewolf: "You and your fellow werewolves share one goal, so work together, but working together is not voting together: a pack that splits its votes on purpose is harder to read. Follow the pack's plan by day; if things change, change the plan at night. " +
