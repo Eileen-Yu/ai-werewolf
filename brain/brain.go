@@ -32,6 +32,10 @@ const (
 	Withdraw    TurnKind = "withdraw"     // after the campaign: a candidate stays in, or passes to withdraw
 	SheriffVote TurnKind = "sheriff_vote" // everyone not running picks a candidate
 	Badge       TurnKind = "badge"        // a sheriff on the way out passes the badge on, or tears it up
+
+	// Prepare brings a player's notes up to date while someone else is still
+	// speaking, so their own turn only has the latest speech left to take in.
+	Prepare TurnKind = "prepare"
 )
 
 // IsChoice reports whether the turn asks for a Target.
@@ -46,7 +50,7 @@ func (k TurnKind) IsChoice() bool {
 // Speaks reports whether the turn asks for a Speech. A wolf plan asks for
 // both a victim and, as its speech, the plan for the day.
 func (k TurnKind) Speaks() bool {
-	return !k.IsChoice() || k == WolfPlan
+	return (!k.IsChoice() && k != Prepare) || k == WolfPlan
 }
 
 // Declares reports whether a speech must also state, on the record, who the
@@ -90,13 +94,18 @@ type Turn struct {
 	Tactic game.Tactic `json:"tactic,omitempty"`
 	// Ballots is every vote so far, which everyone saw.
 	Ballots []game.Ballot `json:"ballots,omitempty"`
+	// Prepared is set on a turn whose notes were brought up to date by a
+	// Prepare turn just before the latest speech.
+	Prepared bool `json:"prepared,omitempty"`
 }
 
 // Action is a player's move.
 //
 // Observations, Thinking and Notes are private and are the player's memory:
 // what has newly happened, how they reasoned about this move, and what they
-// now believe and plan. Notes replaces their previous notes.
+// now believe and plan. Notes updates their previous notes: a belief given
+// replaces the old one about that player, others are kept, and an empty
+// strategy keeps the old one.
 //
 // Speech is said aloud and Target is the pick on a choice turn. Suspect and
 // Claim are a declaring speech's stance, put on the record so others can hold
@@ -126,6 +135,9 @@ func (t Turn) Check(a Action) error {
 	var problems []string
 	if t.Kind.IsChoice() && !slices.Contains(t.Candidates, a.Target) {
 		problems = append(problems, fmt.Sprintf(tx.badTarget, l.List(l.SayAll(t.Candidates)), a.Target))
+	}
+	if t.Kind == Prepare && a.Notes == nil {
+		problems = append(problems, tx.noNotes)
 	}
 	if t.Kind.Speaks() && a.Speech == "" {
 		problems = append(problems, tx.emptySpeech)

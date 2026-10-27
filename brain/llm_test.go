@@ -399,13 +399,16 @@ func TestEnglishPromptsAreAllEnglish(t *testing.T) {
 			{Round: 1, Sheriff: "Mia", Votes: []game.Vote{{Voter: "Mia", Target: "Ruby"}, {Voter: "Dave"}}},
 		},
 	}
-	for _, kind := range []TurnKind{Speech, Rebuttal, WolfChat, WolfPlan, LastWords, Vote, Inspect, Save, Poison, Shoot, Run, Campaign, Withdraw, SheriffVote, Badge} {
+	for _, kind := range []TurnKind{Speech, Rebuttal, WolfChat, WolfPlan, LastWords, Vote, Inspect, Save, Poison, Shoot, Run, Campaign, Withdraw, SheriffVote, Badge, Prepare} {
 		turn := base
 		turn.Kind = kind
 		system, user := prompt(turn)
 		assert.False(t, han.MatchString(system), "%s system prompt: %q", kind, han.FindAllString(system, 5))
 		assert.False(t, han.MatchString(user), "%s prompt: %q", kind, han.FindAllString(user, 5))
 		assert.NotContains(t, user, "：", "%s prompt has a full-width colon", kind)
+		turn.Prepared = true
+		system, user = prompt(turn)
+		assert.False(t, han.MatchString(system+user), "%s prepared prompt: %q", kind, han.FindAllString(system+user, 5))
 
 		err := turn.Check(Action{
 			Target: "Walter", Suspect: "Walter", Faker: "Dave", Focus: "Ruby", Claim: &game.Claim{Role: "mayor"},
@@ -524,4 +527,30 @@ func TestDeepCoverWolvesPushRatherThanFollow(t *testing.T) {
 	assert.NotContains(t, chineseText.tactics[game.DeepCover], "跟着主流投票")
 	assert.Contains(t, chineseText.tactics[game.DeepCover], "潜水不等于不说话")
 	assert.NotContains(t, englishText.tactics[game.DeepCover], "votes with the majority")
+}
+
+func TestPreparingWritesOnlyNotesAndTheTurnAfterOnlyWhatChanged(t *testing.T) {
+	base := Turn{Round: 1, Phase: game.Day, Me: game.Player{Name: "小红"}, Seats: []Seat{{Name: "小红"}, {Name: "老王"}}, Suspects: []string{"老王", game.Nobody}}
+
+	prep := base
+	prep.Kind = Prepare
+	_, user := prompt(prep)
+	assert.Contains(t, user, "现在还没轮到你发言")
+	assert.NotContains(t, user, `"speech"`, "preparing says nothing")
+	assert.Contains(t, user, chineseText.notesLine)
+	assert.ErrorContains(t, prep.Check(Action{}), "notes")
+	assert.NoError(t, prep.Check(Action{Notes: &game.Notes{Strategy: "等老王说完"}}))
+
+	speech := base
+	speech.Kind, speech.Prepared = Speech, true
+	_, user = prompt(speech)
+	assert.Contains(t, user, chineseText.preparedLine)
+	assert.Contains(t, user, chineseText.fields.changedNotes)
+	assert.Contains(t, user, chineseText.changedNotesLine)
+	assert.NotContains(t, user, chineseText.notesLine, "a prepared turn does not rewrite every note")
+	assert.NoError(t, speech.Check(Action{Speech: "老王有问题", Suspect: "老王"}), "notes may be left out")
+
+	speech.Prepared = false
+	_, user = prompt(speech)
+	assert.Contains(t, user, chineseText.notesLine)
 }

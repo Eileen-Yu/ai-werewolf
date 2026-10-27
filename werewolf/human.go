@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/dapr/durabletask-go/task"
@@ -32,12 +33,16 @@ type View struct {
 	Pack  []string     `json:"pack,omitempty"`
 	Alive bool         `json:"alive"`
 	Round int          `json:"round"`
+	Phase game.Phase   `json:"phase"`
 	When  string       `json:"when"`
 	Seats []brain.Seat `json:"seats"`
 	Log   []Line       `json:"log"`
 	// LastVote is how everyone voted on the latest day.
 	LastVote *LastVote `json:"lastVote,omitempty"`
 	Pending  *Pending  `json:"pending,omitempty"`
+	// Now is what the table is waiting on, as anyone at a real table could
+	// tell: whose speech, a vote, the wolves at night. Never a role's move.
+	Now *Activity `json:"now,omitempty"`
 	// Words are the game's own words in the game's language, for the page.
 	Words map[string]string `json:"words"`
 }
@@ -56,6 +61,77 @@ type LastVote struct {
 	Votes []game.Vote `json:"votes"`
 	// Sheriff is whose vote counted one and a half that day, if anyone's.
 	Sheriff string `json:"sheriff,omitempty"`
+}
+
+// Activity is something the table is waiting on. Kind is the public part of
+// the turn: "wolves" and "night" for night moves, "wait" for a hunter's shot,
+// which would give the hunter away, and otherwise the turn kind. Name is who
+// is moving, where everyone can see it, and Waiting how many moves of this
+// kind are still out.
+type Activity struct {
+	Kind    string    `json:"kind"`
+	Name    string    `json:"name,omitempty"`
+	Waiting int       `json:"waiting,omitempty"`
+	Since   time.Time `json:"since"`
+}
+
+// publicActivity is what everyone at the table can tell about a turn.
+func publicActivity(turn brain.Turn) (kind, name string) {
+	switch turn.Kind {
+	case brain.WolfChat, brain.WolfPlan:
+		return "wolves", ""
+	case brain.Inspect, brain.Save, brain.Poison:
+		return "night", ""
+	case brain.Shoot:
+		return "wait", ""
+	case brain.Speech, brain.Rebuttal, brain.Campaign, brain.LastWords, brain.Badge:
+		return string(turn.Kind), turn.Me.Name
+	}
+	return string(turn.Kind), ""
+}
+
+// busyMove is an AI move the page is told the table is waiting on.
+type busyMove struct {
+	t *table
+	a *Activity
+	m move
+}
+
+func (t *table) busy(turn brain.Turn, m move) move {
+	kind, name := publicActivity(turn)
+	a := &Activity{Kind: kind, Name: name, Since: t.ctx.CurrentTimeUTC()}
+	t.now = append(t.now, a)
+	t.publish()
+	return &busyMove{t: t, a: a, m: m}
+}
+
+func (b *busyMove) Await(v any) error {
+	err := b.m.Await(v)
+	b.t.now = slices.DeleteFunc(b.t.now, func(a *Activity) bool { return a == b.a })
+	b.t.publish()
+	return err
+}
+
+// doing is what the page shows the table waiting on: the wolves while they
+// are at it, since the night's other moves are hidden among theirs, and
+// otherwise the longest wait.
+func (t *table) doing() *Activity {
+	var now *Activity
+	for _, a := range t.now {
+		if now == nil || (a.Kind == "wolves" && now.Kind != "wolves") {
+			now = a
+		}
+	}
+	if now == nil {
+		return nil
+	}
+	out := *now
+	for _, a := range t.now {
+		if a.Kind == out.Kind {
+			out.Waiting++
+		}
+	}
+	return &out
 }
 
 // Pending is a move the game is waiting on the human for. The move is raised
@@ -147,8 +223,10 @@ func (t *table) publish() {
 		Role:    t.say(string(me.Role)),
 		Alive:   me.Alive,
 		Round:   t.s.Round,
+		Phase:   t.s.Phase,
 		When:    l.When(t.s.Round, t.s.Phase),
 		Pending: t.pending,
+		Now:     t.doing(),
 		Words:   map[string]string{game.Pass: t.say(game.Pass), game.Nobody: t.say(game.Nobody)},
 	}
 	if me.Role == game.Werewolf {

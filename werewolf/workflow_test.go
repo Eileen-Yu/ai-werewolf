@@ -689,6 +689,8 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 		var lastDay1Speaker string
 		for _, turn := range b.turns {
 			switch turn.Kind {
+			case brain.Prepare:
+				continue // runs alongside a speech, so it may be recorded before it
 			case brain.Run:
 				assert.Equal(t, 1, turn.Round, "the election is on the first day only")
 				if turn.Me.Role == game.Seer {
@@ -888,4 +890,64 @@ func startEngine(t *testing.T) *workflow.Client {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
 	return workflow.NewClient(conn)
+}
+
+func TestTheNextSpeakerPreparesWhileSomeoneSpeaks(t *testing.T) {
+	b := &turnRecorder{}
+	SetBrain(preparer{b})
+	client := startEngine(t)
+	startWorker(t, client)
+
+	playGame(t, client, "prepare")
+
+	prepared := map[string]brain.Turn{}
+	checked := 0
+	for _, turn := range b.turns {
+		if turn.Kind == brain.Prepare {
+			prepared[fmt.Sprint(turn.Me.Name, turn.Round, turn.Phase)] = turn
+			continue
+		}
+		if turn.Kind != brain.Speech || len(turn.Spoken) == 0 {
+			continue
+		}
+		p, ok := prepared[fmt.Sprint(turn.Me.Name, turn.Round, turn.Phase)]
+		require.True(t, ok, "%s spoke on day %d without preparing", turn.Me.Name, turn.Round)
+		assert.True(t, turn.Prepared, "%s's speech is marked prepared", turn.Me.Name)
+		before := turn.Spoken[len(turn.Spoken)-1]
+		saidBy := func(tr []game.Event) bool {
+			return slices.ContainsFunc(tr, func(e game.Event) bool {
+				return e.Speaker == before && e.Round == turn.Round && e.Phase == game.Day && e.Suspect != ""
+			})
+		}
+		day := func(tr []game.Event) int {
+			return len(slices.DeleteFunc(slices.Clone(tr), func(e game.Event) bool { return e.Speaker != before || e.Round != turn.Round || e.Suspect == "" }))
+		}
+		assert.Less(t, day(p.Transcript), day(turn.Transcript), "%s prepared before %s's speech was in", turn.Me.Name, before)
+		assert.True(t, saidBy(turn.Transcript), "%s's own turn hears %s", turn.Me.Name, before)
+		assert.Equal(t, []string{"prepared"}, turn.Notes.Beliefs[before].Evidence, "the notes from preparing are kept")
+		assert.Equal(t, "strategy of "+turn.Me.Name, turn.Notes.Strategy, "an empty strategy keeps the old one")
+		checked++
+	}
+	assert.Positive(t, checked)
+}
+
+// preparer plays randomly. Preparing, it writes a belief about everyone and a
+// strategy; on other turns it writes one belief about nobody, with no
+// strategy, so the prepared notes must survive.
+type preparer struct{ rec *turnRecorder }
+
+func (p preparer) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
+	a, err := p.rec.Act(ctx, t)
+	if t.Kind == brain.Prepare {
+		beliefs := map[string]game.Belief{}
+		for _, s := range t.Seats {
+			if s.Name != t.Me.Name {
+				beliefs[s.Name] = game.Belief{Side: game.Unsure, Evidence: []string{"prepared"}}
+			}
+		}
+		a.Notes = &game.Notes{Beliefs: beliefs, Strategy: "strategy of " + t.Me.Name}
+		return a, err
+	}
+	a.Notes = &game.Notes{Beliefs: map[string]game.Belief{}}
+	return a, err
 }

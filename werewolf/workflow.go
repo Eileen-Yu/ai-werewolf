@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"math/rand/v2"
 	"slices"
 	"strings"
@@ -148,6 +149,8 @@ type table struct {
 	// asked counts the human's moves this round, to name the event for each.
 	asked   int
 	pending *Pending
+	// now is what the table is waiting on from the AI players, for the page.
+	now []*Activity
 }
 
 func (t *table) say(word string) string     { return t.s.Lang.Say(word) }
@@ -584,10 +587,26 @@ func (t *table) day() error {
 // before them and who is still to come. It returns their actions in order.
 func (t *table) goRound(kind brain.TurnKind, order, candidates []string, audience ...string) ([]brain.Action, error) {
 	actions := make([]brain.Action, len(order))
+	// ahead is the next speaker bringing their notes up to date while this one
+	// speaks, so their own turn has only this speech left to take in.
+	var ahead move
 	for i, name := range order {
+		prepared := false
+		if ahead != nil {
+			var p brain.Action
+			if err := ahead.Await(&p); err != nil {
+				return nil, err
+			}
+			t.remember(name, p)
+			prepared, ahead = p.Notes != nil, nil
+		}
 		turn := t.turn(kind, name, candidates)
-		turn.Spoken, turn.Waiting = order[:i], order[i+1:]
-		a, err := t.speak(turn, audience...)
+		turn.Spoken, turn.Waiting, turn.Prepared = order[:i], order[i+1:], prepared
+		m := t.act(turn)
+		if i+1 < len(order) && !t.s.Player(order[i+1]).Human {
+			ahead = t.act(t.turn(brain.Prepare, order[i+1], nil))
+		}
+		a, err := t.said(turn, m, audience...)
 		if err != nil {
 			return nil, err
 		}
@@ -636,15 +655,24 @@ func (t *table) act(turn brain.Turn) move {
 	if turn.Me.Human {
 		return t.askHuman(turn)
 	}
-	return t.ctx.CallActivity(ActActivity, workflow.WithActivityInput(turn), retry)
+	m := t.ctx.CallActivity(ActActivity, workflow.WithActivityInput(turn), retry)
+	if turn.Kind == brain.Prepare {
+		return m
+	}
+	return t.busy(turn, m)
 }
 
 // speak plays a speaking turn: the player's thinking goes into their own
 // memory, then what they say is heard by audience (everyone if empty). A
 // declaring speech is recorded with its stance, so later speakers can quote it.
 func (t *table) speak(turn brain.Turn, audience ...string) (brain.Action, error) {
+	return t.said(turn, t.act(turn), audience...)
+}
+
+// said waits for a speaking turn's move and plays it, as speak does.
+func (t *table) said(turn brain.Turn, m move, audience ...string) (brain.Action, error) {
 	var a brain.Action
-	if err := t.act(turn).Await(&a); err != nil {
+	if err := m.Await(&a); err != nil {
 		return a, err
 	}
 	t.remember(turn.Me.Name, a)
@@ -724,7 +752,16 @@ func (t *table) remember(name string, a brain.Action) {
 	if t.s.Notes == nil {
 		t.s.Notes = map[string]game.Notes{}
 	}
-	t.s.Notes[name] = *a.Notes
+	notes := t.s.Notes[name]
+	notes.Beliefs = maps.Clone(notes.Beliefs)
+	if notes.Beliefs == nil {
+		notes.Beliefs = map[string]game.Belief{}
+	}
+	maps.Copy(notes.Beliefs, a.Notes.Beliefs)
+	if a.Notes.Strategy != "" {
+		notes.Strategy = a.Notes.Strategy
+	}
+	t.s.Notes[name] = notes
 }
 
 // aside prints something for the audience only, without recording it.

@@ -24,6 +24,7 @@ type text struct {
 
 	// What Check hands back to the player.
 	badTarget, emptySpeech, badSuspect, badRole, badClaimTarget, badResult string
+	noNotes                                                                string
 	badFaker, badHook, badFocus, focusIsVictim, mustFake, quoted, notYet   string
 	badBelief                                                              string
 	// quoteCues are ways of quoting what someone said, which cannot follow
@@ -59,6 +60,8 @@ type text struct {
 	fields                                                                     fields
 	targetOnly, fakerOnly, hookOnly, focusOnly                                 string
 	declareOnly, notesLine                                                     string
+	// preparedLine and changedNotesLine are for a turn after a Prepare turn.
+	preparedLine, changedNotesLine string
 
 	// Random's lines.
 	speechLines, wolfLines []string
@@ -67,8 +70,8 @@ type text struct {
 
 // fields describe each JSON field of the answer.
 type fields struct {
-	observations, notes, thinking, victim, faker, hook, focus, plan string
-	target, speech, suspect, claim                                  string
+	observations, notes, changedNotes, thinking, victim, faker, hook, focus, plan string
+	target, speech, suspect, claim                                                string
 }
 
 func (t Turn) text() *text {
@@ -175,6 +178,7 @@ var chineseText = text{
 		"愿不愿意跟别人走，由你的性格决定：有人容易被说服，有人认死理，有人专门唱反调。",
 	adapt: "这个打法是狼队开局的倾向，不是整局的硬规定。第一夜的计划必须按这个打法来。之后局势变了，比如悍跳的狼已经出局或被识破、倒钩已经没用，可以不再派人，改打别的：抓好人真实的破绽、他们自己说过却没做到的话，比编造更有效。",
 	instructions: map[TurnKind]string{
+		Prepare:  "现在还没轮到你发言，别人正在发言。先把到目前为止新发生的事整理进你的笔记：observations、beliefs、strategy 照常写，这一步不说话。轮到你的时候，只需要再看这之后的新发言。",
 		Speech:   "白天发言环节，轮到你了。",
 		Rebuttal: "回应环节：所有人都已经发过一次言。回应别人对你的怀疑，或者质疑某个人的说法（比如对跳的预言家、前后矛盾的人）。不超过80字。",
 		WolfChat: "现在是夜里，只有狼同伴能听到你说话。和同伴商量：今晚杀谁；白天怎么按本局的打法来打，票往谁身上引；第1夜还要说好明天谁上警。",
@@ -281,6 +285,7 @@ var chineseText = text{
 	fields: fields{
 		observations: `"observations": ["你上次行动之后新发生的、和判断有关的具体事情"]`,
 		notes:        `"notes": {"beliefs": {"其他玩家的名字": {"side": "狼人、好人或不确定", "evidence": ["支持这个判断的、真实发生过的具体事情"]}}, "strategy": "你接下来的打算"}`,
+		changedNotes: `"notes": {"beliefs": {"判断有变化的玩家": {"side": "狼人、好人或不确定", "evidence": ["这个人全部的证据，新的加在后面"]}}, "strategy": "打算变了才写"}`,
 		thinking:     `"thinking": "这次行动的理由，只有你自己看得到"`,
 		victim:       `"target": "今晚杀的人"`,
 		faker:        `"faker": "明天悍跳预言家的狼"`,
@@ -292,17 +297,20 @@ var chineseText = text{
 		suspect:      `"suspect": "你现在最怀疑的人"`,
 		claim:        `"claim": {"role": "你声称的身份：预言家、女巫、猎人或村民", "target": "和这个身份相关的人，没有就留空", "result": "查验结果（好人或狼人），或者救了、毒了，没有就留空"}`,
 	},
-	onlyJSON:    "只回复一个JSON对象，不要任何其他内容：",
-	seatLine:    "- %s：%s\n",
-	sheriffMark: "，警长",
-	sheriffLine: "你是警长：你最后一个发言，你的放逐票算1.5票。发言时可以归票，明确告诉大家今天投谁、为什么。\n",
-	line:        "[%s] %s：%s\n",
-	targetOnly:  "target 只能是这些名字之一：%s。\n",
-	fakerOnly:   "faker 只能是：%s。\n",
-	hookOnly:    "hook 只能是：%s。之前定过的倒钩还在场的话，不要换人。\n",
-	focusOnly:   "focus 只能是：%s，而且不能和 target 是同一个人。\n",
-	declareOnly: "suspect 只能是这些之一：%s。claim 是你这次公开声明的身份；不声明身份就写 null，不要写成字符串。suspect 和 claim 会由主持人公开记录，必须和你的 speech 一致。\n",
-	notesLine:   "notes 是你完整的新笔记，会替换旧笔记：每个你有判断的其他玩家都要写上，名字只能是桌上的人，不要写你自己。JSON 里每一项之间都要有逗号，最后一项后面不要有逗号。",
+	onlyJSON:         "只回复一个JSON对象，不要任何其他内容：",
+	seatLine:         "- %s：%s\n",
+	sheriffMark:      "，警长",
+	sheriffLine:      "你是警长：你最后一个发言，你的放逐票算1.5票。发言时可以归票，明确告诉大家今天投谁、为什么。\n",
+	line:             "[%s] %s：%s\n",
+	targetOnly:       "target 只能是这些名字之一：%s。\n",
+	fakerOnly:        "faker 只能是：%s。\n",
+	hookOnly:         "hook 只能是：%s。之前定过的倒钩还在场的话，不要换人。\n",
+	focusOnly:        "focus 只能是：%s，而且不能和 target 是同一个人。\n",
+	declareOnly:      "suspect 只能是这些之一：%s。claim 是你这次公开声明的身份；不声明身份就写 null，不要写成字符串。suspect 和 claim 会由主持人公开记录，必须和你的 speech 一致。\n",
+	preparedLine:     "你的笔记刚刚整理到了最新一段发言之前。这次 observations 只写那之后的新事，想清楚怎么回应它们。\n",
+	changedNotesLine: "notes 只写这次判断有变化的人，没写的人保持原来的笔记；什么都没变就不写 notes。名字只能是桌上的人，不要写你自己。JSON 里每一项之间都要有逗号，最后一项后面不要有逗号。",
+	noNotes:          "这一步要写 notes",
+	notesLine:        "notes 是你完整的新笔记，会替换旧笔记：每个你有判断的其他玩家都要写上，名字只能是桌上的人，不要写你自己。JSON 里每一项之间都要有逗号，最后一项后面不要有逗号。",
 
 	speechLines: []string{
 		"我觉得%s有点可疑。",
@@ -417,6 +425,7 @@ Write everything in English.`,
 		"How readily you go along with others is down to your character: some are easily persuaded, some dig in, some argue against whatever the table says.",
 	adapt: " This play is where the pack starts, not a rule for the whole game. The first night's plan must play it. After that, when things change, say the faker is out or has been seen through, or the hook is no longer of use, you may name nobody and play something else: a good player's real slip, something they said they would do and did not, works better than anything made up.",
 	instructions: map[TurnKind]string{
+		Prepare:  "It is not your turn to speak yet; someone else is speaking. Bring your notes up to date with everything new so far: write observations, beliefs and strategy as usual, and say nothing this time. When your turn comes, you will only need to read what was said after this.",
 		Speech:   "It is the day's speeches and your turn to speak.",
 		Rebuttal: "Reply round: everyone has spoken once. Answer suspicion aimed at you, or challenge someone's story (a counter-claimed seer, someone who contradicts themselves). At most 40 words.",
 		WolfChat: "It is night, and only your fellow werewolves can hear you. Agree on who to kill tonight and how to play the day the way this game's play calls for, and who to push the vote onto; on the first night, also agree who runs for sheriff tomorrow.",
@@ -522,6 +531,7 @@ Write everything in English.`,
 `,
 	fields: fields{
 		observations: `"observations": ["concrete things that newly happened since your last move and matter"]`,
+		changedNotes: `"notes": {"beliefs": {"a player whose belief changes": {"side": "werewolf, good or unsure", "evidence": ["all the evidence on them, new items last"]}}, "strategy": "only if your plan changes"}`,
 		notes:        `"notes": {"beliefs": {"another player's name": {"side": "werewolf, good or unsure", "evidence": ["concrete things that actually happened and support this"]}}, "strategy": "what you mean to do next"}`,
 		thinking:     `"thinking": "your reasoning for this move, seen only by you"`,
 		victim:       `"target": "who to kill tonight"`,
@@ -534,17 +544,20 @@ Write everything in English.`,
 		suspect:      `"suspect": "who you suspect most right now"`,
 		claim:        `"claim": {"role": "the role you claim: seer, witch, hunter or villager", "target": "the player it concerns, or \"\"", "result": "the check result (good or werewolf), or saved / poisoned, or \"\""}`,
 	},
-	onlyJSON:    "Reply with a single JSON object and nothing else: ",
-	seatLine:    "- %s: %s\n",
-	sheriffMark: ", sheriff",
-	sheriffLine: "You are the sheriff: you speak last, and your vote to exile counts one and a half. You may call the vote: tell the table plainly who to vote out today and why.\n",
-	line:        "[%s] %s: %s\n",
-	targetOnly:  "target must be one of: %s.\n",
-	fakerOnly:   "faker must be one of: %s.\n",
-	hookOnly:    "hook must be one of: %s. If a hook was named before and is still in the game, keep them.\n",
-	focusOnly:   "focus must be one of: %s, and not the same person as target.\n",
-	declareOnly: "suspect must be one of: %s. claim is the role you publicly claim in this speech; if you claim none, write null, not a string. The host puts suspect and claim on the record, so they must match your speech.\n",
-	notesLine:   "notes are your complete new notes and replace the old ones: include every other player you have a view on, only names at the table, never yourself. Put a comma between JSON items and none after the last one.",
+	onlyJSON:         "Reply with a single JSON object and nothing else: ",
+	seatLine:         "- %s: %s\n",
+	sheriffMark:      ", sheriff",
+	sheriffLine:      "You are the sheriff: you speak last, and your vote to exile counts one and a half. You may call the vote: tell the table plainly who to vote out today and why.\n",
+	line:             "[%s] %s: %s\n",
+	targetOnly:       "target must be one of: %s.\n",
+	fakerOnly:        "faker must be one of: %s.\n",
+	hookOnly:         "hook must be one of: %s. If a hook was named before and is still in the game, keep them.\n",
+	focusOnly:        "focus must be one of: %s, and not the same person as target.\n",
+	declareOnly:      "suspect must be one of: %s. claim is the role you publicly claim in this speech; if you claim none, write null, not a string. The host puts suspect and claim on the record, so they must match your speech.\n",
+	preparedLine:     "Your notes were just brought up to date, up to before the latest speech. This time, observations covers only what came after that; think about how to answer it.\n",
+	changedNotesLine: "In notes, write only the players whose belief changes this time; anyone left out keeps their old notes. If nothing changes, leave notes out. Only names at the table, never yourself. Put a comma between JSON items and none after the last one.",
+	noNotes:          "this step needs notes",
+	notesLine:        "notes are your complete new notes and replace the old ones: include every other player you have a view on, only names at the table, never yourself. Put a comma between JSON items and none after the last one.",
 
 	speechLines: []string{
 		"%s seems a bit suspicious to me.",

@@ -290,10 +290,18 @@ func prompt(t Turn) (system, user string) {
 	if t.Kind.Speaks() {
 		b.WriteString(tx.selfCheck)
 	}
+	if t.Prepared {
+		b.WriteString(tx.preparedLine)
+	}
 
 	f := tx.fields
-	fields := []string{f.observations, f.notes, f.thinking}
+	notesField, notesLine := f.notes, tx.notesLine
+	if t.Prepared {
+		notesField, notesLine = f.changedNotes, tx.changedNotesLine
+	}
+	fields := []string{f.observations, notesField, f.thinking}
 	switch {
+	case t.Kind == Prepare:
 	case t.Kind == WolfPlan:
 		fields = append(fields, f.victim)
 		switch t.Tactic {
@@ -326,7 +334,7 @@ func prompt(t Turn) (system, user string) {
 	if t.Kind.Declares() {
 		fmt.Fprintf(&b, tx.declareOnly, l.List(l.SayAll(t.Suspects)))
 	}
-	b.WriteString(tx.notesLine)
+	b.WriteString(notesLine)
 	return system, b.String()
 }
 

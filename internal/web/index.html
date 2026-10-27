@@ -38,6 +38,46 @@
   .row { display:flex; gap:8px; } .row > * { flex:1; }
   .mvp { font-size:17px; } .mvp b { color:var(--accent); }
   button.secondary { background:transparent; color:var(--accent); border:1px solid var(--accent); padding:5px 12px; margin:10px 8px 0 0; }
+
+  /* The stage: what the table is waiting on. Night brings a sky, the moon and,
+     while the pack is at it, a pair of wolf eyes. */
+  body { transition: background 1.2s; }
+  body.night { background: radial-gradient(ellipse at top, #1a2148 0%, #0b0e1c 60%, #07080f 100%) fixed; }
+  body.night .card { background: rgba(22,26,44,.88); border-color:#2a3157; }
+  .seat.speaking { border-color:#7fd1ff; color:#bfe8ff; animation: ring 1.4s ease-out infinite; }
+  @keyframes ring { 0% { box-shadow:0 0 0 0 rgba(127,209,255,.55); } 100% { box-shadow:0 0 0 9px rgba(127,209,255,0); } }
+  .stage { position:relative; overflow:hidden; min-height:140px; display:flex; align-items:center; gap:16px; padding:22px 18px; }
+  body.night .stage.night { background: linear-gradient(180deg, #070b22 0%, #141a40 100%); border-color:#2f3870; }
+  .stage:not(.night) .moon { display:none; }
+  .stage .sky { position:absolute; inset:0; pointer-events:none; opacity:0; transition: opacity 1s; }
+  .stage.night .sky { opacity:1; }
+  .stage .sky::before { content:""; position:absolute; inset:0;
+    background-image: radial-gradient(1px 1px at 12% 20%, #fff, transparent), radial-gradient(1px 1px at 30% 70%, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 55% 30%, #fff, transparent), radial-gradient(1px 1px at 70% 80%, #fff, transparent),
+      radial-gradient(1px 1px at 85% 45%, #fff, transparent), radial-gradient(1.5px 1.5px at 42% 12%, #fff, transparent),
+      radial-gradient(1px 1px at 20% 88%, #fff, transparent), radial-gradient(1px 1px at 92% 15%, #fff, transparent);
+    animation: twinkle 3s ease-in-out infinite alternate; }
+  @keyframes twinkle { from { opacity:.35; } to { opacity:1; } }
+  .stage .moon { position:absolute; top:12px; right:16px; width:34px; height:34px; border-radius:50%;
+    background: radial-gradient(circle at 35% 35%, #fffbe6, #f3dc8f 60%, #d9b75a); box-shadow: 0 0 22px 6px rgba(243,220,143,.35);
+    animation: glow 4s ease-in-out infinite alternate; }
+  @keyframes glow { from { box-shadow:0 0 16px 4px rgba(243,220,143,.25); } to { box-shadow:0 0 30px 10px rgba(243,220,143,.45); } }
+  .stage .body { position:relative; flex:1; }
+  .stage .big { font-size:19px; font-weight:600; }
+  .stage .sub { color:var(--dim); font-size:13px; margin-top:4px; }
+  .stage .icon { position:relative; font-size:38px; width:64px; text-align:center; }
+  .eyes { display:flex; gap:16px; justify-content:center; }
+  .eyes span { width:16px; height:9px; border-radius:50% 50% 45% 45%; background:#ff3b30; box-shadow:0 0 10px 3px rgba(255,59,48,.75);
+    animation: blink 3.2s infinite; }
+  @keyframes blink { 0%, 92%, 100% { transform:scaleY(1); } 95% { transform:scaleY(.1); } }
+  .wave { display:inline-flex; gap:3px; align-items:flex-end; height:22px; margin-left:8px; vertical-align:middle; }
+  .wave i { width:3px; background:#7fd1ff; border-radius:2px; animation: wave 1s ease-in-out infinite; }
+  .wave i:nth-child(2) { animation-delay:.15s; } .wave i:nth-child(3) { animation-delay:.3s; } .wave i:nth-child(4) { animation-delay:.45s; } .wave i:nth-child(5) { animation-delay:.6s; }
+  @keyframes wave { 0%, 100% { height:5px; } 50% { height:22px; } }
+  .dots::after { content:""; animation: dots 1.5s steps(4) infinite; }
+  @keyframes dots { 0% { content:""; } 25% { content:"."; } 50% { content:".."; } 75% { content:"..."; } }
+  .ballot { display:inline-block; animation: drop 1.2s ease-in-out infinite; }
+  @keyframes drop { 0%, 100% { transform:translateY(-4px); } 50% { transform:translateY(4px); } }
 </style>
 </head>
 <body>
@@ -75,7 +115,7 @@
           <form id="turnForm"></form>
           <div id="turnErr" class="err"></div>
         </div>
-        <div class="card" id="waiting"></div>
+        <div class="card stage" id="waiting"><div class="sky"></div><div class="moon"></div><div class="icon" id="stageIcon"></div><div class="body"><div class="big" id="stageText"></div><div class="sub" id="stageSub"></div></div></div>
         <div class="card" id="result" hidden></div>
       </div>
     </div>
@@ -103,6 +143,10 @@ const UI = {
       network: "语音识别连不上网络：Chrome 需要联网把录音发给 Google 识别。" },
     voiceReady: "语音朗读已开启，之后的发言会读出来。",
     over: "游戏结束", winner: w => `${w}胜利`, mvp: "MVP", failed: "游戏出错：", host: "主持人", again: "再来一局",
+    stage: { wolves: "狼人正在密谋", wolvesSub: "天黑请闭眼，狼人请睁眼", night: "夜色深沉，有人正悄悄行动", nightIdle: "夜深了",
+      wait: "主持人正在等待", speech: n => `${n} 正在发言`, rebuttal: n => `${n} 正在回应`, campaign: n => `${n} 正在竞选发言`,
+      last_words: n => `${n} 正在留遗言`, badge: n => `${n} 正在决定警徽交给谁`, vote: "大家正在投票", sheriff_vote: "大家正在投票选警长",
+      run: "大家正在决定要不要上警", withdraw: "候选人正在考虑要不要退水", left: n => `还有 ${n} 人在想`, elapsed: s => `已经 ${s} 秒` },
   },
   en: {
     title: "AI Werewolf", name: "Your name", replaces: "Whose seat to take", tactic: "Pack tactic", random: "Random", start: "Start game",
@@ -124,6 +168,10 @@ const UI = {
       network: "Speech recognition cannot reach the network: Chrome sends the recording to Google to transcribe it." },
     voiceReady: "Read aloud is on. New lines will be read out.",
     over: "Game over", winner: w => `The ${w} side wins`, mvp: "MVP", failed: "The game failed: ", host: "Host", again: "Play again",
+    stage: { wolves: "The werewolves are plotting", wolvesSub: "Everyone close your eyes. Werewolves, open yours", night: "Deep in the night, someone is on the move", nightIdle: "Night falls",
+      wait: "The host is waiting", speech: n => `${n} is speaking`, rebuttal: n => `${n} is answering`, campaign: n => `${n} is campaigning`,
+      last_words: n => `${n} is saying last words`, badge: n => `${n} is passing on the badge`, vote: "Everyone is voting", sheriff_vote: "Everyone is voting for sheriff",
+      run: "Everyone is deciding whether to run", withdraw: "The candidates are deciding whether to withdraw", left: n => `${n} still deciding`, elapsed: s => `${s}s so far` },
   },
 };
 const $ = id => document.getElementById(id);
@@ -163,7 +211,7 @@ async function poll() {
     const g = await api(`/api/games/${encodeURIComponent(gameId)}`);
     if (g.view) render(g.view);
     if (g.result || g.error) { finish(g); return; }
-  } catch (e) { $("waiting").textContent = e.message; }
+  } catch (e) { $("stageText").textContent = e.message; }
   setTimeout(poll, 1500);
 }
 
@@ -177,7 +225,9 @@ function render(v) {
   $("role").textContent = v.role;
   $("role").className = "role" + (v.pack ? " wolf" : "");
   $("pack").textContent = v.pack ? t.pack + v.pack.join(", ") : "";
-  $("seats").innerHTML = v.seats.map(s => `<span class="seat${s.death ? " dead" : ""}${s.name === v.you ? " me" : ""}${s.sheriff ? " sheriff" : ""}" title="${esc(s.death || (s.sheriff ? t.sheriff : ""))}">${s.sheriff ? "🎖️ " : ""}${esc(s.name)}</span>`).join("");
+  document.body.classList.toggle("night", v.phase === "night");
+  const speaking = v.now && v.now.name;
+  $("seats").innerHTML = v.seats.map(s => `<span class="seat${s.death ? " dead" : ""}${s.name === v.you ? " me" : ""}${s.sheriff ? " sheriff" : ""}${s.name === speaking ? " speaking" : ""}" title="${esc(s.death || (s.sheriff ? t.sheriff : ""))}">${s.sheriff ? "🎖️ " : ""}${esc(s.name)}</span>`).join("");
   renderVotes(v.lastVote, t);
 
   const log = $("log"), atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
@@ -191,10 +241,47 @@ function render(v) {
   logCount = v.log.length;
   if (atBottom) log.scrollTop = log.scrollHeight;
 
-  $("waiting").textContent = v.alive ? t.waiting : t.dead;
-  $("waiting").hidden = !!v.pending;
+  renderStage(v, t);
+  $("waiting").hidden = !!v.pending && !v.now;
   if (!v.pending) { $("turnCard").hidden = true; shownEvent = null; return; }
   if (v.pending.event !== shownEvent) showTurn(v.pending, t, w);
+}
+
+// renderStage shows what the table is waiting on: only what anyone at a real
+// table could tell, which the game master has already narrowed it to.
+let stageTimer = null;
+function renderStage(v, t) {
+  const s = t.stage, now = v.now, night = v.phase === "night";
+  $("waiting").classList.toggle("night", night);
+  let icon = "", text, sub = "";
+  if (!now) {
+    icon = night ? "💤" : "⏳";
+    text = `<span class="dots">${esc(night ? s.nightIdle : t.waiting.replace(/[.…]+$/, ""))}</span>`;
+    if (!v.alive) sub = t.dead;
+  } else if (now.kind === "wolves") {
+    icon = `<div class="eyes"><span></span><span></span></div>`;
+    text = `<span class="dots">${esc(s.wolves)}</span>`; sub = s.wolvesSub;
+  } else if (now.kind === "night" || now.kind === "wait") {
+    icon = night ? "🦉" : "⏳";
+    text = `<span class="dots">${esc(s[now.kind])}</span>`;
+  } else if (now.name) {
+    icon = now.kind === "badge" ? "🎖️" : "🎙️";
+    const say = s[now.kind];
+    text = esc(typeof say === "function" ? say(now.name) : now.name) + `<span class="wave"><i></i><i></i><i></i><i></i><i></i></span>`;
+  } else {
+    icon = `<span class="ballot">🗳️</span>`;
+    text = `<span class="dots">${esc(s[now.kind] || t.waiting)}</span>`;
+    if (now.waiting > 1) sub = s.left(now.waiting);
+  }
+  $("stageIcon").innerHTML = icon;
+  $("stageText").innerHTML = text;
+  const since = now ? new Date(now.since) : null;
+  const tick = () => {
+    const secs = since ? Math.max(0, Math.round((Date.now() - since) / 1000)) : 0;
+    $("stageSub").textContent = [sub, since ? s.elapsed(secs) : ""].filter(Boolean).join(" · ");
+  };
+  clearInterval(stageTimer);
+  tick(); if (since) stageTimer = setInterval(tick, 1000);
 }
 
 // renderVotes shows a day's votes grouped by who they went to, most votes first.
@@ -277,6 +364,7 @@ function showTurn(p, t, w) {
 function finish(g) {
   clearInterval(timer);
   stopMic();
+  clearInterval(stageTimer);
   $("turnCard").hidden = true; $("waiting").hidden = true;
   const t = UI[(view && view.lang) || "zh"], r = $("result");
   r.hidden = false;
