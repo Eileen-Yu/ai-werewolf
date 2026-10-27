@@ -54,6 +54,7 @@ func TestPromptSeparatesWhatThePlayerKnows(t *testing.T) {
 	assert.Contains(t, system, "性格：推理小说迷。\n策略：", "no habit, no habit line")
 	assert.Contains(t, system, "配置："+game.Chinese.LineupSummary())
 	assert.Contains(t, system, chineseText.strategies[game.Werewolf])
+	assert.NotContains(t, system, chineseText.goodVoting, "a wolf is not told how the good side should vote")
 	assert.Contains(t, user, "- 老王（你）：存活")
 	assert.Contains(t, user, "- 小红：第1夜死亡")
 	assert.Contains(t, user, "都是确定的事实（狼同伴的夜聊也在这里）\n[第1夜] 主持人：你们是狼人同伴：老王、阿杰。\n[第1夜] 阿杰：明天我悍跳预言家。\n")
@@ -100,6 +101,14 @@ func TestPromptForAChoiceAsksForATarget(t *testing.T) {
 	assert.Contains(t, user, `"target"`)
 	assert.Contains(t, user, "target 只能是这些名字之一：老王、小红。")
 	assert.NotContains(t, user, "你是这一轮第")
+}
+
+func TestEveryGoodRoleIsToldToTurnSuspicionIntoAVote(t *testing.T) {
+	for _, role := range []game.Role{game.Seer, game.Witch, game.Hunter, game.Villager} {
+		turn := Turn{Kind: Vote, Round: 2, Phase: game.Day, Me: game.Player{Name: "小红", Role: role}, Candidates: []string{"老王"}}
+		system, _ := prompt(turn)
+		assert.Contains(t, system, chineseText.goodVoting, "the %s is told how the good side wins a vote", role)
+	}
 }
 
 func TestPromptForAnOptionalPowerOffersPass(t *testing.T) {

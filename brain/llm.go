@@ -195,6 +195,8 @@ func prompt(t Turn) (system, user string) {
 	strategy := tx.strategies[t.Me.Role]
 	if t.Me.Role == game.Werewolf {
 		strategy += tx.tactics[t.Tactic] + tx.adapt
+	} else {
+		strategy += tx.goodVoting
 	}
 	system = fmt.Sprintf(tx.rules, len(names), len(names), l.List(names), l.LineupSummary(),
 		t.Me.Name, l.Say(string(t.Me.Role)), t.Me.Persona, character, strategy)

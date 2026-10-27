@@ -61,7 +61,7 @@ A standard nine-player game: 3 werewolves, a seer, a witch, a hunter and 3 villa
 - **Night**: the werewolves talk in private and pick who to kill (they may pick one of their own). The witch learns who was killed and may save them or poison someone: each potion works once, at most one per night, and she may only save herself on the first night. The seer checks one player.
 - **Dawn**: only who died is announced, not how. A hunter who is out may shoot one player, unless the witch poisoned him. The shot is not announced either: a hunter killed at night shoots before dawn, and the player he shot is simply on the list of the dead. A hunter voted out by day shoots after his last words, and the host only says who has died.
 - **Day**: everyone speaks once, then everyone gets one reply. Then a vote: a tie means nobody goes. Whoever is voted out gets last words.
-- **Winning**: the good side wins when every werewolf is out. The werewolves win when every villager is out, or every power role is out.
+- **Winning**: the good side wins when every werewolf is out. The werewolves win when every villager is out, every power role is out, or the living werewolves are at least as many as everyone else, since from then on they control every vote.
 
 ## Quick start: play with LLMs on Catalyst
 

@@ -16,7 +16,10 @@ type text struct {
 	// tactics is, for a wolf, how the pack plays this game.
 	tactics map[game.Tactic]string
 	// adapt lets the pack drop its tactic after the first night.
-	adapt        string
+	adapt string
+	// goodVoting is how every good player turns suspicion into a vote that
+	// gets a wolf out.
+	goodVoting   string
 	instructions map[TurnKind]string
 
 	// What Check hands back to the player.
@@ -79,7 +82,7 @@ var chineseText = text{
 - 村民：没有特殊能力。
 流程：天亮后只公布昨晚谁死了，不公布死因（可能被狼人杀，可能被女巫毒死，也可能被出局的猎人开枪带走；被救的人不会死）。猎人开枪也不公布，被带走的人只会出现在死亡名单里。
 白天先按顺序每人发言一次，再进入回应环节每人再说一次，最后投票放逐一人，平票则无人出局。被放逐的人有遗言。
-胜负：狼人全部出局则好人胜利；所有村民出局，或者预言家、女巫、猎人全部出局，则狼人胜利。
+胜负：狼人全部出局则好人胜利；所有村民出局，或者预言家、女巫、猎人全部出局，或者活着的狼人不少于其他活着的人（狼人从此控制每一次投票），则狼人胜利。
 
 你是%s，身份是%s，性格：%s。
 %s策略：%s
@@ -131,7 +134,6 @@ var chineseText = text{
 		game.Seer: "你的查验结果是好人阵营最重要的信息。查到狼人时应该果断表明身份、报出所有查验结果，带大家投票。" +
 			"如果有人和你对跳，用你的查验记录、他跳出来的时机和发言里的矛盾揭穿他。跳身份后你今晚很可能被杀，所以要把信息一次报完整。",
 		game.Villager: "你没有任何夜间信息，只能靠分析发言找狼。关注谁的发言前后矛盾、谁在跟风、谁在保护谁、谁的投票和发言不一致。" +
-			"同票一次不算证据，但同一组人连续几天投同一个人、互相报好人、互相帮腔，就是很强的狼队信号；连续平票时，想想改投哪边能打破僵局。" +
 			"如果有两个人都自称预言家，必须判断真假：谁的查验结果和其他人的声明、死亡和投票更吻合，谁跳得更自然。",
 	},
 	tactics: map[game.Tactic]string{
@@ -144,6 +146,11 @@ var chineseText = text{
 		game.Hook: "本局狼队的打法是倒钩：计划里指定一只狼当倒钩，他白天装成最坚定的好人：站边真预言家，同伴暴露了就跟着踩，甚至投他，用一个同伴换来好人的信任，留到后面关键的时候再带偏票。" +
 			"其他狼不跳预言家，也不要和倒钩的狼互相维护。倒钩是计划里主动牺牲同伴换信任的人；其他狼也可以踩同伴，但只在局势真的需要时。",
 	},
+	goodVoting: "投票的目的不是投出你个人最怀疑的人，而是让好人真的放逐一只狼。投票前想一想：你的票能不能帮放逐一个可疑的人？" +
+		"如果场上有好几个都像狼的人，好人的票却分散在他们身上，宁可并到其中最有可能出局的那个，除非你有很强的证据说明那个人是好人。但不要为了跟大多数而放弃自己的判断。" +
+		"跨天追踪票型和站边：同一组人一次同票不算证据，但新的矛盾出现后仍然一直同票、互相报好人、互相帮腔，就是狼队配合的信号。这是证据，不是铁证，但足够拿来决定投票。" +
+		"昨天平票的话，先说清楚为什么平票。狼人每晚都会杀一个好人，好人人数不再多于狼人时狼人直接获胜，所以没有新证据却重复同样的分票，等于让狼人靠时间赢。考虑换目标，或者公开提出一个大家都能接受的共同目标。" +
+		"每一句\"这不能证明\"都要接一个结论：在现有的选择里，投谁最值得冒险。",
 	adapt: "这个打法是狼队开局的倾向，不是整局的硬规定。第一夜的计划必须按这个打法来。之后局势变了，比如悍跳的狼已经出局或被识破、倒钩已经没用，可以不再派人，改打别的：抓好人真实的破绽、他们自己说过却没做到的话，比编造更有效。",
 	instructions: map[TurnKind]string{
 		Speech:   "白天发言环节，轮到你了。",
@@ -274,7 +281,7 @@ Roles:
 - Villager: no power.
 Flow: at dawn only who died is announced, never how (killed by werewolves, poisoned by the witch, or shot by a hunter who went out; a saved player does not die). A hunter's shot is not announced either: the player shot simply appears among the dead.
 By day everyone speaks once in order, then once more in a reply round, then everyone votes one person out; a tie means nobody goes. The exiled player gets last words.
-Winning: the good side wins when every werewolf is out; the werewolves win when every villager is out, or when the seer, witch and hunter are all out.
+Winning: the good side wins when every werewolf is out; the werewolves win when every villager is out, when the seer, witch and hunter are all out, or when the living werewolves are at least as many as everyone else alive (from then on they control every vote).
 
 You are %s. Your role is %s. Your personality: %s.
 %sStrategy: %s
@@ -327,7 +334,6 @@ Write everything in English.`,
 		game.Seer: "Your checks are the good side's most important information. When you find a werewolf, claim seer firmly, report every check and lead the vote. " +
 			"If someone counter-claims, expose them with your check record, the timing of their claim and the contradictions in what they said. Once you claim you will probably be killed that night, so report everything at once.",
 		game.Villager: "You have no night information; you find werewolves by reading the table. Watch for who contradicts themselves, who just follows others, who protects whom, and whose vote does not match their words. " +
-			"Voting together once proves nothing, but the same group voting for the same person day after day, vouching for each other and backing each other up is a strong sign of the pack; after a tied vote, think about which side to switch to so the tie breaks. " +
 			"If two people both claim seer, you must decide which is real: whose checks fit the other claims, the deaths and the votes better, and whose claim came more naturally.",
 	},
 	tactics: map[game.Tactic]string{
@@ -340,6 +346,11 @@ Write everything in English.`,
 		game.Hook: "This game the pack plays the hook: the plan names one werewolf as the hook, who plays the staunchest good player at the table, backs the real seer, and when a teammate is exposed piles on and even votes them out, trading a teammate for the good side's trust to steer a vote later when it counts. " +
 			"The others do not claim seer and do not defend the hook. The hook is the one the plan has trade a teammate for trust; the rest of you may turn on a teammate too, but only when the game calls for it.",
 	},
+	goodVoting: "The point of a vote is not to vote out the person you personally suspect most, but for the good side to actually get a werewolf out. Before you vote, ask whether your vote can realistically help vote out someone suspicious. " +
+		"If several players look like werewolves and the good side's votes are split across them, rather join the one most likely to go, unless you have strong evidence that one is good. But do not drop your own reasoning just to follow the majority. " +
+		"Track votes and sides across days: one shared vote proves nothing, but a group that keeps voting together, vouching for each other and backing each other up after new contradictions come out is a sign of a pack working together. It is evidence, not proof, and it is enough to decide a vote on. " +
+		"If yesterday's vote was a tie, say why it tied. The werewolves kill a good player every night and win outright once good players no longer outnumber them, so repeating the same split without new evidence lets them win on time. Consider changing your target, or openly proposing one the table can agree on. " +
+		"Every \"that does not prove it\" needs a conclusion after it: of the choices you actually have, who is most worth the risk.",
 	adapt: " This play is where the pack starts, not a rule for the whole game. The first night's plan must play it. After that, when things change, say the faker is out or has been seen through, or the hook is no longer of use, you may name nobody and play something else: a good player's real slip, something they said they would do and did not, works better than anything made up.",
 	instructions: map[TurnKind]string{
 		Speech:   "It is the day's speeches and your turn to speak.",
