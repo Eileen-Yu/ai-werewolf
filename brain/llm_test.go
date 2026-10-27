@@ -399,7 +399,7 @@ func TestEnglishPromptsAreAllEnglish(t *testing.T) {
 			{Round: 1, Sheriff: "Mia", Votes: []game.Vote{{Voter: "Mia", Target: "Ruby"}, {Voter: "Dave"}}},
 		},
 	}
-	for _, kind := range []TurnKind{Speech, Rebuttal, WolfChat, WolfPlan, LastWords, Vote, Inspect, Save, Poison, Shoot, Run, Campaign, SheriffVote, Badge} {
+	for _, kind := range []TurnKind{Speech, Rebuttal, WolfChat, WolfPlan, LastWords, Vote, Inspect, Save, Poison, Shoot, Run, Campaign, Withdraw, SheriffVote, Badge} {
 		turn := base
 		turn.Kind = kind
 		system, user := prompt(turn)

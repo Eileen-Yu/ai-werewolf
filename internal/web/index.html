@@ -90,8 +90,8 @@ const UI = {
     timeLeft: s => `剩余 ${s} 秒，超时由AI代打`,
     kinds: { speech: "轮到你发言", rebuttal: "第二轮：回应和质疑", wolf_chat: "狼队夜聊", wolf_plan: "你来定今晚的计划",
       last_words: "留下遗言", vote: "投票放逐", inspect: "今晚查验谁", save: "要用解药救他吗", poison: "要用毒药吗", shoot: "开枪带走谁",
-      run: "竞选警长：要上警吗", campaign: "警长竞选发言", sheriff_vote: "投票选警长", badge: "移交警徽" },
-    run: "上警", noRun: "不上警", tearBadge: "撕掉警徽", sheriff: "警长", sheriffBallot: "（警长，1.5票）",
+      run: "竞选警长：要上警吗", campaign: "警长竞选发言", withdraw: "竞选结束：要退水吗", sheriff_vote: "投票选警长", badge: "移交警徽" },
+    run: "上警", noRun: "不上警", stay: "继续竞选", withdraw: "退水", tearBadge: "撕掉警徽", sheriff: "警长", sheriffBallot: "（警长，1.5票）",
     target: "选择", speech: "发言", planSpeech: "给队友的计划说明", suspect: "你怀疑谁（会记录在案）",
     claim: "声称身份（可选）", noClaim: "不声称", claimChecked: "查验了谁", claimResult: "查验结果", claimPotion: "救了/毒了谁",
     votes: w => `${w}票型`, abstain: "弃票", ballots: n => `${n}票`,
@@ -111,8 +111,8 @@ const UI = {
     timeLeft: s => `${s}s left before an AI plays this for you`,
     kinds: { speech: "Your turn to speak", rebuttal: "Second round: answer and challenge", wolf_chat: "Wolf chat", wolf_plan: "Set tonight's plan",
       last_words: "Your last words", vote: "Vote someone out", inspect: "Who to check tonight", save: "Use the antidote on them?", poison: "Use the poison?", shoot: "Who to shoot",
-      run: "Sheriff election: will you run?", campaign: "Your campaign speech", sheriff_vote: "Vote for sheriff", badge: "Pass on the badge" },
-    run: "Run for sheriff", noRun: "Stay out", tearBadge: "Tear up the badge", sheriff: "Sheriff", sheriffBallot: " (sheriff, 1.5 votes)",
+      run: "Sheriff election: will you run?", campaign: "Your campaign speech", withdraw: "Campaign over: withdraw?", sheriff_vote: "Vote for sheriff", badge: "Pass on the badge" },
+    run: "Run for sheriff", noRun: "Stay out", stay: "Stay in the race", withdraw: "Withdraw", tearBadge: "Tear up the badge", sheriff: "Sheriff", sheriffBallot: " (sheriff, 1.5 votes)",
     target: "Pick", speech: "What you say", planSpeech: "The plan, for your pack", suspect: "Who you suspect (goes on the record)",
     claim: "Claim a role (optional)", noClaim: "No claim", claimChecked: "Who you checked", claimResult: "What you saw", claimPotion: "Who you saved or poisoned",
     votes: w => `${w} votes`, abstain: "Abstained", ballots: n => `${n} vote${n === 1 ? "" : "s"}`,
@@ -222,10 +222,11 @@ function showTurn(p, t, w) {
   $("turnCard").hidden = false; $("turnErr").textContent = "";
   $("turnTitle").textContent = t.kinds[k] || k;
   const opts = (xs, blank) => (blank ? `<option value="">${t.none}</option>` : "") + xs.map(x => `<option value="${esc(x)}">${esc(w(x))}</option>`).join("");
-  const choice = ["vote", "wolf_plan", "inspect", "save", "poison", "shoot", "run", "sheriff_vote", "badge"].includes(k);
+  const choice = ["vote", "wolf_plan", "inspect", "save", "poison", "shoot", "run", "withdraw", "sheriff_vote", "badge"].includes(k);
   const speaks = !choice || k === "wolf_plan", declares = ["speech", "rebuttal", "campaign"].includes(k);
   let h = "";
   if (k === "run") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${x === "pass" ? t.noRun : t.run}</option>`).join("")}</select>`;
+  else if (k === "withdraw") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${x === "pass" ? t.withdraw : t.stay}</option>`).join("")}</select>`;
   else if (k === "badge") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${esc(x === "pass" ? t.tearBadge : w(x))}</option>`).join("")}</select>`;
   else if (choice) h += `<label>${t.target}</label><select name="target">${opts(turn.candidates || [])}</select>`;
   if (k === "wolf_plan" && turn.tactic === "counterclaim") h += `<label>${t.faker}</label><select name="faker">${opts([...(turn.pack || []), "nobody"])}</select>`;

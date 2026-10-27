@@ -191,7 +191,10 @@ var chineseText = text{
 		Run: "竞选警长：选你自己的名字表示上警，选\"放弃\"表示不上警。所有人同时决定，看不到别人的选择。" +
 			"警长的1.5票和归票权很有用。预言家一定上警，靠竞选发言报查验、拿警徽带队。" +
 			"狼队为了赢面也一定要有狼上警：悍跳的狼必须上警，和预言家正面对跳；其他打法也要派狼上警抢警徽、站边或搅局。一般一到两只狼上警就够了，夜里说好谁上。上警的人不能投票选警长。",
-		Campaign:    "你上警了，这是你的竞选发言：说清楚为什么大家该把警徽给你，比如报出你的身份和查验，或者你会怎么带队找狼。不超过80字。",
+		Campaign: "你上警了，这是你的竞选发言：说清楚为什么大家该把警徽给你，比如报出你的身份和查验，或者你会怎么带队找狼。不超过80字。",
+		Withdraw: "竞选发言都结束了，正式投票前你可以退水：选你自己的名字表示继续竞选，选\"放弃\"表示退水。所有还在竞选的人同时决定。" +
+			"退水的人不能当警长，也不能投票选警长。看清楚其他人的竞选发言：如果你信任的人更适合拿警徽，或者你的发言被打穿了，可以退水；还想要警徽就留下。" +
+			"跳了预言家的人退水，大家会觉得他是假的，所以悍跳的狼不要退水。",
 		SheriffVote: "投票选警长：从上警的人里选一个。比较他们的竞选发言，谁报的信息更可信、谁当警长对好人更有利，就投谁。谁都信不过可以选\"放弃\"弃票。",
 		Badge: "你是警长，现在出局了。选一个活着的人表示把警徽移交给他，选\"放弃\"表示撕掉警徽、从此没有警长。" +
 			"警徽应该交给你最信任的好人；没有把握、怕交到狼人手里，就撕掉。",
@@ -430,7 +433,10 @@ Write everything in English.`,
 		Run: "Sheriff election: pick your own name to run for sheriff, or \"pass\" not to. Everyone decides at once, without seeing anyone else's choice. " +
 			"The sheriff's one and a half votes and the right to call the vote are worth a lot. The seer always runs, reporting their checks in the campaign to take the badge and lead. " +
 			"To keep their chances, the pack always has a wolf running too: a wolf set to fake the seer must run and take the seer on head to head, and under any other play a wolf runs to grab the badge, pick a side or stir things up. One or two wolves running is usually enough; agree at night who runs. Those who run do not vote for sheriff.",
-		Campaign:    "You are running for sheriff. This is your campaign speech: say why the table should give you the badge, such as your role and your checks, or how you will lead the hunt. At most 40 words.",
+		Campaign: "You are running for sheriff. This is your campaign speech: say why the table should give you the badge, such as your role and your checks, or how you will lead the hunt. At most 40 words.",
+		Withdraw: "The campaign speeches are over. Before the vote you may withdraw: pick your own name to stay in the race, or \"pass\" to withdraw. Everyone still running decides at once. " +
+			"Whoever withdraws cannot be sheriff and cannot vote for sheriff either. Weigh the other campaigns: if someone you trust is better placed to take the badge, or your own campaign was taken apart, you may withdraw; if you still want the badge, stay. " +
+			"Someone who claimed seer and then withdraws looks fake, so a wolf faking the seer never withdraws.",
 		SheriffVote: "Vote for sheriff: pick one of those running. Compare their campaign speeches: whose information is more believable, and who as sheriff helps the good side more. If you trust none of them, pick \"pass\" to abstain.",
 		Badge: "You are the sheriff and you are out. Pick someone alive to pass the badge to, or \"pass\" to tear it up so there is no sheriff any more. " +
 			"Give it to the good player you trust most; if you are unsure and it might reach a werewolf, tear it up.",

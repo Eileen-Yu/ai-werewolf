@@ -29,6 +29,7 @@ const (
 
 	Run         TurnKind = "run"          // first day: pick yourself to run for sheriff, or pass
 	Campaign    TurnKind = "campaign"     // a candidate's speech for the badge
+	Withdraw    TurnKind = "withdraw"     // after the campaign: a candidate stays in, or passes to withdraw
 	SheriffVote TurnKind = "sheriff_vote" // everyone not running picks a candidate
 	Badge       TurnKind = "badge"        // a sheriff on the way out passes the badge on, or tears it up
 )
@@ -36,7 +37,7 @@ const (
 // IsChoice reports whether the turn asks for a Target.
 func (k TurnKind) IsChoice() bool {
 	switch k {
-	case Vote, WolfPlan, Inspect, Save, Poison, Shoot, Run, SheriffVote, Badge:
+	case Vote, WolfPlan, Inspect, Save, Poison, Shoot, Run, Withdraw, SheriffVote, Badge:
 		return true
 	}
 	return false

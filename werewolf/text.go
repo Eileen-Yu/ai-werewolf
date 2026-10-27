@@ -16,6 +16,7 @@ type host struct {
 
 	// The sheriff: the election, the badge's weight in a vote, and passing it on.
 	election, noRunners, allRun, runners, campaign, sheriffVotes string
+	withdrew, allWithdrew                                        string
 	sheriffTie, sheriffAbstained, elected, sheriffVote           string
 	badgePassed, badgeTorn                                       string
 
@@ -83,6 +84,8 @@ var chineseHost = host{
 	allRun:           "所有人都上警了，没有人投票，本局没有警长。",
 	runners:          "上警的有：%s。",
 	campaign:         "请上警的人按顺序发表竞选发言：%s。",
+	withdrew:         "%s退水，不再竞选，也不能投票。",
+	allWithdrew:      "上警的人都退水了，本局没有警长。",
 	sheriffVotes:     "警长投票结果：%s",
 	sheriffTie:       "警长投票平票，警徽流失，本局没有警长。",
 	sheriffAbstained: "所有人都弃票，警徽流失，本局没有警长。",
@@ -153,6 +156,8 @@ var englishHost = host{
 	allRun:           "Everyone runs, so nobody is left to vote and there is no sheriff this game.",
 	runners:          "Running for sheriff: %s.",
 	campaign:         "Campaign speeches, in this order: %s.",
+	withdrew:         "%s withdrew: out of the race and with no vote for sheriff.",
+	allWithdrew:      "Every candidate withdrew, so there is no sheriff this game.",
 	sheriffVotes:     "Sheriff votes: %s",
 	sheriffTie:       "The sheriff vote is a tie, so the badge is lost and there is no sheriff this game.",
 	sheriffAbstained: "Everyone abstained, so the badge is lost and there is no sheriff this game.",

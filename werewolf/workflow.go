@@ -403,8 +403,10 @@ func (t *table) passBadge(dead ...string) error {
 
 // election runs the first day's sheriff election, before the day's speeches.
 // Everyone decides at once whether to run; those running give a campaign
-// speech in seat order and everyone else votes. Nobody running, nobody left
-// to vote, or a tie leaves the game without a sheriff.
+// speech in seat order, then decide at once whether to withdraw, and those who
+// never ran vote. A candidate who withdraws loses their vote too. Nobody
+// running, nobody left to vote, everyone withdrawing, or a tie leaves the game
+// without a sheriff.
 func (t *table) election() error {
 	s := t.s
 	alive := s.Living()
@@ -439,6 +441,14 @@ func (t *table) election() error {
 	if _, err := t.goRound(brain.Campaign, runners, nil); err != nil {
 		return err
 	}
+	runners, err = t.withdraw(runners)
+	if err != nil {
+		return err
+	}
+	if len(runners) == 0 {
+		t.add("", t.h.allWithdrew)
+		return t.pause()
+	}
 	sheriff := runners[0]
 	if len(runners) > 1 {
 		votes, err := t.chooseAll(brain.SheriffVote, voters, func(string) []string { return append(slices.Clone(runners), game.Pass) })
@@ -461,6 +471,26 @@ func (t *table) election() error {
 	s.Sheriff = sheriff
 	t.add("", fmt.Sprintf(t.h.elected, sheriff))
 	return t.pause()
+}
+
+// withdraw asks every candidate but the seer, who always stays in, whether to
+// stay in the race, and returns those still running.
+func (t *table) withdraw(runners []string) ([]string, error) {
+	asked := slices.DeleteFunc(slices.Clone(runners), func(v string) bool { return t.s.Player(v).Role == game.Seer })
+	stays, err := t.chooseAll(brain.Withdraw, asked, func(v string) []string { return []string{v, game.Pass} })
+	if err != nil {
+		return nil, err
+	}
+	var withdrew []string
+	for _, v := range stays {
+		if v.Target == "" {
+			withdrew = append(withdrew, v.Voter)
+		}
+	}
+	if len(withdrew) > 0 {
+		t.add("", fmt.Sprintf(t.h.withdrew, t.list(withdrew)))
+	}
+	return game.Without(runners, withdrew...), nil
 }
 
 // abstained reports whether every voter abstained.

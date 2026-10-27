@@ -612,14 +612,15 @@ func TestAGameRefusesAnUnknownLanguage(t *testing.T) {
 
 // turnRecorder plays randomly and records every turn it is given.
 // campaigner runs the first two living seats for sheriff, and the seer, who
-// always runs, and has every voter back the first runner. A sheriff on the way
-// out passes the badge to the first name offered, or tears it up if tear is
-// set.
+// always runs. The second of those two withdraws after the campaign, and every
+// voter backs the first candidate left. A sheriff on the way out passes the
+// badge to the first name offered, or tears it up if tear is set.
 type campaigner struct {
-	tear  bool
-	mu    sync.Mutex
-	turns []brain.Turn
-	ran   []string
+	tear     bool
+	mu       sync.Mutex
+	turns    []brain.Turn
+	ran      []string
+	withdrew []string
 }
 
 func (b *campaigner) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
@@ -635,6 +636,14 @@ func (b *campaigner) Act(ctx context.Context, t brain.Turn) (brain.Action, error
 			return brain.Action{Target: t.Me.Name}, nil
 		}
 		return brain.Action{Target: game.Pass}, nil
+	case brain.Withdraw:
+		if firstLiving(t.Seats, 2)[1] == t.Me.Name {
+			b.mu.Lock()
+			b.withdrew = append(b.withdrew, t.Me.Name)
+			b.mu.Unlock()
+			return brain.Action{Target: game.Pass}, nil
+		}
+		return brain.Action{Target: t.Me.Name}, nil
 	case brain.SheriffVote:
 		return brain.Action{Target: t.Candidates[0]}, nil
 	case brain.Badge:
@@ -668,13 +677,14 @@ func holder(seats []brain.Seat) string {
 func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
-	passed, torn := false, false
+	passed, torn, withdrewOnce := false, false, false
 	for i := 0; i < 30 && !(passed && torn); i++ {
 		b := &campaigner{tear: i%2 == 1}
 		SetBrain(b)
 		play(t, client, fmt.Sprintf("sheriff-%d", i), newGame())
 
-		var runners []string
+		var runners, left []string
+		withdrawn := false
 		sheriff, elected := "", false
 		var lastDay1Speaker string
 		for _, turn := range b.turns {
@@ -692,14 +702,21 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 						runners = append(runners, s.Name)
 					}
 				}
+				left = runners
 			case brain.Campaign:
 				assert.Contains(t, runners, turn.Me.Name, "only a candidate campaigns")
+			case brain.Withdraw:
+				assert.Contains(t, runners, turn.Me.Name, "only a candidate may withdraw")
+				assert.NotEqual(t, game.Seer, turn.Me.Role, "the seer always stays in")
+				assert.Equal(t, []string{turn.Me.Name, game.Pass}, turn.Candidates)
+				left = game.Without(runners, b.withdrew...)
+				withdrawn = withdrawn || len(b.withdrew) > 0
 			case brain.SheriffVote:
-				assert.NotContains(t, runners, turn.Me.Name, "a candidate does not vote for sheriff")
-				assert.Equal(t, append(slices.Clone(runners), game.Pass), turn.Candidates, "a voter may abstain")
+				assert.NotContains(t, runners, turn.Me.Name, "a candidate, even one who withdrew, does not vote for sheriff")
+				assert.Equal(t, append(slices.Clone(left), game.Pass), turn.Candidates, "only those still running stand, and a voter may abstain")
 			case brain.Speech:
 				if !elected {
-					elected, sheriff = true, runners[0]
+					elected, sheriff = true, left[0]
 				}
 				if turn.Round == 1 {
 					lastDay1Speaker = turn.Me.Name
@@ -723,8 +740,10 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 			assert.Equal(t, sheriff, holder(turn.Seats), "%s's %s turn on round %d shows the wrong sheriff", turn.Me.Name, turn.Kind, turn.Round)
 		}
 		require.NotEmpty(t, runners, "game %d had no election", i)
+		withdrewOnce = withdrewOnce || withdrawn
 		assert.Equal(t, runners[0], lastDay1Speaker, "the sheriff speaks last")
 	}
+	assert.True(t, withdrewOnce, "no candidate withdrew in any game")
 	assert.True(t, passed, "no sheriff passed the badge on in thirty games")
 	assert.True(t, torn, "no sheriff tore up the badge in thirty games")
 }
