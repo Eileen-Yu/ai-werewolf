@@ -716,7 +716,11 @@ func AssignRolesActivity(ctx workflow.ActivityContext) (any, error) {
 
 func (d deal) fill(rng *rand.Rand) (deal, error) {
 	if len(d.Players) == 0 {
-		d.Players = game.Cast(d.Lang, rng)
+		var with string
+		if d.Human != nil {
+			with = d.Human.Replaces
+		}
+		d.Players = game.Cast(d.Lang, rng, with)
 	}
 	if d.Human != nil {
 		seated, err := game.SeatHuman(d.Players, d.Human.Name, d.Human.Replaces, d.Lang)

@@ -11,7 +11,7 @@ import (
 
 func TestAssignRolesDealsTheLineup(t *testing.T) {
 	rng := rand.New(rand.NewPCG(1, 2))
-	players := AssignRoles(Cast(Chinese, rng), rng)
+	players := AssignRoles(Cast(Chinese, rng, ""), rng)
 	require.Len(t, players, len(Lineup))
 
 	counts := map[Role]int{}
@@ -22,10 +22,12 @@ func TestAssignRolesDealsTheLineup(t *testing.T) {
 	assert.Equal(t, map[Role]int{Werewolf: 3, Seer: 1, Witch: 1, Hunter: 1, Villager: 3}, counts)
 }
 
-func TestAChineseCastSeatsEveryRivalPairAndOneLoner(t *testing.T) {
+func TestAChineseCastSeatsRivalsInPairsAndGivesEveryoneAChance(t *testing.T) {
 	seated := map[string]int{}
-	for seed := range uint64(50) {
-		cast := Cast(Chinese, rand.New(rand.NewPCG(seed, 1)))
+	fullTables := 0
+	const games = 1100
+	for seed := range uint64(games) {
+		cast := Cast(Chinese, rand.New(rand.NewPCG(seed, 1)), "")
 		require.Len(t, cast, len(Lineup))
 		names := map[string]bool{}
 		for _, p := range cast {
@@ -33,21 +35,22 @@ func TestAChineseCastSeatsEveryRivalPairAndOneLoner(t *testing.T) {
 			seated[p.Name]++
 		}
 		assert.Len(t, names, len(Lineup), "nobody is seated twice")
+		pairs := 0
 		for _, pair := range chineseRivals {
-			assert.True(t, names[pair[0].Name] && names[pair[1].Name], "%s and %s sit down together", pair[0].Name, pair[1].Name)
-		}
-		loners := 0
-		for _, p := range chineseLoners {
-			if names[p.Name] {
-				loners++
+			assert.Equal(t, names[pair[0].Name], names[pair[1].Name], "%s and %s sit down together or not at all", pair[0].Name, pair[1].Name)
+			if names[pair[0].Name] {
+				pairs++
 			}
 		}
-		assert.Equal(t, 1, loners)
+		if pairs == len(chineseRivals) {
+			fullTables++
+		}
 	}
-	for _, p := range chineseLoners {
-		assert.Positive(t, seated[p.Name], "%s gets a seat in some game", p.Name)
+	assert.InDelta(t, games*3/11, fullTables, games/20, "every pair is seated in about 3 games of 11")
+	for _, name := range Characters(Chinese) {
+		assert.InDelta(t, games*9/11, seated[name], games/20, "%s gets a seat in about 9 games of 11", name)
 	}
-	assert.Len(t, Cast(English, rand.New(rand.NewPCG(1, 2))), len(Lineup))
+	assert.Len(t, Cast(English, rand.New(rand.NewPCG(1, 2)), ""), len(Lineup))
 }
 
 func TestACharacterNamesOnlyRivalsSureToBeAtTheTable(t *testing.T) {
@@ -235,7 +238,7 @@ func TestEnglish(t *testing.T) {
 }
 
 func TestAHumanTakesTheSeatOfTheCharacterTheyPick(t *testing.T) {
-	cast := Cast(Chinese, rand.New(rand.NewPCG(1, 2)))
+	cast := Cast(Chinese, rand.New(rand.NewPCG(1, 2)), "华妃")
 	seated, err := SeatHuman(cast, " Eileen ", "华妃", Chinese)
 	require.NoError(t, err)
 	require.Len(t, seated, len(cast))
@@ -253,25 +256,26 @@ func TestAHumanTakesTheSeatOfTheCharacterTheyPick(t *testing.T) {
 	assert.False(t, slices.ContainsFunc(cast, func(p Player) bool { return p.Human }), "the cast passed in is left alone")
 }
 
-func TestAnyLonerCanBeReplacedEvenIfAnotherWasDrawn(t *testing.T) {
-	cast := Cast(Chinese, rand.New(rand.NewPCG(1, 2)))
-	var missing string
-	for _, l := range chineseLoners {
-		if !slices.ContainsFunc(cast, func(p Player) bool { return p.Name == l.Name }) {
-			missing = l.Name
-			break
+func TestTheCharacterAPersonPicksIsAlwaysSeated(t *testing.T) {
+	for _, name := range Characters(Chinese) {
+		for seed := range uint64(20) {
+			cast := Cast(Chinese, rand.New(rand.NewPCG(seed, 3)), name)
+			require.True(t, slices.ContainsFunc(cast, func(p Player) bool { return p.Name == name }), "%s was not drawn", name)
+			seated, err := SeatHuman(cast, "Eileen", name, Chinese)
+			require.NoError(t, err)
+			for i, p := range seated {
+				if p.Human {
+					assert.Equal(t, name, cast[i].Name, "the person took %s's seat and nobody else's", name)
+				} else {
+					assert.Equal(t, cast[i].Name, p.Name)
+				}
+			}
 		}
-	}
-	require.NotEmpty(t, missing)
-	seated, err := SeatHuman(cast, "Eileen", missing, Chinese)
-	require.NoError(t, err)
-	for _, l := range chineseLoners {
-		assert.False(t, slices.ContainsFunc(seated, func(p Player) bool { return p.Name == l.Name }), "the person took the loner's seat, so no loner is left")
 	}
 }
 
 func TestAHumanSeatRefusesWhatCannotBeSeated(t *testing.T) {
-	cast := Cast(English, rand.New(rand.NewPCG(1, 2)))
+	cast := Cast(English, rand.New(rand.NewPCG(1, 2)), "")
 	for name, replaces := range map[string]string{
 		"":        "Karen",
 		"Eileen":  "华妃",
