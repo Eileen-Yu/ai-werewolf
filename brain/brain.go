@@ -26,12 +26,17 @@ const (
 	Save      TurnKind = "save"       // witch decides whether to save tonight's victim
 	Poison    TurnKind = "poison"     // witch decides whether to poison someone
 	Shoot     TurnKind = "shoot"      // hunter, on the way out, decides whether to shoot
+
+	Run         TurnKind = "run"          // first day: pick yourself to run for sheriff, or pass
+	Campaign    TurnKind = "campaign"     // a candidate's speech for the badge
+	SheriffVote TurnKind = "sheriff_vote" // everyone not running picks a candidate
+	Badge       TurnKind = "badge"        // a sheriff on the way out passes the badge on, or tears it up
 )
 
 // IsChoice reports whether the turn asks for a Target.
 func (k TurnKind) IsChoice() bool {
 	switch k {
-	case Vote, WolfPlan, Inspect, Save, Poison, Shoot:
+	case Vote, WolfPlan, Inspect, Save, Poison, Shoot, Run, SheriffVote, Badge:
 		return true
 	}
 	return false
@@ -46,14 +51,15 @@ func (k TurnKind) Speaks() bool {
 // Declares reports whether a speech must also state, on the record, who the
 // player suspects and what they claim to be.
 func (k TurnKind) Declares() bool {
-	return k == Speech || k == Rebuttal
+	return k == Speech || k == Rebuttal || k == Campaign
 }
 
-// Seat is what everyone knows about a player: their name and, once they are
-// out, how they left. Never their role.
+// Seat is what everyone knows about a player: their name, whether they hold
+// the sheriff's badge and, once they are out, how they left. Never their role.
 type Seat struct {
-	Name  string `json:"name"`
-	Death string `json:"death,omitempty"`
+	Name    string `json:"name"`
+	Death   string `json:"death,omitempty"`
+	Sheriff bool   `json:"sheriff,omitempty"`
 }
 
 // Turn is everything a player is told when it is their turn. Transcript is
@@ -208,6 +214,11 @@ func (t Turn) PlanNames() []string {
 		return t.Pack
 	}
 	return append(slices.Clone(t.Pack), game.Nobody)
+}
+
+// IsSheriff reports whether this player holds the sheriff's badge.
+func (t Turn) IsSheriff() bool {
+	return slices.ContainsFunc(t.Seats, func(s Seat) bool { return s.Sheriff && s.Name == t.Me.Name })
 }
 
 // IsHook reports whether the pack's plan has this wolf side with the good

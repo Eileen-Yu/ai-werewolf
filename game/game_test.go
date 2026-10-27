@@ -180,19 +180,23 @@ func TestWinner(t *testing.T) {
 
 func TestTally(t *testing.T) {
 	tests := []struct {
-		name   string
-		votes  []Vote
-		want   string
-		wantOK bool
+		name    string
+		votes   []Vote
+		sheriff string
+		want    string
+		wantOK  bool
 	}{
-		{"clear majority", []Vote{{"a", "x"}, {"b", "x"}, {"c", "y"}}, "x", true},
-		{"tie", []Vote{{"a", "x"}, {"b", "y"}}, "", false},
-		{"abstentions ignored", []Vote{{"a", "x"}, {"b", ""}, {"c", ""}}, "x", true},
-		{"nobody voted", []Vote{{"a", ""}}, "", false},
+		{"clear majority", []Vote{{"a", "x"}, {"b", "x"}, {"c", "y"}}, "", "x", true},
+		{"tie", []Vote{{"a", "x"}, {"b", "y"}}, "", "", false},
+		{"abstentions ignored", []Vote{{"a", "x"}, {"b", ""}, {"c", ""}}, "", "x", true},
+		{"nobody voted", []Vote{{"a", ""}}, "", "", false},
+		{"the sheriff breaks a tie", []Vote{{"a", "x"}, {"b", "y"}}, "b", "y", true},
+		{"the sheriff's half vote is not a whole one", []Vote{{"a", "x"}, {"b", "x"}, {"c", "y"}, {"d", "y"}, {"e", "y"}}, "a", "y", true},
+		{"the sheriff abstaining counts for nothing", []Vote{{"a", "x"}, {"b", "y"}, {"c", ""}}, "c", "", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := Tally(tt.votes)
+			got, ok := Tally(tt.votes, tt.sheriff)
 			assert.Equal(t, tt.wantOK, ok)
 			assert.Equal(t, tt.want, got)
 		})

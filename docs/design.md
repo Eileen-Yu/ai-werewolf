@@ -23,7 +23,7 @@ The game master workflow holds the full `game.State`, which has the whole truth.
 
 The view has six parts:
 
-- **Seats and status**: who is alive. A dead player only shows when they died, or that they were voted out: "died on Night 2", "died on Day 3", "voted out on Day 2". The host only ever states facts everyone at the table could see. Whether someone was killed by the wolves, poisoned, saved or shot by the hunter is never announced; only the player who used the power is told.
+- **Seats and status**: who is alive, and who holds the sheriff's badge. A dead player only shows when they died, or that they were voted out: "died on Night 2", "died on Day 3", "voted out on Day 2". The host only ever states facts everyone at the table could see. Whether someone was killed by the wolves, poisoned, saved or shot by the hunter is never announced; only the player who used the power is told.
 - **Your secrets**: your own role, your fellow wolves, the wolves' night talk and plan, your check results, and what the witch knows about tonight's victim and her potions. These are the only facts that are certain.
 - **Your notes**: the player's own structured memory, holding what they believe about each player (`beliefs`: werewolf, good or unsure, with a list of evidence) and what they plan to do next (`strategy`). Every move hands back a complete new set of notes.
 - **Your recent private thoughts**: the `thinking` from the last 3 moves. Older reasoning should already be in the notes.
@@ -32,7 +32,13 @@ The view has six parts:
 
 Before each move, the prompt lists again, right next to the task, what this player knows for certain (what the host told them privately: check results, tonight's victim, potions used), and says these win over anyone's claim. The same facts are already under "Your secrets", but that is too far away and the model forgets, for example a seer who checked someone as good and then suspects them by day.
 
-When speaking, the player is also told who has already spoken this round and who has not. A wolf also sees today's pack plan by day.
+When speaking, the player is also told who has already spoken this round and who has not. The sheriff is told they speak last and should sum up and name who the village votes for.
+
+## The sheriff
+
+The election runs once, on Day 1 after the deaths are announced, among the living. It is simpler than the table game in three ways: it comes after the night's deaths rather than before; a tie loses the badge instead of going to a run-off; and nobody can withdraw once they have run. Everyone is asked at once whether to run (`run`: their own name or `pass`), the candidates give a `campaign` speech in seat order, which may carry a claim like any day speech, and the rest cast a `sheriff_vote`. A candidate does not vote. No candidates, everyone a candidate, or a tie all mean no sheriff.
+
+The sheriff speaks last every day: the speaking order starts at the seat after them. `game.Tally` counts in half votes, 3 for the sheriff and 2 for anyone else, so the sheriff breaks a tie but cannot outvote two players. The ballot records who was sheriff, so the vote card can mark that vote 1.5. When the sheriff is out, by night or by day, and the game is not yet over, they get a `badge` turn: a living player, or `pass` to tear the badge up. At night that comes after dawn, so a night hunter has already shot; by day it comes after their last words and before a hunter's shot, and a sheriff the hunter shoots passes it on in turn. A wolf also sees today's pack plan by day.
 
 The pack's tactic is dealt with the roles, in the same activity, and only the wolves are told it. It is dealt rather than left to the wolves because, left to choose, they settle on the same best play, a seer counter-claim, every game. A tactic changes what the wolves are told and what the plan asks for, never what they may do: any wolf may suspect or vote for a teammate. The prompt tells them to protect teammates as a rule and turn on one only for a concrete reason, never out of spite, and that working together is not voting together: at most two wolves on the same vote unless that vote decides who goes, never with the same teammate two days running, and a fake seer never vouches for a teammate. Every good role is told the other half: a vote is for getting a wolf out, not for registering a personal suspicion, so a split good vote should join the likeliest of its suspects; one shared vote proves nothing, but a group that keeps voting together and vouching for each other is the pack; and after a tie, repeating the same split hands the wolves the game, since they kill every night and win once they are as many as everyone else. The random brain keeps its wolves off teammates while it has anyone else to pick, since a sacrifice is a judgement and a random pick is not one. The prompt ends with a checklist to go through before answering.
 
@@ -103,6 +109,7 @@ go test ./...
 - The witch is scripted to save the victim, and the night must pass with no death.
 - The game master worker is killed mid-game and a new one takes over, and the game must still finish.
 - In random games, where the witch saves and poisons and the hunter shoots at random, no public host line may mention a kill, a potion, a shot or a power role, and every seat must show only when its player died or that they were voted out.
+- A scripted Day 1 election: only the living are asked to run, only candidates campaign, only the rest vote, the sheriff speaks last that day, every later turn shows the right sheriff, and a sheriff who is out passes the badge to someone alive or tears it up.
 - The hunter always shoots, and no public line may name the hunter; the player shot must be shown dying like anyone else, and only the hunter is told who he shot.
 
 `werewolf/human_test.go` plays games with a person in a seat, answering through events, and checks the AI never played a move the person answered, the person only saw what their seat may see, and the MVP is announced. Another game has the person never answer, and must still finish, with the AI covering every move. `internal/web/web_test.go` plays a whole game through the HTTP API, including a bad move the page must refuse and a move the game is no longer waiting for.

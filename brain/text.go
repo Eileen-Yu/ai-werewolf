@@ -48,6 +48,7 @@ type text struct {
 	faker, hook, mustFakeLine, hookLine, habitNow    string
 	nobodySpoke, silent                              string
 	shootAlive, selfCheck, onlyJSON, seatLine, known string
+	sheriffMark, sheriffLine                         string
 	line                                             string
 	fields                                           fields
 	targetOnly, fakerOnly, hookOnly, focusOnly       string
@@ -82,6 +83,7 @@ var chineseText = text{
 - 村民：没有特殊能力。
 流程：天亮后只公布昨晚谁死了，不公布死因（可能被狼人杀，可能被女巫毒死，也可能被出局的猎人开枪带走；被救的人不会死）。猎人开枪也不公布，被带走的人只会出现在死亡名单里。
 白天先按顺序每人发言一次，再进入回应环节每人再说一次，最后投票放逐一人，平票则无人出局。被放逐的人有遗言。
+警长：第1天天亮后先竞选警长。想当的人上警，按座位顺序发表竞选发言，没上警的人投票选警长，得票最多的当选；平票、没人上警或者所有人都上警，则没有警长。警长放逐投票算1.5票，每天最后一个发言，可以归票。警长出局时可以把警徽移交给一个活着的人，也可以撕掉警徽，从此没有警长。
 胜负：狼人全部出局则好人胜利；所有村民出局，或者预言家、女巫、猎人全部出局，或者活着的狼人不少于其他活着的人（狼人从此控制每一次投票），则狼人胜利。
 
 你是%s，身份是%s，性格：%s。
@@ -169,6 +171,12 @@ var chineseText = text{
 		Save:      "今晚谁被狼人杀了在【你的秘密信息】里。决定要不要用解药救他：选他的名字表示救，选\"放弃\"表示不救。",
 		Poison:    "决定要不要用毒药：选一个名字表示毒死他，选\"放弃\"表示不用。毒错了好人会很伤，没有把握就别用。",
 		Shoot:     "你出局了，作为猎人可以开枪带走一个人：选一个名字表示开枪，选\"放弃\"表示不开枪。",
+		Run: "竞选警长：选你自己的名字表示上警，选\"放弃\"表示不上警。所有人同时决定，看不到别人的选择。" +
+			"警长的1.5票和归票权很有用：有查验的预言家通常应该上警，靠竞选发言报查验、拿警徽；要悍跳的狼也常上警和他争。上警的人不能投票选警长。",
+		Campaign:    "你上警了，这是你的竞选发言：说清楚为什么大家该把警徽给你，比如报出你的身份和查验，或者你会怎么带队找狼。不超过80字。",
+		SheriffVote: "投票选警长：从上警的人里选一个。比较他们的竞选发言，谁报的信息更可信、谁当警长对好人更有利，就投谁。",
+		Badge: "你是警长，现在出局了。选一个活着的人表示把警徽移交给他，选\"放弃\"表示撕掉警徽、从此没有警长。" +
+			"警徽应该交给你最信任的好人；没有把握、怕交到狼人手里，就撕掉。",
 	},
 
 	badTarget:      "target 必须是这些名字之一：%s，你给的是 %q",
@@ -250,6 +258,8 @@ var chineseText = text{
 	},
 	onlyJSON:    "只回复一个JSON对象，不要任何其他内容：",
 	seatLine:    "- %s：%s\n",
+	sheriffMark: "，警长",
+	sheriffLine: "你是警长：你最后一个发言，你的放逐票算1.5票。发言时可以归票，明确告诉大家今天投谁、为什么。\n",
 	line:        "[%s] %s：%s\n",
 	targetOnly:  "target 只能是这些名字之一：%s。\n",
 	fakerOnly:   "faker 只能是：%s。\n",
@@ -284,6 +294,7 @@ Roles:
 - Villager: no power.
 Flow: at dawn only who died is announced, never how (killed by werewolves, poisoned by the witch, or shot by a hunter who went out; a saved player does not die). A hunter's shot is not announced either: the player shot simply appears among the dead.
 By day everyone speaks once in order, then once more in a reply round, then everyone votes one person out; a tie means nobody goes. The exiled player gets last words.
+Sheriff: on Day 1, before the day's speeches, there is a sheriff election. Whoever wants the badge runs and gives a campaign speech in seat order; everyone not running votes, and the most votes wins. A tie, nobody running, or everyone running means no sheriff. The sheriff's vote to exile counts one and a half, the sheriff speaks last each day and may call the vote. A sheriff who goes out may pass the badge to someone alive, or tear it up, and then there is no sheriff.
 Winning: the good side wins when every werewolf is out; the werewolves win when every villager is out, when the seer, witch and hunter are all out, or when the living werewolves are at least as many as everyone else alive (from then on they control every vote).
 
 You are %s. Your role is %s. Your personality: %s.
@@ -372,6 +383,12 @@ Write everything in English.`,
 		Save:      "Who the werewolves killed tonight is in [Your secrets]. Decide whether to save them with the antidote: pick their name to save them, or \"pass\" not to.",
 		Poison:    "Decide whether to use the poison: pick a name to poison them, or \"pass\" not to. Poisoning a good player hurts badly, so do not use it unless you are sure.",
 		Shoot:     "You are out. As the hunter you may shoot one person and take them with you: pick a name to shoot, or \"pass\" not to.",
+		Run: "Sheriff election: pick your own name to run for sheriff, or \"pass\" not to. Everyone decides at once, without seeing anyone else's choice. " +
+			"The sheriff's one and a half votes and the right to call the vote are worth a lot: a seer with a check should usually run and report it in the campaign to take the badge, and a wolf set to fake the seer often runs against them. Those who run do not vote for sheriff.",
+		Campaign:    "You are running for sheriff. This is your campaign speech: say why the table should give you the badge, such as your role and your checks, or how you will lead the hunt. At most 40 words.",
+		SheriffVote: "Vote for sheriff: pick one of those running. Compare their campaign speeches: whose information is more believable, and who as sheriff helps the good side more.",
+		Badge: "You are the sheriff and you are out. Pick someone alive to pass the badge to, or \"pass\" to tear it up so there is no sheriff any more. " +
+			"Give it to the good player you trust most; if you are unsure and it might reach a werewolf, tear it up.",
 	},
 
 	badTarget:      "target must be one of: %s; you gave %q",
@@ -453,6 +470,8 @@ Write everything in English.`,
 	},
 	onlyJSON:    "Reply with a single JSON object and nothing else: ",
 	seatLine:    "- %s: %s\n",
+	sheriffMark: ", sheriff",
+	sheriffLine: "You are the sheriff: you speak last, and your vote to exile counts one and a half. You may call the vote: tell the table plainly who to vote out today and why.\n",
 	line:        "[%s] %s: %s\n",
 	targetOnly:  "target must be one of: %s.\n",
 	fakerOnly:   "faker must be one of: %s.\n",

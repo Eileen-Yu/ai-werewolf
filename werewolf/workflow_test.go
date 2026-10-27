@@ -468,6 +468,110 @@ func TestAGameRefusesAnUnknownLanguage(t *testing.T) {
 }
 
 // turnRecorder plays randomly and records every turn it is given.
+// campaigner runs the first two living seats for sheriff and has every voter
+// back the first of them. A sheriff on the way out passes the badge to the
+// first name offered, or tears it up if tear is set.
+type campaigner struct {
+	tear  bool
+	mu    sync.Mutex
+	turns []brain.Turn
+}
+
+func (b *campaigner) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
+	b.mu.Lock()
+	b.turns = append(b.turns, t)
+	b.mu.Unlock()
+	switch t.Kind {
+	case brain.Run:
+		if slices.Contains(firstLiving(t.Seats, 2), t.Me.Name) {
+			return brain.Action{Target: t.Me.Name}, nil
+		}
+		return brain.Action{Target: game.Pass}, nil
+	case brain.SheriffVote:
+		return brain.Action{Target: t.Candidates[0]}, nil
+	case brain.Badge:
+		if b.tear {
+			return brain.Action{Target: game.Pass}, nil
+		}
+		return brain.Action{Target: t.Candidates[0]}, nil
+	}
+	return brain.Random{}.Act(ctx, t)
+}
+
+func firstLiving(seats []brain.Seat, n int) []string {
+	var names []string
+	for _, s := range seats {
+		if s.Death == "" && len(names) < n {
+			names = append(names, s.Name)
+		}
+	}
+	return names
+}
+
+func holder(seats []brain.Seat) string {
+	for _, s := range seats {
+		if s.Sheriff {
+			return s.Name
+		}
+	}
+	return ""
+}
+
+func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T) {
+	client := startEngine(t)
+	startWorker(t, client)
+	passed, torn := false, false
+	for i := 0; i < 30 && !(passed && torn); i++ {
+		b := &campaigner{tear: i%2 == 1}
+		SetBrain(b)
+		play(t, client, fmt.Sprintf("sheriff-%d", i), newGame())
+
+		var runners []string
+		sheriff, elected := "", false
+		var lastDay1Speaker string
+		for _, turn := range b.turns {
+			switch turn.Kind {
+			case brain.Run:
+				assert.Equal(t, 1, turn.Round, "the election is on the first day only")
+				assert.Equal(t, []string{turn.Me.Name, game.Pass}, turn.Candidates)
+				runners = firstLiving(turn.Seats, 2)
+			case brain.Campaign:
+				assert.Contains(t, runners, turn.Me.Name, "only a candidate campaigns")
+			case brain.SheriffVote:
+				assert.NotContains(t, runners, turn.Me.Name, "a candidate does not vote for sheriff")
+				assert.Equal(t, runners, turn.Candidates)
+			case brain.Speech:
+				if !elected {
+					elected, sheriff = true, runners[0]
+				}
+				if turn.Round == 1 {
+					lastDay1Speaker = turn.Me.Name
+				}
+			case brain.Badge:
+				require.Equal(t, sheriff, turn.Me.Name, "only the sheriff passes the badge")
+				i := slices.IndexFunc(turn.Seats, func(s brain.Seat) bool { return s.Name == turn.Me.Name })
+				assert.NotEmpty(t, turn.Seats[i].Death, "the sheriff passes the badge once out")
+				assert.Equal(t, game.Pass, turn.Candidates[len(turn.Candidates)-1], "the badge may be torn up")
+				for _, name := range turn.Candidates[:len(turn.Candidates)-1] {
+					j := slices.IndexFunc(turn.Seats, func(s brain.Seat) bool { return s.Name == name })
+					assert.Empty(t, turn.Seats[j].Death, "the badge goes to someone alive, not %s", name)
+				}
+				if b.tear {
+					sheriff, torn = "", true
+				} else {
+					sheriff, passed = turn.Candidates[0], true
+				}
+				continue
+			}
+			assert.Equal(t, sheriff, holder(turn.Seats), "%s's %s turn on round %d shows the wrong sheriff", turn.Me.Name, turn.Kind, turn.Round)
+		}
+		require.NotEmpty(t, runners, "game %d had no election", i)
+		assert.Equal(t, runners[0], lastDay1Speaker, "the sheriff speaks last")
+	}
+	assert.True(t, passed, "no sheriff passed the badge on in thirty games")
+	assert.True(t, torn, "no sheriff tore up the badge in thirty games")
+}
+
 type turnRecorder struct {
 	mu    sync.Mutex
 	turns []brain.Turn

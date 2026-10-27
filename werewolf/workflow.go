@@ -221,7 +221,7 @@ func (t *table) night() error {
 		return nil
 	}
 	t.add("", fmt.Sprintf(t.h.dawnDead, t.list(dead)))
-	return nil
+	return t.passBadge(dead...)
 }
 
 // wolvesHunt has the wolves plot, then the first of them settles the plan:
@@ -356,10 +356,114 @@ func seat(s *game.State, name string) int {
 	return slices.IndexFunc(s.Players, func(p game.Player) bool { return p.Name == name })
 }
 
-func (t *table) day() error {
+// passBadge lets a sheriff among the dead pass the badge to someone alive or
+// tear it up. Once the game is decided there is nothing left to pass on.
+func (t *table) passBadge(dead ...string) error {
+	s := t.s
+	sheriff := s.Sheriff
+	if sheriff == "" || !slices.Contains(dead, sheriff) || s.Winner() != "" {
+		return nil
+	}
+	heir, err := t.choose(brain.Badge, sheriff, append(s.Living(), game.Pass))
+	if err != nil {
+		return err
+	}
+	if heir == "" || heir == game.Pass {
+		s.Sheriff = ""
+		t.add("", fmt.Sprintf(t.h.badgeTorn, sheriff))
+		return nil
+	}
+	s.Sheriff = heir
+	t.add("", fmt.Sprintf(t.h.badgePassed, sheriff, heir))
+	return nil
+}
+
+// election runs the first day's sheriff election, before the day's speeches.
+// Everyone decides at once whether to run; those running give a campaign
+// speech in seat order and everyone else votes. Nobody running, nobody left
+// to vote, or a tie leaves the game without a sheriff.
+func (t *table) election() error {
 	s := t.s
 	alive := s.Living()
-	order := game.Rotate(alive, s.Round-1)
+	t.add("", t.h.election)
+	runs, err := t.chooseAll(brain.Run, alive, func(v string) []string { return []string{v, game.Pass} })
+	if err != nil {
+		return err
+	}
+	var runners []string
+	for _, r := range runs {
+		if r.Target == r.Voter {
+			runners = append(runners, r.Voter)
+		}
+	}
+	voters := game.Without(alive, runners...)
+	switch {
+	case len(runners) == 0:
+		t.add("", t.h.noRunners)
+		return nil
+	case len(voters) == 0:
+		t.add("", t.h.allRun)
+		return nil
+	}
+	t.add("", fmt.Sprintf(t.h.runners, t.list(runners)))
+	t.add("", fmt.Sprintf(t.h.campaign, t.list(runners)))
+	if _, err := t.goRound(brain.Campaign, runners, nil); err != nil {
+		return err
+	}
+	sheriff := runners[0]
+	if len(runners) > 1 {
+		votes, err := t.chooseAll(brain.SheriffVote, voters, func(string) []string { return runners })
+		if err != nil {
+			return err
+		}
+		t.add("", fmt.Sprintf(t.h.sheriffVotes, t.tallyLine(votes)))
+		won, ok := game.Tally(votes, "")
+		if !ok {
+			t.add("", t.h.sheriffTie)
+			return t.pause()
+		}
+		sheriff = won
+	}
+	s.Sheriff = sheriff
+	t.add("", fmt.Sprintf(t.h.elected, sheriff))
+	return t.pause()
+}
+
+// tallyLine lists who voted for whom, the sheriff marked.
+func (t *table) tallyLine(votes []game.Vote) string {
+	tally := make([]string, len(votes))
+	for i, v := range votes {
+		voter, target := v.Voter, v.Target
+		if voter == t.s.Sheriff {
+			voter = fmt.Sprintf(t.h.sheriffVote, voter)
+		}
+		if target == "" {
+			target = t.h.abstain
+		}
+		tally[i] = fmt.Sprintf(t.h.vote, voter, target)
+	}
+	return strings.Join(tally, t.h.comma)
+}
+
+// speakingOrder is who speaks when today. A sheriff speaks last, so the order
+// starts from the seat after theirs; without one it moves round the table
+// from one day to the next.
+func (t *table) speakingOrder(alive []string) []string {
+	if i := slices.Index(alive, t.s.Sheriff); i >= 0 {
+		return game.Rotate(alive, i+1)
+	}
+	return game.Rotate(alive, t.s.Round-1)
+}
+
+func (t *table) day() error {
+	s := t.s
+	if s.Round == 1 {
+		if err := t.election(); err != nil {
+			return err
+		}
+	}
+	alive := s.Living()
+	order := t.speakingOrder(alive)
 	t.add("", fmt.Sprintf(t.h.order, t.list(order)))
 	if _, err := t.goRound(brain.Speech, order, nil); err != nil {
 		return err
@@ -379,18 +483,10 @@ func (t *table) day() error {
 	if err != nil {
 		return err
 	}
-	var tally []string
-	for _, v := range votes {
-		target := v.Target
-		if target == "" {
-			target = t.h.abstain
-		}
-		tally = append(tally, fmt.Sprintf(t.h.vote, v.Voter, target))
-	}
-	s.LastVote = &game.Ballot{Round: s.Round, Votes: votes}
-	t.add("", fmt.Sprintf(t.h.votes, strings.Join(tally, t.h.comma)))
+	s.LastVote = &game.Ballot{Round: s.Round, Votes: votes, Sheriff: s.Sheriff}
+	t.add("", fmt.Sprintf(t.h.votes, t.tallyLine(votes)))
 
-	out, ok := game.Tally(votes)
+	out, ok := game.Tally(votes, s.Sheriff)
 	if !ok {
 		t.add("", t.h.tie)
 		return t.pause()
@@ -400,6 +496,9 @@ func (t *table) day() error {
 	if _, err := t.speak(t.turn(brain.LastWords, out, nil)); err != nil {
 		return err
 	}
+	if err := t.passBadge(out); err != nil {
+		return err
+	}
 	if s.Player(out).Role == game.Hunter {
 		shot, err := t.hunterShoots(out)
 		if err != nil {
@@ -407,6 +506,9 @@ func (t *table) day() error {
 		}
 		if shot != "" {
 			t.add("", fmt.Sprintf(t.h.diedNow, shot))
+			if err := t.passBadge(shot); err != nil {
+				return err
+			}
 		}
 	}
 	return t.pause()
@@ -437,7 +539,7 @@ var retry = workflow.WithActivityRetryPolicy(&workflow.RetryPolicy{
 func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brain.Turn {
 	seats := make([]brain.Seat, len(t.s.Players))
 	for i, p := range t.s.Players {
-		seats[i] = brain.Seat{Name: p.Name, Death: p.Death}
+		seats[i] = brain.Seat{Name: p.Name, Death: p.Death, Sheriff: p.Name == t.s.Sheriff}
 	}
 	turn := brain.Turn{
 		Lang:       t.s.Lang,

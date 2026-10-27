@@ -54,6 +54,8 @@ type Line struct {
 type LastVote struct {
 	When  string      `json:"when"`
 	Votes []game.Vote `json:"votes"`
+	// Sheriff is whose vote counted one and a half that day, if anyone's.
+	Sheriff string `json:"sheriff,omitempty"`
 }
 
 // Pending is a move the game is waiting on the human for. The move is raised
@@ -153,10 +155,10 @@ func (t *table) publish() {
 		v.Pack = t.s.Living(game.Werewolf)
 	}
 	if b := t.s.LastVote; b != nil {
-		v.LastVote = &LastVote{When: l.When(b.Round, game.Day), Votes: b.Votes}
+		v.LastVote = &LastVote{When: l.When(b.Round, game.Day), Votes: b.Votes, Sheriff: b.Sheriff}
 	}
 	for _, p := range t.s.Players {
-		v.Seats = append(v.Seats, brain.Seat{Name: p.Name, Death: p.Death})
+		v.Seats = append(v.Seats, brain.Seat{Name: p.Name, Death: p.Death, Sheriff: p.Name == t.s.Sheriff})
 	}
 	for _, r := range brain.Claimable {
 		v.Words[string(r)] = t.say(string(r))

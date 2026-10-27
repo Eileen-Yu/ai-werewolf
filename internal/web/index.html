@@ -22,6 +22,7 @@
   .seats { display:flex; flex-wrap:wrap; gap:6px; }
   .seat { padding:4px 10px; border:1px solid var(--line); border-radius:999px; font-size:13px; }
   .seat.dead { opacity:.4; text-decoration: line-through; }
+  .seat.sheriff { border-color: #d4a017; font-weight: 600; }
   .seat.me { border-color:var(--accent); color:var(--accent); }
   #log { max-height: 70vh; overflow-y:auto; }
   .line { padding:6px 0; border-bottom:1px solid var(--line); }
@@ -86,7 +87,9 @@ const UI = {
     youAre: "你是", pack: "狼队：", waiting: "等待其他玩家……", dead: "你已出局，继续观战。", submit: "提交",
     timeLeft: s => `剩余 ${s} 秒，超时由AI代打`,
     kinds: { speech: "轮到你发言", rebuttal: "第二轮：回应和质疑", wolf_chat: "狼队夜聊", wolf_plan: "你来定今晚的计划",
-      last_words: "留下遗言", vote: "投票放逐", inspect: "今晚查验谁", save: "要用解药救他吗", poison: "要用毒药吗", shoot: "开枪带走谁" },
+      last_words: "留下遗言", vote: "投票放逐", inspect: "今晚查验谁", save: "要用解药救他吗", poison: "要用毒药吗", shoot: "开枪带走谁",
+      run: "竞选警长：要上警吗", campaign: "警长竞选发言", sheriff_vote: "投票选警长", badge: "移交警徽" },
+    run: "上警", noRun: "不上警", tearBadge: "撕掉警徽", sheriff: "警长", sheriffBallot: "（警长，1.5票）",
     target: "选择", speech: "发言", planSpeech: "给队友的计划说明", suspect: "你怀疑谁（会记录在案）",
     claim: "声称身份（可选）", noClaim: "不声称", claimChecked: "查验了谁", claimResult: "查验结果", claimPotion: "救了/毒了谁",
     votes: w => `${w}票型`, abstain: "弃票", ballots: n => `${n}票`,
@@ -99,7 +102,9 @@ const UI = {
     youAre: "You are", pack: "Your pack: ", waiting: "Waiting for the others…", dead: "You are out. Keep watching.", submit: "Submit",
     timeLeft: s => `${s}s left before an AI plays this for you`,
     kinds: { speech: "Your turn to speak", rebuttal: "Second round: answer and challenge", wolf_chat: "Wolf chat", wolf_plan: "Set tonight's plan",
-      last_words: "Your last words", vote: "Vote someone out", inspect: "Who to check tonight", save: "Use the antidote on them?", poison: "Use the poison?", shoot: "Who to shoot" },
+      last_words: "Your last words", vote: "Vote someone out", inspect: "Who to check tonight", save: "Use the antidote on them?", poison: "Use the poison?", shoot: "Who to shoot",
+      run: "Sheriff election: will you run?", campaign: "Your campaign speech", sheriff_vote: "Vote for sheriff", badge: "Pass on the badge" },
+    run: "Run for sheriff", noRun: "Stay out", tearBadge: "Tear up the badge", sheriff: "Sheriff", sheriffBallot: " (sheriff, 1.5 votes)",
     target: "Pick", speech: "What you say", planSpeech: "The plan, for your pack", suspect: "Who you suspect (goes on the record)",
     claim: "Claim a role (optional)", noClaim: "No claim", claimChecked: "Who you checked", claimResult: "What you saw", claimPotion: "Who you saved or poisoned",
     votes: w => `${w} votes`, abstain: "Abstained", ballots: n => `${n} vote${n === 1 ? "" : "s"}`,
@@ -157,7 +162,7 @@ function render(v) {
   $("role").textContent = v.role;
   $("role").className = "role" + (v.pack ? " wolf" : "");
   $("pack").textContent = v.pack ? t.pack + v.pack.join(", ") : "";
-  $("seats").innerHTML = v.seats.map(s => `<span class="seat${s.death ? " dead" : ""}${s.name === v.you ? " me" : ""}" title="${esc(s.death || "")}">${esc(s.name)}</span>`).join("");
+  $("seats").innerHTML = v.seats.map(s => `<span class="seat${s.death ? " dead" : ""}${s.name === v.you ? " me" : ""}${s.sheriff ? " sheriff" : ""}" title="${esc(s.death || (s.sheriff ? t.sheriff : ""))}">${s.sheriff ? "🎖️ " : ""}${esc(s.name)}</span>`).join("");
   renderVotes(v.lastVote, t);
 
   const log = $("log"), atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
@@ -187,11 +192,12 @@ function renderVotes(b, t) {
     if (!by.has(k)) by.set(k, []);
     by.get(k).push(x.voter);
   }
-  const rows = [...by].sort(([p, x], [q, y]) => (p === "") - (q === "") || y.length - x.length);
+  const weight = voters => voters.reduce((n, v) => n + (v === b.sheriff ? 1.5 : 1), 0);
+  const rows = [...by].sort(([p, x], [q, y]) => (p === "") - (q === "") || weight(y) - weight(x));
   c.innerHTML = `<div style="font-weight:600">${esc(t.votes(b.when))}</div>` + rows.map(([target, voters]) =>
     `<div class="line"><span class="who">${esc(target || t.abstain)}</span>` +
-    (target ? `<span class="dim">${t.ballots(voters.length)}</span>` : "") +
-    `<div class="dim">← ${voters.map(esc).join(", ")}</div></div>`).join("");
+    (target ? `<span class="dim">${t.ballots(weight(voters))}</span>` : "") +
+    `<div class="dim">← ${voters.map(v => esc(v) + (v === b.sheriff ? t.sheriffBallot : "")).join(", ")}</div></div>`).join("");
 }
 
 function showTurn(p, t, w) {
@@ -200,10 +206,12 @@ function showTurn(p, t, w) {
   $("turnCard").hidden = false; $("turnErr").textContent = "";
   $("turnTitle").textContent = t.kinds[k] || k;
   const opts = (xs, blank) => (blank ? `<option value="">${t.none}</option>` : "") + xs.map(x => `<option value="${esc(x)}">${esc(w(x))}</option>`).join("");
-  const choice = ["vote", "wolf_plan", "inspect", "save", "poison", "shoot"].includes(k);
-  const speaks = !choice || k === "wolf_plan", declares = k === "speech" || k === "rebuttal";
+  const choice = ["vote", "wolf_plan", "inspect", "save", "poison", "shoot", "run", "sheriff_vote", "badge"].includes(k);
+  const speaks = !choice || k === "wolf_plan", declares = ["speech", "rebuttal", "campaign"].includes(k);
   let h = "";
-  if (choice) h += `<label>${t.target}</label><select name="target">${opts(turn.candidates || [])}</select>`;
+  if (k === "run") h += `<label>${t.target}</label><select name="target"><option value="${esc(turn.me.name)}">${t.run}</option><option value="pass">${t.noRun}</option></select>`;
+  else if (k === "badge") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${esc(x === "pass" ? t.tearBadge : w(x))}</option>`).join("")}</select>`;
+  else if (choice) h += `<label>${t.target}</label><select name="target">${opts(turn.candidates || [])}</select>`;
   if (k === "wolf_plan" && turn.tactic === "counterclaim") h += `<label>${t.faker}</label><select name="faker">${opts([...(turn.pack || []), "nobody"])}</select>`;
   if (k === "wolf_plan" && turn.tactic === "hook") h += `<label>${t.hook}</label><select name="hook">${opts([...(turn.pack || []), "nobody"])}</select>`;
   if (k === "wolf_plan") h += `<label>${t.focus}</label><select name="focus">${opts(turn.suspects || [], true)}</select>`;

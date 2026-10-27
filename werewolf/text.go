@@ -14,6 +14,10 @@ type host struct {
 	revealed, comma, semicolon, result, silence                       string
 	mvp, takeover                                                     string
 
+	// The sheriff: the election, the badge's weight in a vote, and passing it on.
+	election, noRunners, allRun, runners, campaign, sheriffVotes string
+	sheriffTie, elected, sheriffVote, badgePassed, badgeTorn     string
+
 	// The god's-eye feed: asides, thoughts and secret lines.
 	observed, rejudged, judged, fromNothing, thinks, onlyFor, narrator string
 }
@@ -71,6 +75,18 @@ var chineseHost = host{
 	mvp:         "本局MVP：%s！%s",
 	takeover:    "你超时了，这一手由AI代打。",
 
+	election:     "竞选警长：想当警长的上警。警长的放逐票算1.5票，每天最后发言、可以归票，出局时可以移交警徽。",
+	noRunners:    "没有人上警，本局没有警长。",
+	allRun:       "所有人都上警了，没有人投票，本局没有警长。",
+	runners:      "上警的有：%s。",
+	campaign:     "请上警的人按顺序发表竞选发言：%s。",
+	sheriffVotes: "警长投票结果：%s",
+	sheriffTie:   "警长投票平票，警徽流失，本局没有警长。",
+	elected:      "%s当选警长！",
+	sheriffVote:  "%s（警长）",
+	badgePassed:  "警长%s把警徽移交给了%s。",
+	badgeTorn:    "警长%s撕掉了警徽，从此没有警长。",
+
 	observed:    "观察",
 	rejudged:    "改判",
 	judged:      "%s %s→%s，依据：%s",
@@ -125,6 +141,18 @@ var englishHost = host{
 	silence:     "(silence)",
 	mvp:         "MVP of the game: %s! %s",
 	takeover:    "You ran out of time, so an AI played this move for you.",
+
+	election:     "Sheriff election: whoever wants the badge, run now. The sheriff's vote to exile counts one and a half; the sheriff speaks last each day, may call the vote, and may pass the badge on when they go.",
+	noRunners:    "Nobody runs, so there is no sheriff this game.",
+	allRun:       "Everyone runs, so nobody is left to vote and there is no sheriff this game.",
+	runners:      "Running for sheriff: %s.",
+	campaign:     "Campaign speeches, in this order: %s.",
+	sheriffVotes: "Sheriff votes: %s",
+	sheriffTie:   "The sheriff vote is a tie, so the badge is lost and there is no sheriff this game.",
+	elected:      "%s is elected sheriff!",
+	sheriffVote:  "%s (sheriff)",
+	badgePassed:  "Sheriff %s passes the badge to %s.",
+	badgeTorn:    "Sheriff %s tears up the badge; there is no sheriff any more.",
 
 	observed:    "observes",
 	rejudged:    "rethinks",

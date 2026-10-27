@@ -211,6 +211,9 @@ func prompt(t Turn) (system, user string) {
 		if s.Death != "" {
 			status = s.Death
 		}
+		if s.Sheriff {
+			status += tx.sheriffMark
+		}
 		fmt.Fprintf(&seats, tx.seatLine, who, status)
 	}
 	for _, e := range t.Transcript {
@@ -249,8 +252,11 @@ func prompt(t Turn) (system, user string) {
 	if known.Len() > 0 {
 		b.WriteString(tx.known + known.String())
 	}
-	if t.Kind == Speech || t.Kind == Rebuttal {
+	if t.Kind.Declares() {
 		fmt.Fprintf(&b, tx.order, len(t.Spoken)+1, orNobody(l, t.Spoken), orNobody(l, t.Waiting))
+	}
+	if (t.Kind == Speech || t.Kind == Rebuttal) && t.IsSheriff() {
+		b.WriteString(tx.sheriffLine)
 	}
 	if p := t.Plan; p != nil && t.Phase == game.Day {
 		day := tx.noFaker

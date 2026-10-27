@@ -385,6 +385,9 @@ type State struct {
 	Plan *Plan `json:"plan,omitempty"`
 	// LastVote is the latest day's vote.
 	LastVote *Ballot `json:"lastVote,omitempty"`
+	// Sheriff holds the badge: elected on the first day, passed on or torn
+	// up when they go. "" when nobody holds it.
+	Sheriff string `json:"sheriff,omitempty"`
 }
 
 // Add appends an event to the transcript and returns it.
@@ -482,15 +485,22 @@ type Vote struct {
 type Ballot struct {
 	Round int    `json:"round"`
 	Votes []Vote `json:"votes"`
+	// Sheriff is who held the badge that day, their vote counting one and a half.
+	Sheriff string `json:"sheriff,omitempty"`
 }
 
-// Tally returns the target with strictly the most votes. Abstentions (an
-// empty Target) are not counted; a tie or no votes at all reports false.
-func Tally(votes []Vote) (string, bool) {
-	counts := map[string]int{}
+// Tally returns the target with strictly the most votes, the sheriff's vote
+// counting one and a half. Abstentions (an empty Target) are not counted; a
+// tie or no votes at all reports false.
+func Tally(votes []Vote, sheriff string) (string, bool) {
+	counts := map[string]int{} // in half votes
 	for _, v := range votes {
-		if v.Target != "" {
-			counts[v.Target]++
+		switch {
+		case v.Target == "":
+		case v.Voter == sheriff:
+			counts[v.Target] += 3
+		default:
+			counts[v.Target] += 2
 		}
 	}
 	best, bestN, tied := "", 0, false

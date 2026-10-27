@@ -111,6 +111,20 @@ func TestEveryGoodRoleIsToldToTurnSuspicionIntoAVote(t *testing.T) {
 	}
 }
 
+func TestTheSheriffIsMarkedAndToldToCallTheVote(t *testing.T) {
+	seats := []Seat{{Name: "小红", Sheriff: true}, {Name: "老王"}}
+	speech := Turn{Kind: Speech, Round: 2, Phase: game.Day, Me: game.Player{Name: "小红"}, Seats: seats}
+	_, user := prompt(speech)
+	assert.Contains(t, user, "- 小红（你）：存活，警长")
+	assert.Contains(t, user, chineseText.sheriffLine)
+
+	other := speech
+	other.Me = game.Player{Name: "老王"}
+	_, user = prompt(other)
+	assert.Contains(t, user, "- 小红：存活，警长", "everyone sees who holds the badge")
+	assert.NotContains(t, user, chineseText.sheriffLine, "only the sheriff is told to call the vote")
+}
+
 func TestPromptForAnOptionalPowerOffersPass(t *testing.T) {
 	turn := Turn{Kind: Save, Round: 1, Phase: game.Night, Me: game.Player{Name: "阿芳", Role: game.Witch}, Candidates: []string{"小红", game.Pass}}
 
@@ -322,7 +336,7 @@ func TestEnglishPromptsAreAllEnglish(t *testing.T) {
 	base := Turn{
 		Lang: game.English, Round: 2, Phase: game.Day,
 		Me:    game.Player{Name: "Mia", Role: game.Werewolf, Persona: "a calm lawyer"},
-		Seats: []Seat{{Name: "Mia"}, {Name: "Dave"}, {Name: "Ruby", Death: game.English.Death("Night 1", "died")}},
+		Seats: []Seat{{Name: "Mia", Sheriff: true}, {Name: "Dave"}, {Name: "Ruby", Death: game.English.Death("Night 1", "died")}},
 		Transcript: []game.Event{
 			{Round: 1, Phase: game.Night, Text: "Your role is werewolf.", Audience: []string{"Mia"}},
 			{Round: 1, Phase: game.Night, Speaker: "Mia", Text: "kill Ruby", Thought: true, Audience: []string{"Mia"}},
@@ -336,7 +350,7 @@ func TestEnglishPromptsAreAllEnglish(t *testing.T) {
 		Pack:       []string{"Mia"},
 		Plan:       &game.Plan{Round: 2, Victim: "Ruby", Faker: "Mia", Focus: "Dave"},
 	}
-	for _, kind := range []TurnKind{Speech, Rebuttal, WolfChat, WolfPlan, LastWords, Vote, Inspect, Save, Poison, Shoot} {
+	for _, kind := range []TurnKind{Speech, Rebuttal, WolfChat, WolfPlan, LastWords, Vote, Inspect, Save, Poison, Shoot, Run, Campaign, SheriffVote, Badge} {
 		turn := base
 		turn.Kind = kind
 		system, user := prompt(turn)
