@@ -96,7 +96,7 @@ const UI = {
     claim: "声称身份（可选）", noClaim: "不声称", claimChecked: "查验了谁", claimResult: "查验结果", claimPotion: "救了/毒了谁",
     votes: w => `${w}票型`, abstain: "弃票", ballots: n => `${n}票`,
     faker: "谁来悍跳预言家", hook: "谁来倒钩（白天踩队友）", focus: "白天集中投谁（可选）", none: "（不选）",
-    voiceOn: "🔊 语音朗读：开", voiceOff: "🔇 语音朗读：关", mic: "🎤 语音输入", micStop: "⏹ 停止录音", micErr: "语音输入出错：",
+    voiceOn: "🔊 语音朗读：开", voiceOff: "🔇 语音朗读：关", mic: "🎤 语音输入", micStop: "⏹ 停止录音", micErr: "语音输入出错：", voiceReady: "语音朗读已开启，之后的发言会读出来。",
     over: "游戏结束", winner: w => `${w}胜利`, mvp: "MVP", failed: "游戏出错：", host: "主持人", again: "再来一局",
   },
   en: {
@@ -112,7 +112,7 @@ const UI = {
     claim: "Claim a role (optional)", noClaim: "No claim", claimChecked: "Who you checked", claimResult: "What you saw", claimPotion: "Who you saved or poisoned",
     votes: w => `${w} votes`, abstain: "Abstained", ballots: n => `${n} vote${n === 1 ? "" : "s"}`,
     faker: "Who fakes the seer", hook: "Who plays the hook (turns on a packmate by day)", focus: "Who the pack votes tomorrow (optional)", none: "(none)",
-    voiceOn: "🔊 Read aloud: on", voiceOff: "🔇 Read aloud: off", mic: "🎤 Speak", micStop: "⏹ Stop", micErr: "Voice input failed: ",
+    voiceOn: "🔊 Read aloud: on", voiceOff: "🔇 Read aloud: off", mic: "🎤 Speak", micStop: "⏹ Stop", micErr: "Voice input failed: ", voiceReady: "Read aloud is on. New lines will be read out.",
     over: "Game over", winner: w => `The ${w} side wins`, mvp: "MVP", failed: "The game failed: ", host: "Host", again: "Play again",
   },
 };
@@ -286,9 +286,11 @@ let rec = null;
 
 $("voiceBtn").onclick = () => {
   voice.on = !voice.on;
-  if (!voice.on) speechSynthesis.cancel();
-  const t = UI[(view && view.lang) || "zh"];
+  const lang = (view && view.lang) || "zh", t = UI[lang];
   $("voiceBtn").textContent = voice.on ? t.voiceOn : t.voiceOff;
+  if (!voice.on) { speechSynthesis.cancel(); return; }
+  // Said at once, so the person hears read-aloud works before the next line.
+  speakLine({ text: t.voiceReady }, lang);
 };
 $("voiceBtn").hidden = !window.speechSynthesis;
 
