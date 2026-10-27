@@ -290,7 +290,10 @@ function finish(g) {
 // Read-aloud uses the browser's speech synthesis and voice input its speech
 // recognition, so nothing is sent through the game master. Read-aloud starts
 // off: browsers only let a page speak after the person has clicked something.
-const voice = { on: false };
+// While the microphone is on, new lines wait in held rather than being spoken,
+// so the microphone does not pick them up. Chrome's speechSynthesis.pause and
+// resume are not used: after a resume it often stays silent until cancelled.
+const voice = { on: false, recording: false, held: [] };
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null;
 
@@ -313,6 +316,7 @@ function speakLine(l, lang) {
   if (!voice.on || !window.speechSynthesis) return;
   const text = l.text.replace(/【[^】]*】|\[[^\]]*\]/g, "").trim();
   if (!text) return;
+  if (voice.recording) { voice.held.push([l, lang]); return; }
   const u = new SpeechSynthesisUtterance(l.speaker ? `${l.speaker}：${text}` : text);
   u.lang = lang === "en" ? "en-US" : "zh-CN";
   // Prefer the exact accent (Mandarin over Cantonese, say) when there is one.
@@ -331,7 +335,7 @@ function speakLine(l, lang) {
 
 // addMic puts a voice-input button under the speech box: what the person says
 // is typed into the box, where they can fix it before submitting. Read-aloud
-// pauses meanwhile, so the microphone does not pick it up.
+// stops meanwhile and catches up afterwards.
 function addMic(f, lang, t) {
   const box = f.elements.speech;
   if (!box || !Recognition) return;
@@ -346,10 +350,15 @@ function addMic(f, lang, t) {
     rec.continuous = true; rec.interimResults = true;
     rec.onresult = e => { box.value = before + [...e.results].map(x => x[0].transcript).join(""); };
     rec.onerror = e => { $("turnErr").textContent = t.micErrors[e.error] || t.micErr + e.error; };
-    rec.onend = () => { rec = null; b.textContent = t.mic; if (window.speechSynthesis) speechSynthesis.resume(); };
-    if (window.speechSynthesis) speechSynthesis.pause();
+    rec.onend = () => {
+      rec = null; b.textContent = t.mic;
+      voice.recording = false;
+      for (const [l, lang] of voice.held.splice(0)) speakLine(l, lang);
+    };
+    voice.recording = true;
+    if (window.speechSynthesis) speechSynthesis.cancel();
     $("turnErr").textContent = "";
-    rec.start();
+    try { rec.start(); } catch (err) { $("turnErr").textContent = t.micErr + err.message; rec.onend(); return; }
     b.textContent = t.micStop;
   };
 }
