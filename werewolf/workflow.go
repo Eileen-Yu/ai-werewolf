@@ -202,19 +202,6 @@ func (t *table) night() error {
 			s.Remove(p.Name, t.h.died) // still night, so they died "on Night n"
 		}
 	}
-	// A hunter the wolves killed shoots before dawn, so the one shot is just
-	// another name on the list and nobody is told who the hunter is.
-	for _, d := range slices.Clone(dead) {
-		if s.Player(d).Role == game.Hunter && d != poisoned {
-			shot, err := t.hunterShoots(d)
-			if err != nil {
-				return err
-			}
-			if shot != "" {
-				dead = append(dead, shot)
-			}
-		}
-	}
 	if victim != "" && saved {
 		t.add("", fmt.Sprintf(t.h.survived, victim), s.Living(game.Werewolf)...)
 	}
@@ -225,7 +212,17 @@ func (t *table) night() error {
 		return nil
 	}
 	t.add("", fmt.Sprintf(t.h.dawnDead, t.list(dead)))
-	return t.passBadge(dead...)
+	if err := t.passBadge(dead...); err != nil {
+		return err
+	}
+	// A hunter only shoots by day: one the wolves killed takes his shot once
+	// the deaths are announced. A poisoned hunter cannot shoot.
+	for _, d := range dead {
+		if s.Player(d).Role == game.Hunter && d != poisoned {
+			return t.hunterGoes(d)
+		}
+	}
+	return nil
 }
 
 // wolvesHunt has the wolves plot, then the first of them settles the plan:
@@ -364,6 +361,17 @@ func (t *table) hunterShoots(hunter string) (string, error) {
 	t.s.Remove(target, t.h.died)
 	t.add("", fmt.Sprintf(t.h.shot, target), hunter)
 	return target, nil
+}
+
+// hunterGoes has a hunter who is out take his shot; the one he shot is
+// announced as having died, and passes the badge on if they held it.
+func (t *table) hunterGoes(hunter string) error {
+	shot, err := t.hunterShoots(hunter)
+	if err != nil || shot == "" {
+		return err
+	}
+	t.add("", fmt.Sprintf(t.h.diedNow, shot))
+	return t.passBadge(shot)
 }
 
 // seat is where name sits at the table.
@@ -515,15 +523,8 @@ func (t *table) day() error {
 		return err
 	}
 	if s.Player(out).Role == game.Hunter {
-		shot, err := t.hunterShoots(out)
-		if err != nil {
+		if err := t.hunterGoes(out); err != nil {
 			return err
-		}
-		if shot != "" {
-			t.add("", fmt.Sprintf(t.h.diedNow, shot))
-			if err := t.passBadge(shot); err != nil {
-				return err
-			}
 		}
 	}
 	return t.pause()

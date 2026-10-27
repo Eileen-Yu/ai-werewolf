@@ -266,14 +266,16 @@ func TestTheHuntersShotIsNeverAnnounced(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
 
-	seen := 0
-	for i := 0; i < 30 && seen == 0; i++ {
+	seen, killedAtNight := 0, false
+	for i := 0; i < 60 && (seen == 0 || !killedAtNight); i++ {
 		b := &shootingHunter{}
 		SetBrain(b)
 		playGame(t, client, fmt.Sprintf("shot-%d", i))
 		if len(b.shots) == 0 {
 			continue
 		}
+		assert.Zero(t, b.atNight, "the hunter was asked to shoot at night")
+		killedAtNight = killedAtNight || b.killedAtNight
 		shot := b.shots[0]
 		for _, turn := range b.turns {
 			for _, e := range turn.Transcript {
@@ -293,14 +295,17 @@ func TestTheHuntersShotIsNeverAnnounced(t *testing.T) {
 		}
 	}
 	require.NotZero(t, seen, "no game went on after the hunter shot someone")
+	assert.True(t, killedAtNight, "no hunter killed at night got to shoot")
 }
 
 // shootingHunter plays randomly, except that the witch never uses a potion and
 // the hunter always shoots. It records every turn and every shot.
 type shootingHunter struct {
-	mu    sync.Mutex
-	turns []brain.Turn
-	shots []struct {
+	mu            sync.Mutex
+	atNight       int  // shots the hunter was asked for at night
+	killedAtNight bool // a hunter the wolves killed was asked to shoot
+	turns         []brain.Turn
+	shots         []struct {
 		round          int
 		phase          game.Phase
 		hunter, target string
@@ -315,6 +320,11 @@ func (b *shootingHunter) Act(ctx context.Context, t brain.Turn) (brain.Action, e
 	case brain.Save, brain.Poison:
 		return brain.Action{Target: game.Pass}, nil
 	case brain.Shoot:
+		if t.Phase != game.Day {
+			b.atNight++
+		}
+		me := slices.IndexFunc(t.Seats, func(s brain.Seat) bool { return s.Name == t.Me.Name })
+		b.killedAtNight = b.killedAtNight || strings.HasSuffix(t.Seats[me].Death, "夜死亡")
 		target := t.Candidates[0]
 		b.shots = append(b.shots, struct {
 			round          int
