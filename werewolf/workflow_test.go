@@ -106,6 +106,37 @@ func (b *selfKillingPack) Act(ctx context.Context, t brain.Turn) (brain.Action, 
 	return brain.Random{}.Act(ctx, t)
 }
 
+func TestTheSeerIsAskedWhileTheWolvesAreStillPlotting(t *testing.T) {
+	client := startEngine(t)
+	startWorker(t, client)
+	b := &plotWaitsForSeer{asked: make(chan struct{})}
+	SetBrain(b)
+	playGame(t, client, "seer-alongside-wolves")
+	assert.True(t, b.overlapped, "the wolves settled their first plan before the seer was asked")
+}
+
+// plotWaitsForSeer holds the pack's first plan until the seer has been asked,
+// which only happens in time if the two are asked at once.
+type plotWaitsForSeer struct {
+	asked      chan struct{}
+	once       sync.Once
+	overlapped bool
+}
+
+func (b *plotWaitsForSeer) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
+	switch {
+	case t.Kind == brain.Inspect:
+		b.once.Do(func() { close(b.asked) })
+	case t.Kind == brain.WolfPlan && t.Round == 1:
+		select {
+		case <-b.asked:
+			b.overlapped = true
+		case <-time.After(5 * time.Second):
+		}
+	}
+	return brain.Random{}.Act(ctx, t)
+}
+
 func TestTheWitchMaySaveHerselfOnlyOnTheFirstNight(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)

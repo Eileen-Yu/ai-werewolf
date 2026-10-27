@@ -179,6 +179,7 @@ func (t *table) night() error {
 	s.Phase = game.Night
 	t.add("", fmt.Sprintf(t.h.nightFalls, s.Lang.When(s.Round, game.Night)))
 
+	checked := t.seerChecks()
 	victim, err := t.wolvesHunt()
 	if err != nil {
 		return err
@@ -187,7 +188,7 @@ func (t *table) night() error {
 	if err != nil {
 		return err
 	}
-	if err := t.seerChecks(); err != nil {
+	if err := checked(); err != nil {
 		return err
 	}
 	if err := t.pause(); err != nil {
@@ -326,18 +327,29 @@ func (t *table) witchActs(victim string) (saved bool, poisoned string, err error
 	return false, pick, nil
 }
 
-func (t *table) seerChecks() error {
+// seerChecks asks the seer whom to check as night falls, alongside the
+// wolves, since the check needs nothing they decide. The func it returns
+// waits for the answer and tells the seer what they saw.
+func (t *table) seerChecks() func() error {
 	s := t.s
 	seers := s.Living(game.Seer)
 	if len(seers) == 0 {
+		return func() error { return nil }
+	}
+	seer := seers[0]
+	m := t.act(t.turn(brain.Inspect, seer, game.Without(s.Living(), seer)))
+	return func() error {
+		var a brain.Action
+		if err := m.Await(&a); err != nil {
+			return err
+		}
+		t.remember(seer, a)
+		if a.Target == "" {
+			return nil
+		}
+		t.add("", fmt.Sprintf(t.h.inspected, a.Target, t.say(game.Side(s.Player(a.Target).Role))), seer)
 		return nil
 	}
-	target, err := t.choose(brain.Inspect, seers[0], game.Without(s.Living(), seers[0]))
-	if err != nil || target == "" {
-		return err
-	}
-	t.add("", fmt.Sprintf(t.h.inspected, target, t.say(game.Side(s.Player(target).Role))), seers[0])
-	return nil
 }
 
 // hunterShoots gives a hunter who has just gone out the chance to take
