@@ -283,6 +283,9 @@ func prompt(t Turn) (system, user string) {
 	case t.Kind.Speaks() && len(silent) > 0:
 		fmt.Fprintf(&b, tx.silent, l.List(silent))
 	}
+	if t.SuspectsSomeone() {
+		b.WriteString(tx.twoReadings)
+	}
 	if t.Kind.Speaks() {
 		b.WriteString(tx.selfCheck)
 	}

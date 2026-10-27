@@ -111,6 +111,30 @@ func TestEveryGoodRoleIsToldToTurnSuspicionIntoAVote(t *testing.T) {
 	}
 }
 
+func TestOnlyAGoodPlayerWhoSuspectsSomeoneIsToldToReadItBothWays(t *testing.T) {
+	for _, tc := range []struct {
+		role game.Role
+		kind TurnKind
+		want bool
+	}{
+		{game.Villager, Speech, true},
+		{game.Seer, Rebuttal, true},
+		{game.Villager, Campaign, true},
+		{game.Hunter, LastWords, true},
+		{game.Villager, Vote, true},
+		{game.Hunter, Shoot, true},
+		{game.Witch, Poison, true},
+		{game.Seer, Inspect, false},
+		{game.Villager, SheriffVote, false},
+		{game.Werewolf, Speech, false},
+		{game.Werewolf, Vote, false},
+	} {
+		turn := Turn{Kind: tc.kind, Round: 2, Phase: game.Day, Me: game.Player{Name: "小红", Role: tc.role}, Candidates: []string{"老王", game.Pass}}
+		_, user := prompt(turn)
+		assert.Equal(t, tc.want, strings.Contains(user, chineseText.twoReadings), "%s on a %s turn", tc.role, tc.kind)
+	}
+}
+
 func TestTheSheriffIsMarkedAndToldToCallTheVote(t *testing.T) {
 	seats := []Seat{{Name: "小红", Sheriff: true}, {Name: "老王"}}
 	speech := Turn{Kind: Speech, Round: 2, Phase: game.Day, Me: game.Player{Name: "小红"}, Seats: seats}

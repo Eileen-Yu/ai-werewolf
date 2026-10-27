@@ -216,6 +216,20 @@ func (t Turn) PlanNames() []string {
 	return append(slices.Clone(t.Pack), game.Nobody)
 }
 
+// SuspectsSomeone reports whether this is a good player's turn to suspect,
+// vote out or use a power against someone. A werewolf knows who the wolves
+// are, so has no suspicion to weigh.
+func (t Turn) SuspectsSomeone() bool {
+	if t.Me.Role == game.Werewolf {
+		return false
+	}
+	switch t.Kind {
+	case Speech, Rebuttal, Campaign, LastWords, Vote, Shoot, Poison:
+		return true
+	}
+	return false
+}
+
 // IsSheriff reports whether this player holds the sheriff's badge.
 func (t Turn) IsSheriff() bool {
 	return slices.ContainsFunc(t.Seats, func(s Seat) bool { return s.Sheriff && s.Name == t.Me.Name })

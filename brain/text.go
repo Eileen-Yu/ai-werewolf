@@ -48,11 +48,14 @@ type text struct {
 	faker, hook, mustFakeLine, hookLine, habitNow    string
 	nobodySpoke, silent                              string
 	shootAlive, selfCheck, onlyJSON, seatLine, known string
-	sheriffMark, sheriffLine                         string
-	line                                             string
-	fields                                           fields
-	targetOnly, fakerOnly, hookOnly, focusOnly       string
-	declareOnly, notesLine                           string
+	// twoReadings asks a good player to explain a suspect's behaviour both
+	// ways before acting on the suspicion.
+	twoReadings                                string
+	sheriffMark, sheriffLine                   string
+	line                                       string
+	fields                                     fields
+	targetOnly, fakerOnly, hookOnly, focusOnly string
+	declareOnly, notesLine                     string
 
 	// Random's lines.
 	speechLines, wolfLines []string
@@ -238,6 +241,9 @@ var chineseText = text{
 		"不能评价任何人的发言或观点，也不要编\"他像预言家\"这类没有依据的理由；需要选人时只能靠猜，就直说是猜的。\n",
 	silent:     "还没有公开发过言的人：%s。你不能评价他们说过什么。\n",
 	shootAlive: "只能带走还活着的人。已经出局的人（%s）不能再被带走，选他们是无效的。\n",
+	twoReadings: "【怀疑前想两面】你要怀疑、投票或者对某个人用技能之前，先给他的行为想两种解释：" +
+		"如果他是狼，他的这些行为说明其他人是什么身份，谁像他的同伴、谁是他在打的好人，这和场上其他事情对得上吗？" +
+		"如果他是好人，同样的行为你会怎么解释？在 thinking 里两种解释各写一句；狼人那种明显更说得通，才把他当狼。\n",
 	selfCheck: `【回答前自检】
 - 我提到的每件事都在【公开记录】或【你的秘密信息】里出现过吗？
 - 我有没有评价还没发言的人？
@@ -454,6 +460,9 @@ Write everything in English.`,
 		"Do not comment on anyone's speech or views, and do not invent reasons like \"he seems like the seer\"; if you have to pick someone, it is a guess, so say so.\n",
 	silent:     "Players who have not said anything in public yet: %s. You cannot comment on what they said.\n",
 	shootAlive: "You can only shoot someone still alive. Players already out (%s) cannot be shot; picking one of them is invalid.\n",
+	twoReadings: "[Read it both ways] Before you suspect, vote for or use a power on someone, explain their behaviour two ways. " +
+		"If they are a werewolf, what does their behaviour imply about the others: who looks like their teammate, which good player are they going after, and does that fit everything else at the table? " +
+		"If they are good, how would you explain the same behaviour? Write one sentence for each reading in thinking, and treat them as a werewolf only if the werewolf reading clearly fits better.\n",
 	selfCheck: `[Check before you answer]
 - Does everything I mention appear in [Public record] or [Your secrets]?
 - Am I commenting on someone who has not spoken yet?
