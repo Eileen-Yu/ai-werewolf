@@ -435,14 +435,18 @@ func (t *table) election() error {
 	}
 	sheriff := runners[0]
 	if len(runners) > 1 {
-		votes, err := t.chooseAll(brain.SheriffVote, voters, func(string) []string { return runners })
+		votes, err := t.chooseAll(brain.SheriffVote, voters, func(string) []string { return append(slices.Clone(runners), game.Pass) })
 		if err != nil {
 			return err
 		}
 		t.add("", fmt.Sprintf(t.h.sheriffVotes, t.tallyLine(votes)))
 		won, ok := game.Tally(votes, "")
 		if !ok {
-			t.add("", t.h.sheriffTie)
+			line := t.h.sheriffTie
+			if abstained(votes) {
+				line = t.h.sheriffAbstained
+			}
+			t.add("", line)
 			return t.pause()
 		}
 		sheriff = won
@@ -450,6 +454,11 @@ func (t *table) election() error {
 	s.Sheriff = sheriff
 	t.add("", fmt.Sprintf(t.h.elected, sheriff))
 	return t.pause()
+}
+
+// abstained reports whether every voter abstained.
+func abstained(votes []game.Vote) bool {
+	return !slices.ContainsFunc(votes, func(v game.Vote) bool { return v.Target != "" })
 }
 
 // tallyLine lists who voted for whom, the sheriff marked.
@@ -502,7 +511,7 @@ func (t *table) day() error {
 	}
 	t.add("", fmt.Sprintf(t.h.stances, strings.Join(summary, t.h.semicolon)))
 
-	votes, err := t.chooseAll(brain.Vote, alive, s.VoteCandidates)
+	votes, err := t.chooseAll(brain.Vote, alive, func(voter string) []string { return append(s.VoteCandidates(voter), game.Pass) })
 	if err != nil {
 		return err
 	}
@@ -511,7 +520,11 @@ func (t *table) day() error {
 
 	out, ok := game.Tally(votes, s.Sheriff)
 	if !ok {
-		t.add("", t.h.tie)
+		line := t.h.tie
+		if abstained(votes) {
+			line = t.h.allAbstained
+		}
+		t.add("", line)
 		return t.pause()
 	}
 	s.Remove(out, t.h.votedOut)
@@ -628,6 +641,9 @@ func (t *table) chooseAll(kind brain.TurnKind, voters []string, candidates func(
 			return nil, err
 		}
 		t.remember(voters[i], a)
+		if a.Target == game.Pass {
+			a.Target = "" // an abstention, which counts for nobody
+		}
 		votes[i] = game.Vote{Voter: voters[i], Target: a.Target}
 	}
 	return votes, nil

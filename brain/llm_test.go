@@ -265,6 +265,9 @@ func TestNormalize(t *testing.T) {
 	assert.Equal(t, game.Nobody, speech.Normalize(Action{Suspect: "没有"}).Suspect)
 	assert.Equal(t, game.Pass, shoot.Normalize(Action{Target: "Pass"}).Target, "English for the game's words")
 	assert.Equal(t, game.Nobody, speech.Normalize(Action{Suspect: "nobody"}).Suspect)
+	vote := Turn{Kind: Vote, Candidates: []string{"老王", "小红", game.Pass}}
+	assert.Equal(t, game.Pass, vote.Normalize(Action{Target: "弃票"}).Target)
+	assert.Equal(t, game.Pass, vote.Normalize(Action{Target: "abstain"}).Target)
 
 	for _, role := range []game.Role{"null", "无", "不声明", "none"} {
 		assert.Nil(t, speech.Normalize(Action{Claim: &game.Claim{Role: role}}).Claim, "claiming %q is claiming nothing", role)

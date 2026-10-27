@@ -173,7 +173,7 @@ var chineseText = text{
 			"focus 是明天要把票引向的人：他明天必须还活着，所以不能是今晚要杀的人。引票靠好人的票，不靠狼队一起投：speech 里说清楚谁投 focus、谁投别人。" +
 			"speech 写白天按本局打法的具体打法，不超过80字。",
 		LastWords: "你被投票放逐了，发表遗言，不超过80字。",
-		Vote:      "根据今天的发言、回应和主持人汇总的表态，投票放逐一人。",
+		Vote:      "根据今天的发言、回应和主持人汇总的表态，投票放逐一人。也可以选\"放弃\"弃票，不算任何人的票。",
 		Inspect:   "选择今晚要查验的人。优先查最可疑、或者发言最能带动大家的人。",
 		Save:      "今晚谁被狼人杀了在【你的秘密信息】里。决定要不要用解药救他：选他的名字表示救，选\"放弃\"表示不救。",
 		Poison:    "决定要不要用毒药：选一个名字表示毒死他，选\"放弃\"表示不用。毒错了好人会很伤，没有把握就别用。",
@@ -181,7 +181,7 @@ var chineseText = text{
 		Run: "竞选警长：选你自己的名字表示上警，选\"放弃\"表示不上警。所有人同时决定，看不到别人的选择。" +
 			"警长的1.5票和归票权很有用：有查验的预言家通常应该上警，靠竞选发言报查验、拿警徽；要悍跳的狼也常上警和他争。上警的人不能投票选警长。",
 		Campaign:    "你上警了，这是你的竞选发言：说清楚为什么大家该把警徽给你，比如报出你的身份和查验，或者你会怎么带队找狼。不超过80字。",
-		SheriffVote: "投票选警长：从上警的人里选一个。比较他们的竞选发言，谁报的信息更可信、谁当警长对好人更有利，就投谁。",
+		SheriffVote: "投票选警长：从上警的人里选一个。比较他们的竞选发言，谁报的信息更可信、谁当警长对好人更有利，就投谁。谁都信不过可以选\"放弃\"弃票。",
 		Badge: "你是警长，现在出局了。选一个活着的人表示把警徽移交给他，选\"放弃\"表示撕掉警徽、从此没有警长。" +
 			"警徽应该交给你最信任的好人；没有把握、怕交到狼人手里，就撕掉。",
 	},
@@ -392,7 +392,7 @@ Write everything in English.`,
 			"focus is who the pack steers the vote onto tomorrow: they must still be alive then, so not tonight's target. You steer with good players' votes, not by all voting together: say in speech who votes for focus and who votes elsewhere. " +
 			"speech is how you play the day this game's way, at most 40 words.",
 		LastWords: "You have been voted out. Give your last words, at most 40 words.",
-		Vote:      "Based on today's speeches, replies and the stances the host summed up, vote one person out.",
+		Vote:      "Based on today's speeches, replies and the stances the host summed up, vote one person out. You may also pick \"pass\" to abstain, which counts for nobody.",
 		Inspect:   "Choose who to check tonight. Check whoever is most suspicious, or whose speeches sway the table most.",
 		Save:      "Who the werewolves killed tonight is in [Your secrets]. Decide whether to save them with the antidote: pick their name to save them, or \"pass\" not to.",
 		Poison:    "Decide whether to use the poison: pick a name to poison them, or \"pass\" not to. Poisoning a good player hurts badly, so do not use it unless you are sure.",
@@ -400,7 +400,7 @@ Write everything in English.`,
 		Run: "Sheriff election: pick your own name to run for sheriff, or \"pass\" not to. Everyone decides at once, without seeing anyone else's choice. " +
 			"The sheriff's one and a half votes and the right to call the vote are worth a lot: a seer with a check should usually run and report it in the campaign to take the badge, and a wolf set to fake the seer often runs against them. Those who run do not vote for sheriff.",
 		Campaign:    "You are running for sheriff. This is your campaign speech: say why the table should give you the badge, such as your role and your checks, or how you will lead the hunt. At most 40 words.",
-		SheriffVote: "Vote for sheriff: pick one of those running. Compare their campaign speeches: whose information is more believable, and who as sheriff helps the good side more.",
+		SheriffVote: "Vote for sheriff: pick one of those running. Compare their campaign speeches: whose information is more believable, and who as sheriff helps the good side more. If you trust none of them, pick \"pass\" to abstain.",
 		Badge: "You are the sheriff and you are out. Pick someone alive to pass the badge to, or \"pass\" to tear it up so there is no sheriff any more. " +
 			"Give it to the good player you trust most; if you are unsure and it might reach a werewolf, tear it up.",
 	},

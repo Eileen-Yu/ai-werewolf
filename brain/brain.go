@@ -345,7 +345,7 @@ func (t Turn) Normalize(a Action) Action {
 }
 
 // declines are words that, where no name was given, mean passing.
-var declines = []string{"不", "放弃", "无", "没有", "null", "pass", "none", "nobody", "no one", "skip", "not ", "don't", "n/a", "empty"}
+var declines = []string{"不", "放弃", "弃票", "无", "没有", "null", "pass", "none", "nobody", "no one", "skip", "not ", "don't", "n/a", "empty", "abstain"}
 
 func isDecline(s string) bool {
 	s = strings.ToLower(s)

@@ -112,6 +112,7 @@ go test ./...
 - The game master worker is killed mid-game and a new one takes over, and the game must still finish.
 - In random games, where the witch saves and poisons and the hunter shoots at random, no public host line may mention a kill, a potion, a shot or a power role, and every seat must show only when its player died or that they were voted out.
 - A scripted Day 1 election: only the living are asked to run, only candidates campaign, only the rest vote, the sheriff speaks last that day, every later turn shows the right sheriff, and a sheriff who is out passes the badge to someone alive or tears it up.
+- Every vote, for sheriff or to vote someone out, offers `pass`, and an abstention counts for nobody: a day where everyone abstains sends nobody out, and the host says so rather than calling it a tie.
 - The hunter always shoots, only ever by day, and no public line may name the hunter; the player shot must be shown dying like anyone else, and only the hunter is told who he shot.
 
 `werewolf/human_test.go` plays games with a person in a seat, answering through events, and checks the AI never played a move the person answered, the person only saw what their seat may see, and the MVP is announced. Another game has the person never answer, and must still finish, with the AI covering every move. `internal/web/web_test.go` plays a whole game through the HTTP API, including a bad move the page must refuse and a move the game is no longer waiting for.

@@ -137,6 +137,55 @@ func (b *plotWaitsForSeer) Act(ctx context.Context, t brain.Turn) (brain.Action,
 	return brain.Random{}.Act(ctx, t)
 }
 
+func TestAVoterMayAbstain(t *testing.T) {
+	client := startEngine(t)
+	startWorker(t, client)
+	b := &abstainer{}
+	SetBrain(b)
+	playGame(t, client, "abstain")
+
+	require.NotEmpty(t, b.offered, "nobody was asked to vote")
+	for _, kind := range b.offered {
+		assert.Contains(t, kind.candidates, game.Pass, "a %s offers no way to abstain", kind.kind)
+	}
+	assert.Contains(t, b.day2, "所有人都弃票，今天无人出局。")
+	assert.NotContains(t, b.day2, "第1天被投票放逐", "an abstention counted as a vote")
+}
+
+// abstainer abstains in every vote on the first day and plays randomly
+// otherwise. It keeps what the table looks like on Day 2.
+type abstainer struct {
+	mu      sync.Mutex
+	offered []struct {
+		kind       brain.TurnKind
+		candidates []string
+	}
+	day2 string
+}
+
+func (b *abstainer) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if t.Kind == brain.Vote || t.Kind == brain.SheriffVote {
+		b.offered = append(b.offered, struct {
+			kind       brain.TurnKind
+			candidates []string
+		}{t.Kind, t.Candidates})
+		if t.Round == 1 {
+			return brain.Action{Target: game.Pass}, nil
+		}
+	}
+	if t.Round == 2 && b.day2 == "" {
+		for _, e := range t.Transcript {
+			b.day2 += e.Text + "\n"
+		}
+		for _, s := range t.Seats {
+			b.day2 += s.Death + "\n"
+		}
+	}
+	return brain.Random{}.Act(ctx, t)
+}
+
 func TestTheWitchMaySaveHerselfOnlyOnTheFirstNight(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
@@ -633,7 +682,7 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 				assert.Contains(t, runners, turn.Me.Name, "only a candidate campaigns")
 			case brain.SheriffVote:
 				assert.NotContains(t, runners, turn.Me.Name, "a candidate does not vote for sheriff")
-				assert.Equal(t, runners, turn.Candidates)
+				assert.Equal(t, append(slices.Clone(runners), game.Pass), turn.Candidates, "a voter may abstain")
 			case brain.Speech:
 				if !elected {
 					elected, sheriff = true, runners[0]
