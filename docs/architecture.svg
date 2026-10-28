@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640" viewBox="0 0 960 640" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#3ddc84"/></marker>
+    <marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#e0a84a"/></marker>
+    <marker id="n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8b90a0"/></marker>
+  </defs>
+  <rect width="960" height="640" rx="16" fill="#0d0f14"/>
+
+  <!-- Human path, in orange -->
+  <rect x="330" y="24" width="300" height="64" rx="8" fill="#16130c" stroke="#e0a84a" stroke-width="1.5"/>
+  <text x="480" y="52" text-anchor="middle" fill="#f3f3f5" font-size="17" font-weight="600">Web page</text>
+  <text x="480" y="73" text-anchor="middle" fill="#a8a08c" font-size="12.5">your seat &#183; internal/web/index.html</text>
+
+  <line x1="440" y1="90" x2="440" y2="137" stroke="#e0a84a" stroke-width="1.5" marker-end="url(#o)"/>
+  <text x="430" y="118" text-anchor="end" fill="#e0a84a" font-size="12">your move</text>
+  <line x1="520" y1="137" x2="520" y2="90" stroke="#e0a84a" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#o)"/>
+  <text x="530" y="118" fill="#e0a84a" font-size="12">public view</text>
+
+  <rect x="330" y="140" width="300" height="64" rx="8" fill="#16130c" stroke="#e0a84a" stroke-width="1.5"/>
+  <text x="480" y="168" text-anchor="middle" fill="#f3f3f5" font-size="17" font-weight="600">gm -web</text>
+  <text x="480" y="189" text-anchor="middle" fill="#a8a08c" font-size="12.5">internal/web &#183; checks a move, then raises it</text>
+
+  <line x1="440" y1="206" x2="440" y2="253" stroke="#e0a84a" stroke-width="1.5" marker-end="url(#o)"/>
+  <text x="430" y="234" text-anchor="end" fill="#e0a84a" font-size="12">RaiseEvent</text>
+  <line x1="520" y1="253" x2="520" y2="206" stroke="#e0a84a" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#o)"/>
+  <text x="530" y="234" fill="#e0a84a" font-size="12">custom status</text>
+
+  <!-- Catalyst, in green -->
+  <rect x="60" y="256" width="840" height="132" rx="10" fill="#0c1a12" stroke="#3ddc84" stroke-width="1.5"/>
+  <text x="80" y="279" fill="#3ddc84" font-size="11.5" font-weight="600" letter-spacing="1.2">DIAGRID CATALYST &#183; DAPR WORKFLOW</text>
+  <text x="480" y="308" text-anchor="middle" fill="#f3f3f5" font-size="20" font-weight="600">GameWorkflow</text>
+  <text x="480" y="330" text-anchor="middle" fill="#9fb8a8" font-size="12.5">werewolf/workflow.go &#183; night &#8594; dawn &#8594; sheriff &#8594; speeches &#8594; vote &#183; continues as new each round</text>
+  <g font-size="12" fill="#cdeedb" text-anchor="middle">
+    <rect x="228" y="346" width="110" height="26" rx="13" fill="#123222" stroke="#2a6b45"/><text x="283" y="363">history</text>
+    <rect x="350" y="346" width="122" height="26" rx="13" fill="#123222" stroke="#2a6b45"/><text x="411" y="363">durable timers</text>
+    <rect x="484" y="346" width="122" height="26" rx="13" fill="#123222" stroke="#2a6b45"/><text x="545" y="363">human events</text>
+    <rect x="618" y="346" width="122" height="26" rx="13" fill="#123222" stroke="#2a6b45"/><text x="679" y="363">replay on restart</text>
+  </g>
+
+  <!-- Activities -->
+  <line x1="200" y1="390" x2="200" y2="437" stroke="#3ddc84" stroke-width="1.5" marker-end="url(#g)"/>
+  <line x1="480" y1="390" x2="480" y2="437" stroke="#3ddc84" stroke-width="1.5" marker-end="url(#g)"/>
+  <line x1="760" y1="390" x2="760" y2="437" stroke="#3ddc84" stroke-width="1.5" marker-end="url(#g)"/>
+  <text x="490" y="418" fill="#3ddc84" font-size="12">schedules, records each result</text>
+
+  <g>
+    <rect x="75" y="440" width="250" height="76" rx="8" fill="#14171e" stroke="#3a3f4b" stroke-width="1.5"/>
+    <text x="200" y="468" text-anchor="middle" fill="#f3f3f5" font-size="16" font-weight="600">AssignRolesActivity</text>
+    <text x="200" y="489" text-anchor="middle" fill="#8b90a0" font-size="12.5">deals the cast and the roles</text>
+    <text x="200" y="505" text-anchor="middle" fill="#8b90a0" font-size="12.5">so a replay deals the same game</text>
+
+    <rect x="355" y="440" width="250" height="76" rx="8" fill="#14171e" stroke="#3a3f4b" stroke-width="1.5"/>
+    <text x="480" y="468" text-anchor="middle" fill="#f3f3f5" font-size="16" font-weight="600">ActActivity</text>
+    <text x="480" y="489" text-anchor="middle" fill="#8b90a0" font-size="12.5">one AI player's move</text>
+    <text x="480" y="505" text-anchor="middle" fill="#8b90a0" font-size="12.5">sees only what their role may know</text>
+
+    <rect x="635" y="440" width="250" height="76" rx="8" fill="#14171e" stroke="#3a3f4b" stroke-width="1.5"/>
+    <text x="760" y="468" text-anchor="middle" fill="#f3f3f5" font-size="16" font-weight="600">JudgeActivity</text>
+    <text x="760" y="489" text-anchor="middle" fill="#8b90a0" font-size="12.5">names the MVP</text>
+    <text x="760" y="505" text-anchor="middle" fill="#8b90a0" font-size="12.5">reads the whole record, roles revealed</text>
+  </g>
+
+  <!-- LLM -->
+  <line x1="480" y1="518" x2="480" y2="563" stroke="#8b90a0" stroke-width="1.5" marker-end="url(#n)"/>
+  <line x1="760" y1="518" x2="760" y2="563" stroke="#8b90a0" stroke-width="1.5" marker-end="url(#n)"/>
+  <rect x="355" y="566" width="530" height="56" rx="8" fill="#14171e" stroke="#3a3f4b" stroke-width="1.5"/>
+  <text x="620" y="590" text-anchor="middle" fill="#f3f3f5" font-size="16" font-weight="600">Dapr Conversation API</text>
+  <text x="620" y="609" text-anchor="middle" fill="#8b90a0" font-size="12.5">an LLM component on Catalyst &#183; the model and its key live there, not in code</text>
+</svg>

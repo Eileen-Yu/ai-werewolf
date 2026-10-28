@@ -76,24 +76,7 @@ The process may die. The drama persists. [Try it yourself](#6-try-killing-the-ga
 
 ## Why this is not just nine chatbots taking turns
 
-```mermaid
-flowchart LR
-    page["Web page<br/>(your seat)"]
-    subgraph gm["werewolf gm"]
-        wf["GameWorkflow<br/>night → dawn → sheriff → speeches → vote"]
-        act["ActActivity<br/>one player's move"]
-        judge["JudgeActivity<br/>the MVP"]
-    end
-    llm[("LLM<br/>Conversation API")]
-    catalyst[("Diagrid Catalyst<br/>workflow history")]
-
-    wf -- "each player's view:<br/>only what they may know" --> act
-    act --> llm
-    judge --> llm
-    wf <-->|"every step recorded"| catalyst
-    page -- "your move, as an event" --> wf
-    wf -- "public status only" --> page
-```
+<img src="docs/architecture.svg" alt="The web page sends your move through gm -web into GameWorkflow on Catalyst, which schedules AssignRolesActivity, ActActivity and JudgeActivity; the last two call the Dapr Conversation API" width="820">
 
 - **The workflow is the game master.** The phases are plain Go code in one Dapr Workflow, which continues as new at the end of each round so its history stays short. Dealing roles, every player's move and the MVP verdict are activities, so their results are written to the workflow history on Catalyst.
 - **Secrets stay secret in code.** The workflow holds the whole truth. Before each move it builds that player's view with only what their role entitles them to; a seat has no role field at all, so there is nothing for the prompt to leak.
