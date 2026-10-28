@@ -529,6 +529,15 @@ func TestDeepCoverWolvesPushRatherThanFollow(t *testing.T) {
 	assert.NotContains(t, englishText.tactics[game.DeepCover], "votes with the majority")
 }
 
+func TestWolvesMayChangeCourseWhenTheirPlayFails(t *testing.T) {
+	assert.Contains(t, chineseText.strategies[game.Werewolf], "反跳预言家")
+	assert.Contains(t, englishText.strategies[game.Werewolf], "claim seer on the spot")
+	assert.Contains(t, chineseText.strategies[game.Werewolf], "别再拿它推同一个人")
+	assert.Contains(t, englishText.strategies[game.Werewolf], "stop using it against the same person")
+	assert.NotContains(t, chineseText.tactics[game.Hook], "其他狼不跳预言家")
+	assert.NotContains(t, englishText.tactics[game.Hook], "The others do not claim seer")
+}
+
 func TestPreparingWritesOnlyNotesAndTheTurnAfterOnlyWhatChanged(t *testing.T) {
 	base := Turn{Round: 1, Phase: game.Day, Me: game.Player{Name: "小红"}, Seats: []Seat{{Name: "小红"}, {Name: "老王"}}, Suspects: []string{"老王", game.Nobody}}
 

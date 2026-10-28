@@ -145,7 +145,12 @@ var chineseText = text{
 			"自刀是一招险棋：刀自己或同伴，赌女巫用解药救下，既骗掉解药，被救的狼第二天还能以\"银水\"（被女巫救过的人）的身份获得信任。" +
 			"但女巫不救，你们就真的少了一只狼，所以一般只在第1夜、女巫还有解药时考虑，而且要在计划里说清楚谁自刀。" +
 			"狼要有狼性：隐藏身份不等于说话保守。好人会很强势地带队、穷追不舍，你们只有更强势才赢得了。每次发言都要有明确的立场和攻击目标，主动带节奏，抓住好人发言和投票里真实的漏洞往死里打，不要和稀泥，不要\"再观察一下\"。" +
-			"分开投票是为了不被看出是一伙的，不是让你们说话变软。",
+			"分开投票是为了不被看出是一伙的，不是让你们说话变软。" +
+			"局面不利时要换思路，不要硬撑。下面这些是可以考虑的招，不是规定，按局势和你的性格挑：" +
+			"被查杀了、场上又没有狼跳预言家，可以当场反跳预言家、给对方回一个查杀，把一边倒变成两个预言家对跳；也可以认下普通身份，去攻击别的真实漏洞。" +
+			"你的理由被驳倒了，就别再拿它推同一个人：要么换目标，要么拿出新的、真实发生过的理由。嘴上认错、结论不变，好人只会觉得你在硬推。" +
+			"多想一层：不只想自己这条理由站不站得住，还要想好人现在信谁、为什么信，怎么让他们互相怀疑；谁的话最有分量，是拉拢他还是打掉他；什么时候和同伴拉开距离，换来后面要用的信任。" +
+			"几只狼不要一个样：有的强攻，有的煽动好人内斗，有的装老实和稀泥，各按自己的性格来。",
 		game.Witch: "你的两瓶药是好人阵营的关键资源。解药适合在前期救人，尤其是可能是神职的人；毒药留给你有把握是狼人的人，" +
 			"比如被真预言家查出的狼，或者悍跳的假预言家。合适的时候可以表明身份，报出你救了谁，帮大家分辨真假预言家。" +
 			"注意狼人可能自刀骗你的解药，所以被你救下的人不一定是好人，要结合他白天的表现判断。",
@@ -162,11 +167,11 @@ var chineseText = text{
 			"悍跳就要往死里干：把自己当成真预言家，一心想带好人赢，所以你认定对面那个预言家一定是狼。查杀报给他或者他最信任的人，每一轮都咬死他：拿他发言里的漏洞、他的查验和死亡、投票对不上的地方，盘出一套完整的逻辑证明你才是真的。口气越笃定，越有人信你、投你；不要犹豫，不要退让。" +
 			"悍跳的狼不要给同伴报好人：给狼报金水、金水再跟着他投票，等于把同伴亮出来。金水报给好人，查杀报给真预言家或者发言最有威胁的好人。" +
 			"其他狼最多一只站边悍跳的狼，另一只装中立甚至站边真预言家，投票时分开投。如果悍跳的狼已经被识破、保不住了，其他狼可以和他切割，像倒钩一样跟着踩他、投他。",
-		game.DeepCover: "本局狼队的打法是潜水：谁都不跳神职，全都装成普通村民。" +
+		game.DeepCover: "本局狼队的打法是潜水：一般谁都不跳神职，全都装成普通村民。" +
 			"潜水不等于不说话：要像一个很想赢的强势村民，主动带节奏、抓好人的漏洞、点名推人。白天不要几只狼一起冲同一个人，也不要互相维护，免得被看出是一伙的。" +
 			"计划里的 focus 是你们各自顺势推一把的人，不是一起冲的人。你们装的是互不相识的村民，所以同伴已经暴露、救不回来时，跟着大家投他反而更符合人设。",
 		game.Hook: "本局狼队的打法是倒钩：计划里指定一只狼当倒钩，他白天装成最坚定的好人：站边真预言家，同伴暴露了就跟着踩，甚至投他，用一个同伴换来好人的信任，留到后面关键的时候再带偏票。" +
-			"其他狼不跳预言家，也不要和倒钩的狼互相维护。倒钩是计划里主动牺牲同伴换信任的人；其他狼也可以踩同伴，但只在局势真的需要时。",
+			"其他狼一般不跳预言家，也不要和倒钩的狼互相维护。倒钩是计划里主动牺牲同伴换信任的人；其他狼也可以踩同伴，但只在局势真的需要时。",
 	},
 	goodVoting: "投票的目的不是投出你个人最怀疑的人，而是让好人真的放逐一只狼。投票前想一想：你的票能不能帮放逐一个可疑的人？" +
 		"如果场上有好几个都像狼的人，好人的票却分散在他们身上，宁可并到其中最有可能出局的那个，除非你有很强的证据说明那个人是好人。但不要为了跟大多数而放弃自己的判断。" +
@@ -392,7 +397,12 @@ Write everything in English.`,
 			"A self-kill is a gamble: kill yourself or a teammate and bet the witch saves them, which wastes her antidote and makes the saved werewolf look trusted the next day. " +
 			"If she does not save, you really lose a werewolf, so only consider it on Night 1 while she still has the antidote, and say in the plan who it is. " +
 			"Play like a wolf: hiding who you are does not mean talking timidly. Good players will lead hard and keep pressing, and you only beat them by pressing harder. Every speech takes a clear side and a clear target; drive the table, and hit the real holes in good players' speeches and votes as hard as you can. Never sit on the fence, never \"wait and see\". " +
-			"Splitting your votes keeps you from being read as a team; it is no reason to go soft in what you say.",
+			"Splitting your votes keeps you from being read as a team; it is no reason to go soft in what you say. " +
+			"When things go against you, change your approach instead of digging in. These are moves to weigh, not rules; pick by the situation and your personality. " +
+			"Called out as a werewolf while no werewolf has claimed seer, you may claim seer on the spot and call your accuser a werewolf, turning a one-sided table into two seers fighting it out; or keep a plain claim and go after other real holes. " +
+			"When your reason is refuted, stop using it against the same person: switch targets, or bring a new reason from something that really happened. Owning the mistake but keeping the same conclusion only tells good players you are forcing it. " +
+			"Think one level up: not only whether your argument holds, but whom the good players trust now and why, and how to turn them on each other; whose word carries the most weight, and whether to win them over or take them down; when to put distance between you and a teammate to buy trust you will need later. " +
+			"The werewolves should not all play alike: one presses hard, one stirs good players against each other, one plays the quiet fence-sitter, each in their own personality.",
 		game.Witch: "Your two potions are the good side's key resource. Use the antidote early, especially on someone who may hold a power role; keep the poison for someone you are sure is a werewolf, " +
 			"such as a werewolf the real seer found, or a fake seer. When the time is right you can reveal yourself and say who you saved, to help the table tell the real seer from the fake. " +
 			"Werewolves may self-kill to waste your antidote, so someone you saved is not necessarily good; judge them by how they play by day.",
@@ -409,11 +419,11 @@ Write everything in English.`,
 			"A counter-claim goes all in: be the real seer in your own head, desperate to lead the good side to victory, and so certain the other seer is a werewolf. Report them, or whoever they trust most, as a werewolf, and stay on them every round: use the holes in their speeches and where their checks do not fit the deaths and votes to build a full case that you are the real one. The surer you sound, the more people believe you and vote with you; never hesitate, never back down. " +
 			"The faker never reports a teammate as good: vouching for a werewolf who then votes with you gives them away. Report good players as good, and the real seer or the most dangerous good player as a werewolf. " +
 			"At most one of the others sides with the faker; another plays neutral or even backs the real seer, and you split your votes. If the faker is seen through and cannot be saved, the rest of you may cut them loose and pile on, as a hook would.",
-		game.DeepCover: "This game the pack plays deep cover: none of you claims a power role; you all pass as plain villagers. " +
+		game.DeepCover: "This game the pack plays deep cover: as a rule none of you claims a power role; you all pass as plain villagers. " +
 			"Deep cover is not keeping quiet: play a villager who badly wants to win, drive the table, go after good players' holes and push someone out. By day, never pile onto the same person together and never defend each other, or you will be read as a team. " +
 			"The plan's focus is someone each of you nudges along, not someone you charge together. You are playing strangers, so when a teammate is exposed and done for, voting them out with the table fits your cover.",
 		game.Hook: "This game the pack plays the hook: the plan names one werewolf as the hook, who plays the staunchest good player at the table, backs the real seer, and when a teammate is exposed piles on and even votes them out, trading a teammate for the good side's trust to steer a vote later when it counts. " +
-			"The others do not claim seer and do not defend the hook. The hook is the one the plan has trade a teammate for trust; the rest of you may turn on a teammate too, but only when the game calls for it.",
+			"The others usually do not claim seer, and do not defend the hook. The hook is the one the plan has trade a teammate for trust; the rest of you may turn on a teammate too, but only when the game calls for it.",
 	},
 	goodVoting: "The point of a vote is not to vote out the person you personally suspect most, but for the good side to actually get a werewolf out. Before you vote, ask whether your vote can realistically help vote out someone suspicious. " +
 		"If several players look like werewolves and the good side's votes are split across them, rather join the one most likely to go, unless you have strong evidence that one is good. But do not drop your own reasoning just to follow the majority. " +
