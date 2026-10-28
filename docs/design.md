@@ -143,7 +143,7 @@ A round is mostly waiting on LLMs, so the workflow runs every move at once that 
 | Night | The seer's check runs alongside the wolves, since it needs nothing they decide | The wolves talk in turn, the next one preparing; then the plan; then the witch, who has to be told the victim |
 | Sheriff | Everyone decides whether to run; then every candidate but the seer decides whether to withdraw; then the sheriff vote | Campaign speeches, in seat order, the next one preparing |
 | Day | Every vote | Speeches, then a reply round, each answering the last, the next one preparing |
-| A death | | A player voted out gives last words; then a dead sheriff passes the badge; then a dead hunter shoots, since the badge must land before the shot can take anyone else out |
+| A death | | A player voted out gives last words; then a dead sheriff passes the badge; then a dead hunter shoots. A sheriff the hunter shoots passes the badge in turn |
 
 A durable timer (`phaseDelay`) pauses between phases, so watchers can follow, and the workflow's custom status says what the table is waiting on (`View.Now`) for the page.
 
