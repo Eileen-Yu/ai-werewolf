@@ -519,7 +519,10 @@ type Plan struct {
 	Hook string `json:"hook,omitempty"`
 	// Focus is who the pack pushes the vote onto tomorrow.
 	Focus string `json:"focus,omitempty"`
-	Notes string `json:"notes,omitempty"`
+	// Runner is the wolf who runs for sheriff on the first day, besides the
+	// faker, who always runs.
+	Runner string `json:"runner,omitempty"`
+	Notes  string `json:"notes,omitempty"`
 }
 
 // Tactic is how the pack plays a whole game. It is dealt with the roles, so

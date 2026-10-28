@@ -313,6 +313,9 @@ func prompt(t Turn) (system, user string) {
 		case game.Hook:
 			fields = append(fields, f.hook)
 		}
+		if t.NamesRunner() {
+			fields = append(fields, f.runner)
+		}
 		fields = append(fields, f.focus, f.plan)
 	case t.Kind.IsChoice():
 		fields = append(fields, f.target)
@@ -331,6 +334,9 @@ func prompt(t Turn) (system, user string) {
 			fmt.Fprintf(&b, tx.fakerOnly, l.List(l.SayAll(t.PlanNames())))
 		case game.Hook:
 			fmt.Fprintf(&b, tx.hookOnly, l.List(l.SayAll(t.PlanNames())))
+		}
+		if t.NamesRunner() {
+			fmt.Fprintf(&b, tx.runnerOnly, l.List(t.Pack))
 		}
 		fmt.Fprintf(&b, tx.focusOnly, l.List(l.SayAll(t.Suspects)))
 	}

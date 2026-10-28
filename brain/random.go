@@ -20,6 +20,9 @@ func (Random) Act(_ context.Context, t Turn) (Action, error) {
 		victim := pick(t.Candidates)
 		focus := pick(slices.DeleteFunc(slices.Clone(t.Suspects), func(s string) bool { return s == victim }))
 		a := Action{Target: victim, Faker: game.Nobody, Focus: focus, Speech: fmt.Sprintf(tx.randomPlan, victim, focus)}
+		if t.NamesRunner() {
+			a.Runner = pick(t.Pack)
+		}
 		switch t.Tactic {
 		case game.Counterclaim:
 			a.Faker = pick(t.Pack)

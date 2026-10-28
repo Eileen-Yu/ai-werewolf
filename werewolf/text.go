@@ -8,7 +8,7 @@ type host struct {
 	antidote, poison, noPotions, selfVictim, saved, poisoned                   string
 	inspected, peaceful, died, dawnDead, shot, diedNow, order                  string
 	rebuttals, stance, stances, vote, votes, abstain, tie, allAbstained        string
-	votedOut, exiled, plan, noFaker, faker, hook, undecided, gameOver          string
+	votedOut, exiled, plan, runner, noFaker, faker, hook, undecided, gameOver  string
 	tactic                                                                     string
 	tactics                                                                    map[game.Tactic]string
 	revealed, comma, semicolon, result, silence                                string
@@ -64,6 +64,7 @@ var chineseHost = host{
 	votedOut:     "被投票放逐",
 	exiled:       "%s被放逐了。",
 	plan:         "狼队计划（%s定）：今晚杀%s；明天%s，票投%s。打法：%s",
+	runner:       "。%s上警",
 	noFaker:      "不悍跳",
 	faker:        "%s悍跳预言家",
 	hook:         "%s倒钩",
@@ -137,6 +138,7 @@ var englishHost = host{
 	votedOut:     "voted out",
 	exiled:       "%s is voted out.",
 	plan:         "Pack plan (set by %s): kill %s tonight; tomorrow %s, and vote out %s. How: %s",
+	runner:       ". %s runs for sheriff",
 	noFaker:      "nobody claims seer",
 	faker:        "%s claims seer",
 	hook:         "%s plays the hook",

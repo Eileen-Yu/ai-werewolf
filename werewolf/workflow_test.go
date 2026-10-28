@@ -629,7 +629,7 @@ func (b *campaigner) Act(ctx context.Context, t brain.Turn) (brain.Action, error
 	b.mu.Unlock()
 	switch t.Kind {
 	case brain.Run:
-		if t.Me.Role == game.Seer || slices.Contains(firstLiving(t.Seats, 2), t.Me.Name) {
+		if len(t.Candidates) == 1 || slices.Contains(firstLiving(t.Seats, 2), t.Me.Name) {
 			b.mu.Lock()
 			b.ran = append(b.ran, t.Me.Name)
 			b.mu.Unlock()
@@ -677,13 +677,13 @@ func holder(seats []brain.Seat) string {
 func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
-	passed, torn, withdrewOnce := false, false, false
+	passed, torn, withdrewOnce, sentOnce := false, false, false, false
 	for i := 0; i < 30 && !(passed && torn); i++ {
 		b := &campaigner{tear: i%2 == 1}
 		SetBrain(b)
 		play(t, client, fmt.Sprintf("sheriff-%d", i), newGame())
 
-		var runners, left []string
+		var runners, left, sent []string
 		withdrawn := false
 		sheriff, elected := "", false
 		var lastDay1Speaker string
@@ -695,6 +695,9 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 				assert.Equal(t, 1, turn.Round, "the election is on the first day only")
 				if turn.Me.Role == game.Seer {
 					assert.Equal(t, []string{turn.Me.Name}, turn.Candidates, "the seer always runs")
+				} else if turn.Plan != nil && (turn.Plan.Runner == turn.Me.Name || turn.Plan.Faker == turn.Me.Name) {
+					sent = append(sent, turn.Me.Name)
+					assert.Equal(t, []string{turn.Me.Name}, turn.Candidates, "the wolves the plan sends always run")
 				} else {
 					assert.Equal(t, []string{turn.Me.Name, game.Pass}, turn.Candidates)
 				}
@@ -748,8 +751,11 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 		}
 		withdrewOnce = withdrewOnce || withdrawn
 		assert.Equal(t, runners[0], lastDay1Speaker, "the sheriff speaks last")
+		assert.Subset(t, runners, sent, "a wolf the plan sent did not run")
+		sentOnce = sentOnce || len(sent) > 0
 	}
 	assert.True(t, withdrewOnce, "no candidate withdrew in any game")
+	assert.True(t, sentOnce, "the plan sent no wolf to run in any game")
 	assert.True(t, passed, "no sheriff passed the badge on in thirty games")
 	assert.True(t, torn, "no sheriff tore up the badge in thirty games")
 }
@@ -987,11 +993,14 @@ func TestALoneCandidateIsElectedWithoutAVote(t *testing.T) {
 }
 
 // loneRunner plays randomly, except that only the seer, who must, runs for
-// sheriff.
+// sheriff: the wolf plan sends nobody.
 type loneRunner struct{ rec turnRecorder }
 
 func (b *loneRunner) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
 	a, err := b.rec.Act(ctx, t)
+	if t.Kind == brain.WolfPlan {
+		a.Runner, a.Faker = "", ""
+	}
 	if t.Kind == brain.Run {
 		a.Target = game.Pass
 		if t.Me.Role == game.Seer {

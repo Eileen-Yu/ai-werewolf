@@ -109,9 +109,9 @@ type Turn struct {
 //
 // Speech is said aloud and Target is the pick on a choice turn. Suspect and
 // Claim are a declaring speech's stance, put on the record so others can hold
-// the player to it; a wolf's Claim may be a lie. Faker, Hook and Focus are a
-// wolf plan's seer claimant, the wolf who sides with the good players, and
-// vote target.
+// the player to it; a wolf's Claim may be a lie. Faker, Hook, Focus and
+// Runner are a wolf plan's seer claimant, the wolf who sides with the good
+// players, vote target, and the wolf who runs for sheriff on the first day.
 type Action struct {
 	Observations []string    `json:"observations,omitempty"`
 	Thinking     string      `json:"thinking"`
@@ -123,6 +123,7 @@ type Action struct {
 	Faker        string      `json:"faker,omitempty"`
 	Hook         string      `json:"hook,omitempty"`
 	Focus        string      `json:"focus,omitempty"`
+	Runner       string      `json:"runner,omitempty"`
 }
 
 // Claimable is what a player may claim to be. A wolf claims one of these too.
@@ -194,8 +195,9 @@ func (t Turn) ClaimProblems(c game.Claim) []string {
 }
 
 // planProblems checks a wolf plan against the game: the seer claimant must
-// be a wolf, and the pack cannot push tomorrow's vote onto a teammate, or
-// onto tonight's victim, who will be dead by then.
+// be a wolf, the first night's plan must send a wolf to run for sheriff, and
+// the pack cannot push tomorrow's vote onto a teammate, or onto tonight's
+// victim, who will be dead by then.
 func (t Turn) planProblems(a Action) []string {
 	tx, l := t.text(), t.Lang
 	var problems []string
@@ -205,6 +207,9 @@ func (t Turn) planProblems(a Action) []string {
 	}
 	if t.Tactic == game.Hook && !slices.Contains(named, a.Hook) {
 		problems = append(problems, fmt.Sprintf(tx.badHook, l.List(l.SayAll(named)), a.Hook))
+	}
+	if t.NamesRunner() && !slices.Contains(t.Pack, a.Runner) {
+		problems = append(problems, fmt.Sprintf(tx.badRunner, l.List(l.SayAll(t.Pack)), a.Runner))
 	}
 	if !slices.Contains(t.Suspects, a.Focus) {
 		problems = append(problems, fmt.Sprintf(tx.badFocus, l.List(l.SayAll(t.Suspects)), a.Focus))
@@ -219,6 +224,12 @@ func (t Turn) planProblems(a Action) []string {
 // seer today.
 func (t Turn) MustFakeSeer() bool {
 	return t.Plan != nil && t.Plan.Faker == t.Me.Name
+}
+
+// NamesRunner reports whether this wolf plan names who runs for sheriff:
+// only the first night's, since the election is on the first day.
+func (t Turn) NamesRunner() bool {
+	return t.Kind == WolfPlan && t.Round <= 1
 }
 
 // PlanNames is who a wolf plan may name as the faker or the hook. The first
@@ -333,6 +344,7 @@ func (t Turn) Normalize(a Action) Action {
 		a.Focus = closest(a.Focus, t.Suspects)
 		a.Faker = closest(a.Faker, append(slices.Clone(t.Pack), game.Nobody))
 		a.Hook = closest(a.Hook, append(slices.Clone(t.Pack), game.Nobody))
+		a.Runner = closest(a.Runner, t.Pack)
 	}
 	if a.Claim != nil {
 		c := *a.Claim

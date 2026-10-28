@@ -233,16 +233,20 @@ func TestTheWolfPlanAsksForWhatThisGamesTacticNeeds(t *testing.T) {
 		Candidates: []string{"老王", "小红"}, Suspects: []string{"老王", "小红"}, Pack: []string{"阿杰"},
 	}
 	for tactic, want := range map[game.Tactic]string{
-		game.Counterclaim: `"target": "今晚杀的人", "faker": "明天悍跳预言家的狼", "focus": "明天把票引向的人", "speech": "白天的具体打法"`,
-		game.Hook:         `"target": "今晚杀的人", "hook": "倒钩的狼", "focus": "明天把票引向的人", "speech": "白天的具体打法"`,
-		game.DeepCover:    `"target": "今晚杀的人", "focus": "明天把票引向的人", "speech": "白天的具体打法"`,
+		game.Counterclaim: `"target": "今晚杀的人", "faker": "明天悍跳预言家的狼", "runner": "明天上警的狼", "focus": "明天把票引向的人", "speech": "白天的具体打法"`,
+		game.Hook:         `"target": "今晚杀的人", "hook": "倒钩的狼", "runner": "明天上警的狼", "focus": "明天把票引向的人", "speech": "白天的具体打法"`,
+		game.DeepCover:    `"target": "今晚杀的人", "runner": "明天上警的狼", "focus": "明天把票引向的人", "speech": "白天的具体打法"`,
 	} {
 		turn.Tactic = tactic
 		system, user := prompt(turn)
 		assert.Contains(t, user, want, tactic)
 		assert.Contains(t, user, "target 只能是这些名字之一：老王、小红。")
+		assert.Contains(t, user, "runner 只能是：阿杰。")
 		assert.Contains(t, system, chineseText.tactics[tactic], "a wolf is told this game's play")
 	}
+	turn.Round = 2
+	_, user := prompt(turn)
+	assert.NotContains(t, user, `"runner"`, "only the first night's plan sends someone to the election")
 }
 
 func TestOnlyAWolfIsToldTheTactic(t *testing.T) {
@@ -268,8 +272,9 @@ func TestCheck(t *testing.T) {
 	assert.Error(t, speech.Check(Action{Thinking: "只想了没说", Suspect: "老王"}))
 	assert.ErrorContains(t, speech.Check(Action{Speech: "我怀疑小李"}), "suspect")
 	assert.NoError(t, wolfChat.Check(Action{Speech: "今晚刀老王"}), "only daytime speeches declare a stance")
-	assert.NoError(t, plan.Check(Action{Target: "老王", Faker: "阿杰", Focus: "小红", Speech: "阿杰悍跳"}))
-	assert.ErrorContains(t, plan.Check(Action{Target: "老王", Faker: "阿杰", Focus: "小红"}), "speech", "a plan without a plan for the day")
+	assert.NoError(t, plan.Check(Action{Target: "老王", Faker: "阿杰", Runner: "阿杰", Focus: "小红", Speech: "阿杰悍跳"}))
+	assert.ErrorContains(t, plan.Check(Action{Target: "老王", Faker: "阿杰", Runner: "阿杰", Focus: "小红"}), "speech", "a plan without a plan for the day")
+	assert.ErrorContains(t, plan.Check(Action{Target: "老王", Faker: "阿杰", Focus: "小红", Speech: "阿杰悍跳"}), "runner", "the first night's plan sends a wolf to run")
 }
 
 func TestNormalize(t *testing.T) {
@@ -450,20 +455,21 @@ func TestCheckHoldsTheWolfPlanToTheGame(t *testing.T) {
 	}
 
 	plan.Tactic = game.Counterclaim
-	assert.NoError(t, plan.Check(Action{Target: "阿芳", Faker: "小宇", Focus: "老王", Speech: "小宇跳"}))
-	assert.NoError(t, plan.Check(Action{Target: "阿杰", Faker: "小宇", Focus: "老王", Speech: "自刀"}))
+	assert.NoError(t, plan.Check(Action{Target: "阿芳", Faker: "小宇", Runner: "小宇", Focus: "老王", Speech: "小宇跳"}))
+	assert.NoError(t, plan.Check(Action{Target: "阿杰", Faker: "小宇", Runner: "阿杰", Focus: "老王", Speech: "自刀"}))
+	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Faker: "小宇", Runner: "老王", Focus: "老王", Speech: "老王上警"}), "runner", "only a wolf is sent to run")
 	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Faker: "小宇", Focus: "阿芳", Speech: "集中投阿芳"}), "阿芳今晚就会被杀")
 	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Faker: "小宇", Focus: "小宇", Speech: "投小宇"}), "focus")
 	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Faker: "老王", Focus: "老王", Speech: "老王跳"}), "faker")
 	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Faker: game.Nobody, Focus: "老王", Speech: "不跳"}), "faker", "a counter-claim needs a claimant")
 
 	plan.Tactic = game.Hook
-	assert.NoError(t, plan.Check(Action{Target: "阿芳", Hook: "小宇", Focus: "老王", Speech: "小宇倒钩"}))
+	assert.NoError(t, plan.Check(Action{Target: "阿芳", Hook: "小宇", Runner: "阿杰", Focus: "老王", Speech: "小宇倒钩"}))
 	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Hook: "老王", Focus: "老王", Speech: "老王倒钩"}), "hook")
 	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Focus: "老王", Speech: "没人倒钩"}), "hook", "the hook needs a wolf to play it")
 
 	plan.Tactic = game.DeepCover
-	assert.NoError(t, plan.Check(Action{Target: "阿芳", Focus: "老王", Speech: "大家潜水"}), "deep cover names neither")
+	assert.NoError(t, plan.Check(Action{Target: "阿芳", Runner: "阿杰", Focus: "老王", Speech: "大家潜水"}), "deep cover names neither")
 
 	later := plan
 	later.Round = 2

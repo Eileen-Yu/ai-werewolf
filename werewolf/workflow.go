@@ -270,7 +270,7 @@ func (t *table) wolvesHunt() (string, error) {
 	if a.Target == "" {
 		return "", nil
 	}
-	plan := &game.Plan{Round: s.Round, Victim: a.Target, Focus: a.Focus, Notes: a.Speech}
+	plan := &game.Plan{Round: s.Round, Victim: a.Target, Focus: a.Focus, Runner: a.Runner, Notes: a.Speech}
 	day := t.h.noFaker
 	switch {
 	case a.Faker != game.Nobody && a.Faker != "":
@@ -285,7 +285,11 @@ func (t *table) wolvesHunt() (string, error) {
 	if focus == "" {
 		focus = t.h.undecided
 	}
-	t.add("", fmt.Sprintf(t.h.plan, leader, plan.Victim, day, focus, plan.Notes), wolves...)
+	line := fmt.Sprintf(t.h.plan, leader, plan.Victim, day, focus, plan.Notes)
+	if plan.Runner != "" {
+		line += fmt.Sprintf(t.h.runner, plan.Runner)
+	}
+	t.add("", line, wolves...)
 	return plan.Victim, nil
 }
 
@@ -433,8 +437,10 @@ func (t *table) election() error {
 	s.Stage = game.StageElection
 	t.add("", t.h.election)
 	// The seer always runs: their checks are worth the most with the badge.
+	// So do the wolves the pack's plan sends, unless a person plays them.
+	mustRun := func(v string) bool { return s.Player(v).Role == game.Seer || t.planRuns(v) }
 	runs, err := t.chooseAll(brain.Run, alive, func(v string) []string {
-		if s.Player(v).Role == game.Seer {
+		if mustRun(v) {
 			return []string{v}
 		}
 		return []string{v, game.Pass}
@@ -444,7 +450,7 @@ func (t *table) election() error {
 	}
 	var runners []string
 	for _, r := range runs {
-		if r.Target == r.Voter {
+		if r.Target == r.Voter || mustRun(r.Voter) {
 			runners = append(runners, r.Voter)
 		}
 	}
@@ -514,6 +520,16 @@ func (t *table) withdraw(runners []string) ([]string, error) {
 		t.add("", fmt.Sprintf(t.h.withdrew, t.list(withdrew)))
 	}
 	return game.Without(runners, withdrew...), nil
+}
+
+// planRuns reports whether the pack's plan sends this AI wolf to run for
+// sheriff: the wolf it names, and the faker, who claims seer in the campaign.
+func (t *table) planRuns(name string) bool {
+	p := t.s.Plan
+	if p == nil || p.Round != t.s.Round || t.s.Player(name).Human {
+		return false
+	}
+	return name == p.Runner || name == p.Faker
 }
 
 // abstained reports whether every voter abstained.
@@ -892,7 +908,8 @@ func ActActivity(ctx workflow.ActivityContext) (any, error) {
 // is not allowed to stall the game: a bad pick counts as abstaining, an empty
 // speech as silence, a bad suspect as suspecting nobody; a bad claim is
 // dropped, and so are bad beliefs. A wolf plan's bad seer claimant means
-// nobody claims and a bad focus means none. The rest is let through: a
+// nobody claims, a bad runner means nobody is sent, and a bad focus means
+// none. The rest is let through: a
 // speech that quotes someone yet to speak, or a faker who does not claim, is
 // a slip, not a broken move.
 func settle(t brain.Turn, a brain.Action) brain.Action {
@@ -917,6 +934,9 @@ func settle(t brain.Turn, a brain.Action) brain.Action {
 		}
 		if t.Tactic != game.Hook || !slices.Contains(t.Pack, a.Hook) {
 			a.Hook = ""
+		}
+		if !t.NamesRunner() || !slices.Contains(t.Pack, a.Runner) {
+			a.Runner = ""
 		}
 		if !slices.Contains(t.Suspects, a.Focus) || a.Focus == a.Target {
 			a.Focus = ""
