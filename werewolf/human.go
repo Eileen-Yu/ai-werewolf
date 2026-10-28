@@ -30,7 +30,8 @@ const MaxHumans = 9
 var HumanTimeout = 3 * time.Minute
 
 // View is the game as one person sees it, cut by ReadView from what the
-// workflow publishes for the web page.
+// workflow publishes for the web page. A spectator's view has no You, role
+// or pending move, and only what everyone at the table hears.
 type View struct {
 	You   string       `json:"you"`
 	Lang  game.Lang    `json:"lang"`
@@ -39,9 +40,13 @@ type View struct {
 	Alive bool         `json:"alive"`
 	Round int          `json:"round"`
 	Phase game.Phase   `json:"phase"`
+	Stage game.Stage   `json:"stage,omitempty"`
 	When  string       `json:"when"`
 	Seats []brain.Seat `json:"seats"`
-	Log   []Line       `json:"log"`
+	// People is who at the table is a person, which everyone may know: the
+	// people invited each other.
+	People []string `json:"people,omitempty"`
+	Log    []Line   `json:"log"`
 	// LastVote is how everyone voted on the latest day.
 	LastVote *LastVote `json:"lastVote,omitempty"`
 	Pending  *Pending  `json:"pending,omitempty"`
@@ -52,12 +57,35 @@ type View struct {
 	Words map[string]string `json:"words"`
 }
 
-// Line is one event the person saw.
+// Line is one event the person saw. Stance is what a speech put on the
+// record, apart from its words. Kind is "speech", "host", or the kind of a
+// host announcement; Stage is empty for events from before it was kept.
 type Line struct {
-	When    string `json:"when"`
-	Speaker string `json:"speaker,omitempty"`
-	Text    string `json:"text"`
-	Private bool   `json:"private,omitempty"`
+	When    string     `json:"when"`
+	Round   int        `json:"round"`
+	Phase   game.Phase `json:"phase"`
+	Stage   game.Stage `json:"stage,omitempty"`
+	Kind    string     `json:"kind"`
+	Speaker string     `json:"speaker,omitempty"`
+	Text    string     `json:"text"`
+	Stance  string     `json:"stance,omitempty"`
+	Private bool       `json:"private,omitempty"`
+}
+
+func line(e game.Event, l game.Lang) Line {
+	out := Line{When: e.When(l), Round: e.Round, Phase: e.Phase, Stage: e.Stage, Kind: string(e.Kind),
+		Speaker: e.Speaker, Text: e.Text, Private: len(e.Audience) > 0}
+	if e.Suspect != "" {
+		out.Stance = game.Stance(l, e.Suspect, e.Claim)
+	}
+	switch {
+	case out.Kind != "":
+	case e.Speaker != "":
+		out.Kind = "speech"
+	default:
+		out.Kind = "host"
+	}
+	return out
 }
 
 // LastVote is a day's votes. An empty Target is an abstention.
@@ -172,8 +200,9 @@ type humanSeat struct {
 var ErrNoSeat = errors.New("this link does not open a seat at this table")
 
 // ReadView cuts the view of the person whose seat key opens from a game's
-// custom status. It reports false if the game has not dealt yet, and
-// ErrNoSeat if no seat opens with key.
+// custom status, or a spectator's view for an empty key that opens no seat.
+// It reports false if the game has not dealt yet, and ErrNoSeat if no seat
+// opens with a key that is not empty.
 func ReadView(meta *workflow.WorkflowMetadata, key string) (View, bool, error) {
 	var b board
 	s := meta.CustomStatus.GetValue()
@@ -183,15 +212,23 @@ func ReadView(meta *workflow.WorkflowMetadata, key string) (View, bool, error) {
 	if err := json.Unmarshal([]byte(s), &b); err != nil {
 		return View{}, false, fmt.Errorf("read the table: %w", err)
 	}
+	v := b.View
+	for _, h := range b.Humans {
+		v.People = append(v.People, h.Name)
+	}
 	i := slices.IndexFunc(b.Humans, func(h humanSeat) bool { return h.Key == key })
-	if i < 0 {
+	if i < 0 && key != "" {
 		return View{}, false, ErrNoSeat
 	}
-	me, v := b.Humans[i], b.View
-	v.You, v.Role, v.Pack, v.Alive, v.Pending = me.Name, me.Role, me.Pack, me.Alive, me.Pending
+	visible := func(e game.Event) bool { return len(e.Audience) == 0 }
+	if i >= 0 {
+		me := b.Humans[i]
+		v.You, v.Role, v.Pack, v.Alive, v.Pending = me.Name, me.Role, me.Pack, me.Alive, me.Pending
+		visible = func(e game.Event) bool { return e.VisibleTo(me.Name) }
+	}
 	for _, e := range b.Record {
-		if e.VisibleTo(me.Name) {
-			v.Log = append(v.Log, Line{When: e.When(v.Lang), Speaker: e.Speaker, Text: e.Said(v.Lang), Private: len(e.Audience) > 0})
+		if visible(e) {
+			v.Log = append(v.Log, line(e, v.Lang))
 		}
 	}
 	return v, true, nil
@@ -245,15 +282,16 @@ func (m *humanMove) Await(v any) error {
 	return nil
 }
 
-// publish puts the table, with every person's seat, in the custom status. It
-// runs on replay too, since the status is rebuilt with each run of the
-// workflow.
+// publish puts the table, with every person's seat, in the custom status,
+// for the people playing and anyone watching. It runs on replay too, since
+// the status is rebuilt with each run of the workflow.
 func (t *table) publish() {
 	l := t.s.Lang
 	b := board{View: View{
 		Lang:  l,
 		Round: t.s.Round,
 		Phase: t.s.Phase,
+		Stage: t.s.Stage,
 		When:  l.When(t.s.Round, t.s.Phase),
 		Now:   t.doing(),
 		Words: map[string]string{game.Pass: t.say(game.Pass), game.Nobody: t.say(game.Nobody)},
@@ -267,9 +305,6 @@ func (t *table) publish() {
 			me.Pack = t.s.Living(game.Werewolf)
 		}
 		b.Humans = append(b.Humans, me)
-	}
-	if len(b.Humans) == 0 {
-		return
 	}
 	if x := t.s.LastExile(); x != nil {
 		b.LastVote = &LastVote{When: l.When(x.Round, game.Day), Votes: x.Votes, Sheriff: x.Sheriff}

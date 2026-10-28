@@ -198,8 +198,45 @@ func TestEachPersonAtATableSeesOnlyTheirOwnSeat(t *testing.T) {
 				"%s saw %s's private line: %s", name, l.Speaker, l.Text)
 		}
 	}
-	_, _, err = ReadView(meta, "")
-	assert.ErrorIs(t, err, ErrNoSeat, "a link without a key opens nobody's seat")
+	_, _, err = ReadView(meta, "someone-else")
+	assert.ErrorIs(t, err, ErrNoSeat, "a key nobody was given opens no seat")
+	v, ok, err := ReadView(meta, "")
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Empty(t, v.You, "a link without a key watches instead")
+	assert.Empty(t, v.Role)
+	assert.Nil(t, v.Pack)
+	assert.ElementsMatch(t, []string{"Eileen", "Bob"}, v.People)
+}
+
+func TestASpectatorFollowsTheGameStageByStage(t *testing.T) {
+	SetBrain(brain.Random{})
+	client := startEngine(t)
+	startWorker(t, client)
+	play(t, client, "watched", Game{Lang: game.English})
+	meta, err := client.FetchWorkflowMetadata(t.Context(), "watched")
+	require.NoError(t, err)
+	v, ok, err := ReadView(meta, "")
+	require.NoError(t, err)
+	require.True(t, ok, "a game nobody plays in is still published for spectators")
+
+	order := map[game.Stage]int{game.StageNight: 0, game.StageDawn: 1, game.StageElection: 2, game.StageDay: 3, game.StageEnd: 4}
+	last, kinds := 0, map[string]bool{}
+	for i, l := range v.Log {
+		assert.False(t, l.Private, "a spectator saw a private line: %s", l.Text)
+		require.Contains(t, order, l.Stage, "line %d has no stage: %s", i, l.Text)
+		at := l.Round*10 + order[l.Stage]
+		assert.GreaterOrEqual(t, at, last, "%s (%s, round %d) is out of order", l.Text, l.Stage, l.Round)
+		last = at
+		kinds[l.Kind] = true
+		if l.Kind == "speech" {
+			assert.NotEmpty(t, l.Speaker)
+		}
+	}
+	for _, k := range []string{"host", "speech", "vote", "death", "result"} {
+		assert.True(t, kinds[k], "no %s line in kinds seen: %v", k, kinds)
+	}
+	assert.Equal(t, game.StageEnd, v.Log[len(v.Log)-1].Stage)
 }
 
 func TestThePageIsToldOnlyWhatTheTableCanSee(t *testing.T) {

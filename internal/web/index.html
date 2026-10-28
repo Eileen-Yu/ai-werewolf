@@ -17,20 +17,73 @@
   textarea { min-height: 110px; resize: vertical; }
   button { background:var(--accent); color:#14161c; border:none; font-weight:600; cursor:pointer; width:auto; padding:9px 18px; margin-top:12px; }
   button:disabled { opacity:.5; cursor:default; }
-  .grid { display:grid; grid-template-columns: 1fr 360px; gap:16px; }
-  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
-  .seats { display:flex; flex-wrap:wrap; gap:6px; }
-  .seat { padding:4px 10px; border:1px solid var(--line); border-radius:999px; font-size:13px; }
-  .seat.dead { opacity:.4; text-decoration: line-through; }
-  .seat.sheriff { border-color: #d4a017; font-weight: 600; }
-  .seat.me { border-color:var(--accent); color:var(--accent); }
-  #log { max-height: 70vh; overflow-y:auto; }
-  .line { padding:6px 0; border-bottom:1px solid var(--line); }
-  .line .when { color:var(--dim); font-size:12px; margin-right:6px; }
-  .line .who { font-weight:600; margin-right:4px; }
-  .line.host .who { color:var(--dim); }
-  .line.private { background: rgba(224,168,74,.07); }
-  .line.mine .who { color:var(--accent); }
+  .grid { display:grid; grid-template-columns: 1fr 360px; gap:16px; align-items:start; }
+  /* On a phone: the seats, then what the table is waiting on or your move,
+     then the timeline, then the votes. */
+  @media (max-width: 860px) {
+    .grid { grid-template-columns: 1fr; gap:0; }
+    .side { display:contents; }
+    #result, #turnCard, #waiting { order:1; } .timeline { order:2; } #votes { order:3; }
+  }
+
+  /* The game stage: every seat at the table. */
+  .boardHead { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  .boardHead .phase { font-size:17px; font-weight:700; }
+  .boardHead .me { flex:1; min-width:180px; }
+  .boardHead #voiceBtn { margin:0; }
+  .seats { display:grid; grid-template-columns: repeat(9, 1fr); gap:8px; }
+  @media (max-width: 860px) { .seats { grid-template-columns: repeat(5, 1fr); } }
+  @media (max-width: 520px) { .seats { grid-template-columns: repeat(3, 1fr); } }
+  .seat { position:relative; display:flex; flex-direction:column; align-items:center; gap:3px; padding:10px 4px 8px;
+    border:1px solid var(--line); border-radius:10px; background:rgba(255,255,255,.02); text-align:center; min-width:0; transition: opacity .4s; }
+  .seat .name { font-size:13px; font-weight:600; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .seat .tags { display:flex; flex-wrap:wrap; justify-content:center; gap:3px; min-height:18px; }
+  .tag { font-size:11px; line-height:16px; padding:0 6px; border-radius:999px; background:#2a2e3a; color:#c9ccd6; white-space:nowrap; }
+  .tag.you { background:var(--accent); color:#14161c; font-weight:700; }
+  .tag.person { background:#26344a; color:#a9cdf5; }
+  .tag.wolf { background:#4a2224; color:#ffb3b0; }
+  .tag.out { background:transparent; color:var(--dim); border:1px solid var(--line); }
+  .tag.revealed { background:#3a3320; color:var(--accent); }
+  .tag.revealed.wolf { background:#4a2224; color:#ffb3b0; }
+  .avatar { position:relative; flex:none; width:44px; height:44px; border-radius:50%; display:grid; place-items:center;
+    font-weight:700; font-size:18px; color:#fff; background:var(--c, #555); box-shadow: inset 0 -3px 0 rgba(0,0,0,.25); }
+  .avatar.sm { width:30px; height:30px; font-size:13px; }
+  .avatar .badge { position:absolute; right:-6px; bottom:-4px; font-size:16px; }
+  .seat.me { border-color:var(--accent); background:rgba(224,168,74,.08); }
+  .seat.sheriff .avatar { box-shadow: 0 0 0 2px #d4a017; }
+  .seat.dead .avatar, .seat.dead .name { opacity:.45; }
+  .seat.dead .avatar { filter: grayscale(1); }
+  .seat.dead .name { text-decoration: line-through; }
+
+  /* The live timeline. */
+  .timeline { position:relative; padding:0; }
+  #log { max-height: max(360px, calc(100vh - 300px)); overflow-y:auto; padding:4px 16px 16px; }
+  @media (max-width: 860px) { #log { max-height: 65vh; } }
+  .group-head { position:sticky; top:0; z-index:1; margin:0 -16px 6px; padding:10px 16px 6px; font-size:13px; font-weight:700;
+    color:var(--dim); letter-spacing:.03em; background:var(--card); border-bottom:1px solid var(--line); }
+  body.night .group-head { background: #161a2c; }
+  .group-head.night { color:#a7b4ff; } .group-head.dawn { color:#f2b97c; } .group-head.election { color:#e8c45a; }
+  .group-head.day { color:#e6e6ea; } .group-head.end { color:var(--accent); }
+  .msg { display:flex; gap:8px; margin:10px 0; align-items:flex-start; }
+  .bubble { min-width:0; flex:1; }
+  .bubble .meta { display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:13px; }
+  .bubble .meta b { font-size:14px; }
+  .bubble .text { margin-top:3px; padding:8px 11px; border-radius:4px 12px 12px 12px; background:#252936; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .msg.mine .bubble .text { background:#3a3320; }
+  .msg.mine .meta b { color:var(--accent); }
+  .msg.private .bubble .text { background:#3a2023; border:1px dashed #7a3a3d; }
+  .chip { font-size:11.5px; padding:1px 7px; border-radius:999px; border:1px solid #4a5068; color:#c3c8dc; }
+  .chip.claim { border-color:var(--accent); color:var(--accent); }
+  .host { margin:8px 0; color:var(--dim); font-size:13.5px; white-space:pre-wrap; }
+  .host.private { color:#e9cf9b; padding:6px 10px; border-radius:8px; background:rgba(224,168,74,.08); }
+  .event { margin:10px 0; padding:8px 12px; border-radius:8px; border-left:3px solid; white-space:pre-wrap; }
+  .event.death { border-color:var(--wolf); background:rgba(217,83,79,.12); font-weight:600; }
+  .event.vote { border-color:#6f8cff; background:rgba(111,140,255,.10); font-size:14px; }
+  .event.result { border-color:var(--accent); background:rgba(224,168,74,.10); font-weight:600; }
+  #votes .line { padding:6px 0; border-bottom:1px solid var(--line); }
+  #votes .who { font-weight:600; margin-right:6px; }
+  #newPill { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); margin:0; padding:6px 14px; border-radius:999px;
+    box-shadow:0 4px 14px rgba(0,0,0,.5); z-index:2; }
   .role { font-size:18px; font-weight:700; color:var(--accent); }
   .role.wolf { color:var(--wolf); }
   .dim { color:var(--dim); font-size:13px; }
@@ -45,10 +98,11 @@
   /* The stage: what the table is waiting on. Night brings a sky, the moon and,
      while the pack is at it, a pair of wolf eyes. */
   body { transition: background 1.2s; }
-  body.night { background: radial-gradient(ellipse at top, #1a2148 0%, #0b0e1c 60%, #07080f 100%) fixed; }
+  body.night { background: radial-gradient(ellipse at top, #1a2148 0%, #0b0e1c 60%, #07080f 100%) fixed #07080f; }
   body.night .card { background: rgba(22,26,44,.88); border-color:#2a3157; }
-  .seat.speaking { border-color:#7fd1ff; color:#bfe8ff; animation: ring 1.4s ease-out infinite; }
-  @keyframes ring { 0% { box-shadow:0 0 0 0 rgba(127,209,255,.55); } 100% { box-shadow:0 0 0 9px rgba(127,209,255,0); } }
+  .seat.speaking { border-color:#7fd1ff; }
+  .seat.speaking .avatar { animation: ring 1.4s ease-out infinite; }
+  @keyframes ring { 0% { box-shadow:0 0 0 0 rgba(127,209,255,.7); } 100% { box-shadow:0 0 0 11px rgba(127,209,255,0); } }
   .stage { position:relative; overflow:hidden; min-height:140px; display:flex; align-items:center; gap:16px; padding:22px 18px; }
   body.night .stage.night { background: linear-gradient(180deg, #070b22 0%, #141a40 100%); border-color:#2f3870; }
   .stage:not(.night) .moon { display:none; }
@@ -110,16 +164,17 @@
   </section>
 
   <section id="table" hidden>
+    <div class="card" id="board">
+      <div class="boardHead">
+        <div class="phase" id="when"></div>
+        <div class="me"><span id="youAre"></span> <span id="role" class="role"></span> <span class="dim" id="pack"></span></div>
+        <button id="voiceBtn" class="secondary" type="button"></button>
+      </div>
+      <div class="seats" id="seats"></div>
+    </div>
     <div class="grid">
-      <div class="card"><div id="log"></div></div>
-      <div>
-        <div class="card">
-          <div class="dim" id="when"></div>
-          <div><span id="youAre"></span> <span id="role" class="role"></span></div>
-          <div class="dim" id="pack"></div>
-          <div class="seats" id="seats" style="margin-top:10px"></div>
-          <button id="voiceBtn" class="secondary" type="button"></button>
-        </div>
+      <div class="card timeline"><div id="log"></div><button id="newPill" type="button" hidden></button></div>
+      <div class="side">
         <div class="card" id="votes" hidden></div>
         <div class="card" id="turnCard" hidden>
           <div id="turnTitle" style="font-weight:600"></div>
@@ -157,6 +212,9 @@ const UI = {
       "audio-capture": "找不到麦克风：检查麦克风有没有连上、系统设置里有没有选它。",
       network: "语音识别连不上网络：Chrome 需要联网把录音发给 Google 识别。" },
     voiceReady: "语音朗读已开启，之后的发言会读出来。",
+    watchOnly: "0（只观战：9个AI对局）", watching: "👀 观战中：只看得到公开的信息", watchLink: "观战链接（任何人都能看，只有公开信息）",
+    you: "你", person: "👤 真人", packmate: "🐺 队友", out: "出局", newLines: n => `${n} 条新消息 ↓`, packTag: "🐺 狼队频道", secret: "🔒 只有你知道",
+    stages: { night: r => `第${r}夜`, dawn: r => `第${r}天 · 天亮`, election: r => `第${r}天 · 警长竞选`, day: r => `第${r}天 · 白天讨论`, end: () => "游戏结束" },
     over: "游戏结束", winner: w => `${w}胜利`, mvp: "MVP", failed: "游戏出错：", host: "主持人", again: "再来一局",
     rulesBtn: "📖 游戏规则",
     rules: `<h3>游戏规则</h3>
@@ -206,6 +264,9 @@ const UI = {
       "audio-capture": "No microphone found: check it is plugged in and selected in your system settings.",
       network: "Speech recognition cannot reach the network: Chrome sends the recording to Google to transcribe it." },
     voiceReady: "Read aloud is on. New lines will be read out.",
+    watchOnly: "0 (just watch nine AIs play)", watching: "👀 Watching: you only see what everyone hears", watchLink: "Spectator link (anyone can watch; public information only)",
+    you: "You", person: "👤 Person", packmate: "🐺 Pack", out: "Out", newLines: n => `${n} new ↓`, packTag: "🐺 Pack only", secret: "🔒 Only you know",
+    stages: { night: r => `Night ${r}`, dawn: r => `Day ${r} · Dawn`, election: r => `Day ${r} · Sheriff election`, day: r => `Day ${r} · Discussion`, end: () => "Game over" },
     over: "Game over", winner: w => `The ${w} side wins`, mvp: "MVP", failed: "The game failed: ", host: "Host", again: "Play again",
     rulesBtn: "📖 Rules",
     rules: `<h3>Rules</h3>
@@ -273,7 +334,8 @@ async function loadSetup() {
   $("title").textContent = t.title;
   $("countLabel").textContent = t.count;
   $("startBtn").textContent = t.start;
-  if (!$("count").options.length) $("count").innerHTML = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<option>${n}</option>`).join("");
+  const n = $("count").value || "1";
+  $("count").innerHTML = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => `<option value="${i}"${String(i) === n ? " selected" : ""}>${i ? i : esc(t.watchOnly)}</option>`).join("");
   ({ characters } = await api(`/api/characters?lang=${lang}`));
   renderPeople(true);
 }
@@ -293,6 +355,7 @@ $("startBtn").onclick = async () => {
   try {
     const g = await api("/api/games", { lang: $("lang").value, humans });
     const link = s => `?game=${encodeURIComponent(g.id)}&seat=${encodeURIComponent(s.key)}`;
+    if (!g.seats.length) { location.search = `?game=${encodeURIComponent(g.id)}`; return; }
     if (g.seats.length === 1) { location.search = link(g.seats[0]); return; }
     showLinks(g, link);
   } catch (e) { $("setupErr").textContent = e.message; }
@@ -306,11 +369,10 @@ function showLinks(g, link) {
   const base = local && g.lan ? `${location.protocol}//${g.lan}${location.port ? ":" + location.port : ""}/` : `${location.origin}/`;
   $("setup").hidden = true; $("links").hidden = false;
   $("linksTitle").textContent = t.linksTitle; $("linksHint").textContent = t.linksHint;
-  $("linkList").innerHTML = g.seats.map(s => {
-    const url = base + link(s);
-    return `<div class="link"><b>${esc(s.name)}</b><br><code>${esc(url)}</code><br>` +
-      `<button type="button" class="secondary" data-url="${esc(url)}">${esc(t.copy)}</button><a href="${esc(url)}" target="_blank"><button type="button" class="secondary">${esc(t.open)}</button></a></div>`;
-  }).join("");
+  const watch = { name: t.watchLink, url: `${base}?game=${encodeURIComponent(g.id)}` };
+  $("linkList").innerHTML = [...g.seats.map(s => ({ name: s.name, url: base + link(s) })), watch].map(({ name, url }) =>
+    `<div class="link"><b>${esc(name)}</b><br><code>${esc(url)}</code><br>` +
+    `<button type="button" class="secondary" data-url="${esc(url)}">${esc(t.copy)}</button><a href="${esc(url)}" target="_blank"><button type="button" class="secondary">${esc(t.open)}</button></a></div>`).join("");
   for (const b of $("linkList").querySelectorAll("button[data-url]")) {
     b.hidden = !navigator.clipboard; // only on localhost or https
     b.onclick = async () => { await navigator.clipboard.writeText(b.dataset.url); b.textContent = t.copied; };
@@ -333,31 +395,102 @@ function render(v) {
   document.title = $("title").textContent = t.title;
   renderRules(v.lang);
   $("voiceBtn").textContent = voice.on ? t.voiceOn : t.voiceOff;
-  $("when").textContent = v.when;
-  $("youAre").textContent = `${v.you}，${t.youAre}`;
-  $("role").textContent = v.role;
-  $("role").className = "role" + (v.pack ? " wolf" : "");
-  $("pack").textContent = v.pack ? t.pack + v.pack.join(", ") : "";
-  document.body.classList.toggle("night", v.phase === "night");
-  const speaking = v.now && v.now.name;
-  $("seats").innerHTML = v.seats.map(s => `<span class="seat${s.death ? " dead" : ""}${s.name === v.you ? " me" : ""}${s.sheriff ? " sheriff" : ""}${s.name === speaking ? " speaking" : ""}" title="${esc(s.death || (s.sheriff ? t.sheriff : ""))}">${s.sheriff ? "🎖️ " : ""}${esc(s.name)}</span>`).join("");
-  renderVotes(v.lastVote, t);
-
-  const log = $("log"), atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
-  for (const l of v.log.slice(logCount)) {
-    const d = document.createElement("div");
-    d.className = "line" + (l.speaker ? "" : " host") + (l.private ? " private" : "") + (l.speaker === v.you ? " mine" : "");
-    d.innerHTML = `<span class="when">${esc(l.when)}</span><span class="who">${esc(l.speaker || t.host)}:</span>${esc(l.text)}`;
-    log.appendChild(d);
-    if (l.speaker !== v.you) speakLine(l, v.lang);
+  $("when").textContent = stageLabel(t, v.round, v.stage, v.phase);
+  if (v.you) {
+    $("youAre").textContent = `${v.you}，${t.youAre}`;
+    $("role").textContent = v.role;
+    $("role").className = "role" + (v.pack ? " wolf" : "");
+    $("pack").textContent = v.pack ? t.pack + v.pack.join(", ") : "";
+  } else {
+    $("youAre").textContent = t.watching;
   }
-  logCount = v.log.length;
-  if (atBottom) log.scrollTop = log.scrollHeight;
-
+  document.body.classList.toggle("night", v.phase === "night");
+  renderSeats(v, t);
+  renderVotes(v.lastVote, t);
+  renderLog(v, t);
   renderStage(v, t);
   $("waiting").hidden = !!v.pending && (!v.now || v.now.name === v.you);
   if (!v.pending) { $("turnCard").hidden = true; shownEvent = null; return; }
   if (v.pending.event !== shownEvent) showTurn(v.pending, t, w);
+}
+
+// stageLabel names a part of the game, e.g. "第2天 · 警长竞选". Events from
+// before stages were kept fall back to their phase.
+function stageLabel(t, round, stage, phase) {
+  const k = stage || (phase === "night" ? "night" : "day");
+  return t.stages[k](round);
+}
+
+// avatar is a character's initial on a colour of their own.
+function avatar(name, small, badge) {
+  return `<div class="avatar${small ? " sm" : ""}" style="--c:hsl(${hash(name) % 360} 45% 40%)">${esc([...name][0] || "?")}${badge || ""}</div>`;
+}
+
+// renderSeats draws every seat: who is out, who has the badge, who is
+// speaking, which seats people play, and only the roles this seat knows:
+// its own and its pack's, or everyone's once the game is over.
+function renderSeats(v, t, roles) {
+  const speaking = v.now && v.now.name, people = v.people || [], pack = v.pack || [];
+  const w = k => v.words[k] || k;
+  $("seats").innerHTML = v.seats.map(s => {
+    const me = s.name === v.you, tags = [];
+    if (me) tags.push(`<span class="tag you">${esc(t.you)}</span>`);
+    else if (people.includes(s.name)) tags.push(`<span class="tag person">${esc(t.person)}</span>`);
+    if (roles) tags.push(`<span class="tag revealed${roles[s.name] === "werewolf" ? " wolf" : ""}">${esc(w(roles[s.name]))}</span>`);
+    else if (!me && pack.includes(s.name)) tags.push(`<span class="tag wolf">${esc(t.packmate)}</span>`);
+    if (s.death) tags.push(`<span class="tag out">${esc(t.out)}</span>`);
+    const cls = ["seat", s.death && "dead", me && "me", s.sheriff && "sheriff", !roles && s.name === speaking && "speaking"].filter(Boolean).join(" ");
+    return `<div class="${cls}" title="${esc(s.death || (s.sheriff ? t.sheriff : ""))}">` +
+      avatar(s.name, false, s.sheriff ? `<span class="badge">🎖️</span>` : "") +
+      `<div class="name">${esc(s.name)}</div><div class="tags">${tags.join("")}</div></div>`;
+  }).join("");
+}
+
+// renderLog adds the lines this poll brought to the timeline, under a heading
+// for each part of the game. It follows new lines only while the reader is
+// at the bottom; scrolled up, they are counted on a button instead.
+let group = null, groupKey = "", unseen = 0;
+const GROUP_ICON = { night: "🌙", dawn: "🌅", election: "🎖️", day: "☀️", end: "🏁" };
+function renderLog(v, t) {
+  const log = $("log"), first = logCount === 0;
+  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+  const fresh = v.log.slice(logCount);
+  for (const l of fresh) {
+    const k = l.stage || (l.phase === "night" ? "night" : "day"), key = `${l.round}/${k}`;
+    if (key !== groupKey) {
+      groupKey = key;
+      group = document.createElement("section");
+      group.innerHTML = `<div class="group-head ${k}">${GROUP_ICON[k]} ${esc(stageLabel(t, l.round, k))}</div>`;
+      log.appendChild(group);
+    }
+    group.insertAdjacentHTML("beforeend", lineHTML(l, v, t));
+    if (l.speaker !== v.you) speakLine(l, v.lang);
+  }
+  logCount = v.log.length;
+  if (first || atBottom) { log.scrollTop = log.scrollHeight; unseen = 0; }
+  else unseen += fresh.length;
+  $("newPill").hidden = !unseen;
+  $("newPill").textContent = t.newLines(unseen);
+}
+$("log").onscroll = () => {
+  const log = $("log");
+  if (log.scrollHeight - log.scrollTop - log.clientHeight < 60) { unseen = 0; $("newPill").hidden = true; }
+};
+$("newPill").onclick = () => { const log = $("log"); log.scrollTo({ top: log.scrollHeight, behavior: "smooth" }); };
+
+function lineHTML(l, v, t) {
+  const text = esc(l.text);
+  if (l.kind === "speech") {
+    const cls = ["msg", l.speaker === v.you && "mine", l.private && "private"].filter(Boolean).join(" ");
+    const tag = l.private ? `<span class="tag wolf">${esc(v.pack ? t.packTag : t.secret)}</span>` : "";
+    const stance = l.stance ? `<span class="chip${/声称|claims/.test(l.stance) ? " claim" : ""}">${esc(l.stance)}</span>` : "";
+    return `<div class="${cls}">${avatar(l.speaker, true)}<div class="bubble"><div class="meta"><b>${esc(l.speaker)}</b>${tag}${stance}</div>` +
+      `<div class="text">${text}</div></div></div>`;
+  }
+  if (l.kind === "death") return `<div class="event death">💀 ${text}</div>`;
+  if (l.kind === "vote") return `<div class="event vote">🗳️ ${text}</div>`;
+  if (l.kind === "result") return `<div class="event result">📣 ${text}</div>`;
+  return `<div class="host${l.private ? " private" : ""}">${l.private ? esc(t.secret) + " · " : ""}${text}</div>`;
 }
 
 // renderStage shows what the table is waiting on: only what anyone at a real
@@ -370,7 +503,7 @@ function renderStage(v, t) {
   if (!now) {
     icon = night ? "💤" : "⏳";
     text = `<span class="dots">${esc(night ? s.nightIdle : t.waiting.replace(/[.…]+$/, ""))}</span>`;
-    if (!v.alive) sub = t.dead;
+    if (v.you && !v.alive) sub = t.dead;
   } else if (now.kind === "wolves") {
     icon = `<div class="eyes"><span></span><span></span></div>`;
     text = `<span class="dots">${esc(s.wolves)}</span>`; sub = s.wolvesSub;
@@ -483,6 +616,7 @@ function finish(g) {
   r.hidden = false;
   if (g.error) { r.innerHTML = `<div class="err">${t.failed}${esc(g.error)}</div>`; return; }
   const res = g.result, w = k => (view && view.words[k]) || k;
+  if (view) renderSeats(view, t, Object.fromEntries(res.players.map(p => [p.name, p.role])));
   r.innerHTML = `<div style="font-weight:700">${t.over} · ${esc(t.winner(w(res.winner)))}</div>` +
     (res.mvp && res.mvp.name ? `<p class="mvp">${t.mvp}: <b>${esc(res.mvp.name)}</b></p><p>${esc(res.mvp.reason)}</p>` : "") +
     `<a href="/"><button>${t.again}</button></a>`;

@@ -33,7 +33,6 @@ func TestPeoplePlayAWholeGameFromThePage(t *testing.T) {
 	assert.Contains(t, chars["characters"], "Karen")
 
 	for _, bad := range [][]game.Person{
-		nil,
 		{{Name: "Eileen", Replaces: "华妃"}},
 		{{Name: "Eileen", Replaces: "Karen"}, {Name: "Bob", Replaces: "Karen"}},
 		{{Name: "Eileen", Replaces: "Karen"}, {Name: "Eileen", Replaces: "Gym Bro"}},
@@ -119,6 +118,36 @@ func playFromPage(t *testing.T, url string) bool {
 		if !moved {
 			time.Sleep(20 * time.Millisecond)
 		}
+	}
+}
+
+func TestAnyoneCanWatchAGameNobodyPlaysIn(t *testing.T) {
+	werewolf.SetBrain(brain.Random{})
+	srv := httptest.NewServer(Handler(startEngine(t)))
+	t.Cleanup(srv.Close)
+
+	g := start(t, srv.URL, startRequest{Lang: game.English})
+	assert.NotNil(t, g.Seats, "the page reads the seats as a list")
+	assert.Empty(t, g.Seats)
+	gameURL := srv.URL + "/api/games/" + g.ID
+	deadline := time.Now().Add(time.Minute)
+	for {
+		require.True(t, time.Now().Before(deadline), "the game did not finish")
+		r := get[gameReply](t, gameURL, http.StatusOK, true)
+		require.Empty(t, r.Error)
+		if r.Result == nil {
+			time.Sleep(20 * time.Millisecond)
+			continue
+		}
+		require.NotNil(t, r.View, "a finished game can still be watched")
+		assert.Empty(t, r.View.You)
+		assert.Empty(t, r.View.Role)
+		assert.Len(t, r.View.Seats, len(game.Lineup))
+		for _, l := range r.View.Log {
+			assert.False(t, l.Private, "a spectator saw a private line: %s", l.Text)
+		}
+		post(t, gameURL+"/moves", moveRequest{Event: "move-1-1"}, http.StatusConflict)
+		return
 	}
 }
 

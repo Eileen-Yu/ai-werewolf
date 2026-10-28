@@ -138,14 +138,15 @@ func GameWorkflow(ctx *workflow.WorkflowContext) (any, error) {
 		for _, p := range g.State.Players {
 			roles = append(roles, fmt.Sprintf(t.h.revealed, p.Name, t.say(string(p.Role))))
 		}
-		t.add("", fmt.Sprintf(t.h.gameOver, t.say(winner), strings.Join(roles, t.h.comma)))
+		g.State.Stage = game.StageEnd
+		t.announce(game.KindResult, fmt.Sprintf(t.h.gameOver, t.say(winner), strings.Join(roles, t.h.comma)))
 		var mvp brain.MVP
 		final := brain.Final{Lang: g.State.Lang, Winner: winner, Players: g.State.Players, Log: g.State.Log}
 		if err := ctx.CallActivity(JudgeActivity, workflow.WithActivityInput(final), retry).Await(&mvp); err != nil {
 			return nil, fmt.Errorf("judge: %w", err)
 		}
 		if mvp.Name != "" {
-			t.add("", fmt.Sprintf(t.h.mvp, mvp.Name, mvp.Reason))
+			t.announce(game.KindResult, fmt.Sprintf(t.h.mvp, mvp.Name, mvp.Reason))
 		}
 		return Result{Winner: winner, Rounds: g.State.Round, Players: g.State.Players, MVP: mvp}, nil
 	}
@@ -173,7 +174,7 @@ func (t *table) say(word string) string     { return t.s.Lang.Say(word) }
 func (t *table) list(names []string) string { return t.s.Lang.List(names) }
 
 func (t *table) setup(people []game.Person) error {
-	t.s.Round, t.s.Phase = 1, game.Night
+	t.s.Round, t.s.Phase, t.s.Stage = 1, game.Night, game.StageNight
 	var dealt deal
 	in := deal{Players: t.s.Players, Lang: t.s.Lang, Tactic: t.s.Tactic, Humans: people}
 	if err := t.ctx.CallActivity(AssignRolesActivity, workflow.WithActivityInput(in)).Await(&dealt); err != nil {
@@ -195,7 +196,7 @@ func (t *table) setup(people []game.Person) error {
 // announces who died without saying how.
 func (t *table) night() error {
 	s := t.s
-	s.Phase = game.Night
+	s.Phase, s.Stage = game.Night, game.StageNight
 	t.add("", fmt.Sprintf(t.h.nightFalls, s.Lang.When(s.Round, game.Night)))
 
 	checked := t.seerChecks()
@@ -225,12 +226,12 @@ func (t *table) night() error {
 		t.add("", fmt.Sprintf(t.h.survived, victim), s.Living(game.Werewolf)...)
 	}
 	slices.SortFunc(dead, func(a, b string) int { return seat(s, a) - seat(s, b) }) // table order, so the list gives away nothing
-	s.Phase = game.Day
+	s.Phase, s.Stage = game.Day, game.StageDawn
 	if len(dead) == 0 {
-		t.add("", t.h.peaceful)
+		t.announce(game.KindResult, t.h.peaceful)
 		return nil
 	}
-	t.add("", fmt.Sprintf(t.h.dawnDead, t.list(dead)))
+	t.announce(game.KindDeath, fmt.Sprintf(t.h.dawnDead, t.list(dead)))
 	if err := t.passBadge(dead...); err != nil {
 		return err
 	}
@@ -389,7 +390,7 @@ func (t *table) hunterGoes(hunter string) error {
 	if err != nil || shot == "" {
 		return err
 	}
-	t.add("", fmt.Sprintf(t.h.diedNow, shot))
+	t.announce(game.KindDeath, fmt.Sprintf(t.h.diedNow, shot))
 	return t.passBadge(shot)
 }
 
@@ -412,11 +413,11 @@ func (t *table) passBadge(dead ...string) error {
 	}
 	if heir == "" || heir == game.Pass {
 		s.Sheriff = ""
-		t.add("", fmt.Sprintf(t.h.badgeTorn, sheriff))
+		t.announce(game.KindResult, fmt.Sprintf(t.h.badgeTorn, sheriff))
 		return nil
 	}
 	s.Sheriff = heir
-	t.add("", fmt.Sprintf(t.h.badgePassed, sheriff, heir))
+	t.announce(game.KindResult, fmt.Sprintf(t.h.badgePassed, sheriff, heir))
 	return nil
 }
 
@@ -429,6 +430,7 @@ func (t *table) passBadge(dead ...string) error {
 func (t *table) election() error {
 	s := t.s
 	alive := s.Living()
+	s.Stage = game.StageElection
 	t.add("", t.h.election)
 	// The seer always runs: their checks are worth the most with the badge.
 	runs, err := t.chooseAll(brain.Run, alive, func(v string) []string {
@@ -449,10 +451,10 @@ func (t *table) election() error {
 	voters := game.Without(alive, runners...)
 	switch {
 	case len(runners) == 0:
-		t.add("", t.h.noRunners)
+		t.announce(game.KindResult, t.h.noRunners)
 		return nil
 	case len(voters) == 0:
-		t.add("", t.h.allRun)
+		t.announce(game.KindResult, t.h.allRun)
 		return nil
 	}
 	t.add("", fmt.Sprintf(t.h.runners, t.list(runners)))
@@ -465,32 +467,32 @@ func (t *table) election() error {
 		return err
 	}
 	if len(runners) == 0 {
-		t.add("", t.h.allWithdrew)
+		t.announce(game.KindResult, t.h.allWithdrew)
 		return t.pause()
 	}
 	sheriff := runners[0]
 	if len(runners) == 1 {
-		t.add("", fmt.Sprintf(t.h.unopposed, sheriff))
+		t.announce(game.KindResult, fmt.Sprintf(t.h.unopposed, sheriff))
 	} else {
 		votes, err := t.chooseAll(brain.SheriffVote, voters, func(string) []string { return append(slices.Clone(runners), game.Pass) })
 		if err != nil {
 			return err
 		}
 		s.Ballots = append(s.Ballots, game.Ballot{Round: s.Round, Votes: votes, Election: true})
-		t.add("", fmt.Sprintf(t.h.sheriffVotes, t.tallyLine(votes)))
+		t.announce(game.KindVote, fmt.Sprintf(t.h.sheriffVotes, t.tallyLine(votes)))
 		won, ok := game.Tally(votes, "")
 		if !ok {
 			line := t.h.sheriffTie
 			if abstained(votes) {
 				line = t.h.sheriffAbstained
 			}
-			t.add("", line)
+			t.announce(game.KindResult, line)
 			return t.pause()
 		}
 		sheriff = won
 	}
 	s.Sheriff = sheriff
-	t.add("", fmt.Sprintf(t.h.elected, sheriff))
+	t.announce(game.KindResult, fmt.Sprintf(t.h.elected, sheriff))
 	return t.pause()
 }
 
@@ -554,6 +556,7 @@ func (t *table) day() error {
 	}
 	alive := s.Living()
 	order := t.speakingOrder(alive)
+	s.Stage = game.StageDay
 	t.add("", fmt.Sprintf(t.h.order, t.list(order)))
 	if _, err := t.goRound(brain.Speech, order, nil); err != nil {
 		return err
@@ -574,7 +577,7 @@ func (t *table) day() error {
 		return err
 	}
 	s.Ballots = append(s.Ballots, game.Ballot{Round: s.Round, Votes: votes, Sheriff: s.Sheriff})
-	t.add("", fmt.Sprintf(t.h.votes, t.tallyLine(votes)))
+	t.announce(game.KindVote, fmt.Sprintf(t.h.votes, t.tallyLine(votes)))
 
 	out, ok := game.Tally(votes, s.Sheriff)
 	if !ok {
@@ -582,11 +585,11 @@ func (t *table) day() error {
 		if abstained(votes) {
 			line = t.h.allAbstained
 		}
-		t.add("", line)
+		t.announce(game.KindResult, line)
 		return t.pause()
 	}
 	s.Remove(out, t.h.votedOut)
-	t.add("", fmt.Sprintf(t.h.exiled, out))
+	t.announce(game.KindDeath, fmt.Sprintf(t.h.exiled, out))
 	if _, err := t.speak(t.turn(brain.LastWords, out, nil)); err != nil {
 		return err
 	}
@@ -743,6 +746,11 @@ func (t *table) pause() error {
 // add records an event and narrates it from the god's-eye view.
 func (t *table) add(speaker, text string, audience ...string) {
 	t.narrate(t.s.Add(speaker, text, audience...))
+}
+
+// announce records a public host announcement of a kind and narrates it.
+func (t *table) announce(kind game.Kind, text string) {
+	t.narrate(t.s.Announce(kind, text))
 }
 
 // remember keeps a player's thinking and, if they wrote any, their new notes.

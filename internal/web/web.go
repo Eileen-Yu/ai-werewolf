@@ -1,6 +1,7 @@
 // Package web serves the page people play werewolf from: start a game with
 // up to nine people in characters' seats, then each, from their own link,
-// watches what their seat sees and makes its moves.
+// watches what their seat sees and makes its moves. A link without a seat
+// watches what everyone at the table hears.
 package web
 
 import (
@@ -63,9 +64,10 @@ type startRequest struct {
 	Humans []game.Person `json:"humans"`
 }
 
-// startReply is the new game and the link key for each person's seat. LAN is
-// this machine's address on the local network, for links that work from
-// other devices when the host opened the page as localhost.
+// startReply is the new game and the link key for each person's seat, none
+// for a game nobody plays in. LAN is this machine's address on the local
+// network, for links that work from other devices when the host opened the
+// page as localhost.
 type startReply struct {
 	ID    string           `json:"id"`
 	Seats []werewolf.Human `json:"seats"`
@@ -83,8 +85,8 @@ func (s *server) start(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, err)
 		return
 	}
-	if len(req.Humans) == 0 || len(req.Humans) > werewolf.MaxHumans {
-		fail(w, http.StatusBadRequest, fmt.Errorf("a table seats 1 to %d people", werewolf.MaxHumans))
+	if len(req.Humans) > werewolf.MaxHumans {
+		fail(w, http.StatusBadRequest, fmt.Errorf("a table seats up to %d people", werewolf.MaxHumans))
 		return
 	}
 	for i := range req.Humans {
@@ -103,7 +105,7 @@ func (s *server) start(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadGateway, err)
 		return
 	}
-	reply(w, startReply{ID: id, Seats: input.Humans, LAN: lanAddress()})
+	reply(w, startReply{ID: id, Seats: append([]werewolf.Human{}, input.Humans...), LAN: lanAddress()})
 }
 
 // lanAddress is this machine's private IPv4 address, if it has one.

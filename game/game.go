@@ -400,7 +400,37 @@ type Event struct {
 	// Suspect and Claim are the stance a daytime speech puts on the record.
 	Suspect string `json:"suspect,omitempty"`
 	Claim   *Claim `json:"claim,omitempty"`
+	// Stage is the part of the round the event happened in, for the page to
+	// group the record by. Events from before it was kept have none.
+	Stage Stage `json:"stage,omitempty"`
+	// Kind marks a host announcement the page shows apart from the others.
+	Kind Kind `json:"kind,omitempty"`
 }
+
+// Stage is a part of a round: the night, dawn's news, the first day's
+// sheriff election, the day's talk and vote, or the end of the game.
+type Stage string
+
+const (
+	StageNight    Stage = "night"
+	StageDawn     Stage = "dawn"
+	StageElection Stage = "election"
+	StageDay      Stage = "day"
+	StageEnd      Stage = "end"
+)
+
+// Kind is what a host announcement is about.
+type Kind string
+
+const (
+	// KindDeath says who died or was voted out.
+	KindDeath Kind = "death"
+	// KindVote is a vote's tally.
+	KindVote Kind = "vote"
+	// KindResult settles something: an election, a vote with nobody out, the
+	// badge, a quiet night, the game.
+	KindResult Kind = "result"
+)
 
 // Claim is what a player says they are and, optionally, what their power
 // told them: seer, Ruby, good. It is only their word; wolves claim too.
@@ -528,25 +558,34 @@ type State struct {
 	// Sheriff holds the badge: elected on the first day, passed on or torn
 	// up when they go. "" when nobody holds it.
 	Sheriff string `json:"sheriff,omitempty"`
+	// Stage is the part of the round the game is in, stamped on each event.
+	Stage Stage `json:"stage,omitempty"`
 }
 
 // Add appends an event to the transcript and returns it.
 func (s *State) Add(speaker, text string, audience ...string) Event {
-	e := Event{Round: s.Round, Phase: s.Phase, Speaker: speaker, Text: text, Audience: audience}
+	e := Event{Round: s.Round, Phase: s.Phase, Stage: s.Stage, Speaker: speaker, Text: text, Audience: audience}
+	s.Log = append(s.Log, e)
+	return e
+}
+
+// Announce appends a public host announcement of a kind the page shows apart.
+func (s *State) Announce(kind Kind, text string) Event {
+	e := Event{Round: s.Round, Phase: s.Phase, Stage: s.Stage, Text: text, Kind: kind}
 	s.Log = append(s.Log, e)
 	return e
 }
 
 // Declare records a public daytime speech along with its stance.
 func (s *State) Declare(speaker, text, suspect string, claim *Claim) Event {
-	e := Event{Round: s.Round, Phase: s.Phase, Speaker: speaker, Text: text, Suspect: suspect, Claim: claim}
+	e := Event{Round: s.Round, Phase: s.Phase, Stage: s.Stage, Speaker: speaker, Text: text, Suspect: suspect, Claim: claim}
 	s.Log = append(s.Log, e)
 	return e
 }
 
 // Think records a player's private reasoning, which only they will see.
 func (s *State) Think(name, text string) Event {
-	e := Event{Round: s.Round, Phase: s.Phase, Speaker: name, Text: text, Audience: []string{name}, Thought: true}
+	e := Event{Round: s.Round, Phase: s.Phase, Stage: s.Stage, Speaker: name, Text: text, Audience: []string{name}, Thought: true}
 	s.Log = append(s.Log, e)
 	return e
 }
