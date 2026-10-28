@@ -76,6 +76,12 @@
   @keyframes wave { 0%, 100% { height:5px; } 50% { height:22px; } }
   .dots::after { content:""; display:inline-block; width:1.4em; text-align:left; animation: dots 1.5s steps(4) infinite; }
   @keyframes dots { 0% { content:""; } 25% { content:"."; } 50% { content:".."; } 75% { content:"..."; } }
+  #rulesBtn { position:fixed; right:20px; bottom:20px; z-index:20; margin:0; box-shadow:0 4px 16px rgba(0,0,0,.4); }
+  #rules { position:fixed; right:20px; bottom:72px; z-index:20; width:min(420px, calc(100vw - 40px)); max-height:70vh; overflow-y:auto;
+    margin:0; box-shadow:0 8px 32px rgba(0,0,0,.55); }
+  #rules h3 { margin:0 0 8px; font-size:16px; } #rules h4 { margin:12px 0 4px; font-size:14px; color:var(--accent); }
+  #rules p, #rules li { font-size:13.5px; margin:4px 0; } #rules ul { padding-left:18px; margin:4px 0; }
+  #rulesClose { position:absolute; top:8px; right:10px; background:none; color:var(--dim); padding:4px 8px; margin:0; font-size:18px; }
   .ballot { display:inline-block; animation: drop 1.2s ease-in-out infinite; }
   @keyframes drop { 0%, 100% { transform:translateY(-4px); } 50% { transform:translateY(4px); } }
 </style>
@@ -121,6 +127,8 @@
     </div>
   </section>
 </main>
+<button id="rulesBtn" class="secondary" type="button"></button>
+<section id="rules" class="card" hidden><button id="rulesClose" type="button" aria-label="close">×</button><div id="rulesBody"></div></section>
 <script>
 const UI = {
   zh: {
@@ -143,6 +151,29 @@ const UI = {
       network: "语音识别连不上网络：Chrome 需要联网把录音发给 Google 识别。" },
     voiceReady: "语音朗读已开启，之后的发言会读出来。",
     over: "游戏结束", winner: w => `${w}胜利`, mvp: "MVP", failed: "游戏出错：", host: "主持人", again: "再来一局",
+    rulesBtn: "📖 游戏规则",
+    rules: `<h3>游戏规则</h3>
+<p>标准9人局：3狼人、1预言家、1女巫、1猎人、3村民。你的身份随机发，只有你自己知道。</p>
+<h4>夜晚</h4><ul>
+<li>狼人睁眼商量，杀一个人，可以杀任何活着的人，包括自己和同伴（自刀）。</li>
+<li>预言家查验一个人是好人还是狼人。</li>
+<li>女巫知道谁被杀了：一瓶解药可以救他，一瓶毒药可以毒死任何人。两瓶各用一次，一晚最多用一瓶，只有第1夜能救自己。</li></ul>
+<h4>天亮</h4><ul>
+<li>主持人只公布谁死了，不说怎么死的。</li>
+<li>猎人出局时可以开枪带走一个人，只能在白天开枪；被女巫毒死的不能开枪。开枪也不会公布，主持人只说又有谁死了。</li></ul>
+<h4>警长（第1天）</h4><ul>
+<li>想当警长的上警，预言家一定上警。上警的人轮流竞选发言，发言完可以退水。</li>
+<li>没上警的人投票选警长；上警的人（包括退水的）不能投。只剩一个候选人时直接当选；平票、没人上警或都退水，就没有警长。</li>
+<li>警长每天最后发言、可以归票，放逐票算1.5票。警长出局时可以把警徽交给活着的人，或者撕掉。</li></ul>
+<h4>白天</h4><ul>
+<li>每人发言一次，再每人回应一次，然后投票放逐一人。可以弃票；平票或都弃票，就没人出局。</li>
+<li>被放逐的人留遗言。</li></ul>
+<h4>胜负</h4><ul>
+<li>好人：所有狼人出局。</li>
+<li>狼人：村民全部出局，或神职（预言家、女巫、猎人）全部出局，或活着的狼人不少于其他人。</li></ul>
+<h4>你怎么玩</h4><ul>
+<li>轮到你时，右边会出现操作框；3分钟没操作，AI 会替你走这一步。</li>
+<li>发言时要选你怀疑谁（会公开记录），也可以声称一个身份。狼人也可以假装成任何身份。</li></ul>`,
     stage: { wolves: "狼人正在密谋", wolvesSub: "天黑请闭眼，狼人请睁眼", night: "夜色深沉，有人正悄悄行动", nightIdle: "夜深了",
       wait: "主持人正在等待", speech: n => `${n} 正在发言`, rebuttal: n => `${n} 正在回应`, campaign: n => `${n} 正在竞选发言`,
       last_words: n => `${n} 正在留遗言`, badge: n => `${n} 正在决定警徽交给谁`, vote: "大家正在投票", sheriff_vote: "大家正在投票选警长",
@@ -168,6 +199,29 @@ const UI = {
       network: "Speech recognition cannot reach the network: Chrome sends the recording to Google to transcribe it." },
     voiceReady: "Read aloud is on. New lines will be read out.",
     over: "Game over", winner: w => `The ${w} side wins`, mvp: "MVP", failed: "The game failed: ", host: "Host", again: "Play again",
+    rulesBtn: "📖 Rules",
+    rules: `<h3>Rules</h3>
+<p>A standard nine-player game: 3 werewolves, a seer, a witch, a hunter and 3 villagers. Your role is dealt at random, and only you know it.</p>
+<h4>Night</h4><ul>
+<li>The werewolves talk in private and kill one player: anyone alive, even one of their own.</li>
+<li>The seer checks whether one player is good or a werewolf.</li>
+<li>The witch learns who was killed: her antidote can save them, her poison can kill anyone. Each works once, at most one a night, and she may only save herself on the first night.</li></ul>
+<h4>Dawn</h4><ul>
+<li>The host only says who died, never how.</li>
+<li>A hunter who is out may shoot one player, by day only, unless the witch poisoned him. The shot is not announced either: the host only says who else has died.</li></ul>
+<h4>Sheriff (Day 1)</h4><ul>
+<li>Whoever wants the badge runs; the seer always does. Candidates give a campaign speech and may then withdraw.</li>
+<li>Those who never ran vote; candidates, even ones who withdrew, do not. A lone candidate wins without a vote; a tie, nobody running or everyone withdrawing means no sheriff.</li>
+<li>The sheriff speaks last each day, may call the vote, and their vote counts 1.5. A sheriff who is out passes the badge to a living player or tears it up.</li></ul>
+<h4>Day</h4><ul>
+<li>Everyone speaks once, then replies once, then everyone votes someone out. You may abstain; a tie, or everyone abstaining, means nobody goes.</li>
+<li>Whoever is voted out gets last words.</li></ul>
+<h4>Winning</h4><ul>
+<li>Good: every werewolf is out.</li>
+<li>Werewolves: every villager is out, or every power role (seer, witch, hunter) is out, or the living werewolves are at least as many as everyone else.</li></ul>
+<h4>How you play</h4><ul>
+<li>On your turn a move box appears on the right; after three minutes, an AI plays the move for you.</li>
+<li>When you speak, you pick who you suspect (it goes on the record) and may claim a role. Werewolves may claim anything.</li></ul>`,
     stage: { wolves: "The werewolves are plotting", wolvesSub: "Everyone close your eyes. Werewolves, open yours", night: "Deep in the night, someone is on the move", nightIdle: "Night falls",
       wait: "The host is waiting", speech: n => `${n} is speaking`, rebuttal: n => `${n} is answering`, campaign: n => `${n} is campaigning`,
       last_words: n => `${n} is saying last words`, badge: n => `${n} is passing on the badge`, vote: "Everyone is voting", sheriff_vote: "Everyone is voting for sheriff",
@@ -175,6 +229,19 @@ const UI = {
   },
 };
 const $ = id => document.getElementById(id);
+
+// The rules panel opens and closes from a button in the corner, in the game's
+// language, or the setup page's before a game starts.
+let rulesLang = null;
+function renderRules(lang) {
+  if (lang === rulesLang) return; // the page redraws every poll; keep the reader's scroll
+  rulesLang = lang;
+  const t = UI[lang] || UI.zh;
+  $("rulesBtn").textContent = t.rulesBtn;
+  $("rulesBody").innerHTML = t.rules;
+}
+$("rulesBtn").onclick = () => { $("rules").hidden = !$("rules").hidden; };
+$("rulesClose").onclick = () => { $("rules").hidden = true; };
 const params = new URLSearchParams(location.search);
 let gameId = params.get("game");
 let shownEvent = null, logCount = 0, view = null, timer = null;
@@ -189,6 +256,7 @@ async function api(path, body) {
 // ---- setup ----
 async function loadSetup() {
   const lang = $("lang").value, t = UI[lang];
+  renderRules(lang);
   $("title").textContent = t.title;
   $("nameLabel").textContent = t.name; $("replacesLabel").textContent = t.replaces;
   $("tacticLabel").textContent = t.tactic; $("startBtn").textContent = t.start;
@@ -219,6 +287,7 @@ function render(v) {
   view = v;
   const t = UI[v.lang] || UI.zh, w = k => v.words[k] || k;
   document.title = $("title").textContent = t.title;
+  renderRules(v.lang);
   $("voiceBtn").textContent = voice.on ? t.voiceOn : t.voiceOff;
   $("when").textContent = v.when;
   $("youAre").textContent = `${v.you}，${t.youAre}`;
