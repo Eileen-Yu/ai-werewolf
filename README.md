@@ -84,11 +84,15 @@ The process may die. The drama persists. [Try it yourself](#6-try-killing-the-ga
 - **A person is just another event.** Your seat's move arrives as an external event, with a three-minute timer; if it fires, an AI plays the move for you.
 - **Restarts are free.** After a crash the workflow replays its history: finished moves return their recorded answers, no LLM is called twice, and the game carries on from the line it stopped at.
 
-Here is what one round looks like from inside Catalyst, the final night and day of a real game, read left to right:
+### Inside a real game
 
-![One round of a game in the Catalyst workflow view](docs/catalyst-round.png)
+Nine AI agents. One durable workflow. Parallel moves, private decisions, and a complete execution history.
 
-The night's moves and a pause, then the day's speeches: each pair is one player speaking while the next one prepares, which is why they run side by side. Then the reply round in the same shape, five votes fanning out at once, the last words of the player voted out, and the MVP judge. Earlier rounds are earlier executions of the same workflow, since it continues as new each round.
+[![The end of a real game in the Catalyst workflow view: five votes run at once, then the last words, a pause and the MVP judge](docs/images/workflow-detail.png)](docs/images/workflow-full.png)
+
+*Click to see the whole final round.*
+
+That is the end of a real game: the five players still alive vote at once, each taking 9 to 23 seconds, so the vote takes as long as the slowest one rather than all five added up. Then come the last words of the player voted out, a pause, and the MVP judge. Earlier in the round, the day's speeches run two at a time: one player speaks while the next one prepares. Earlier rounds are earlier executions of the same workflow, since it continues as new each round.
 
 How each part works is in [docs/design.md](docs/design.md).
 
