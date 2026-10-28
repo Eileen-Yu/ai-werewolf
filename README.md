@@ -10,9 +10,22 @@ Welcome to AI Werewolf: a social deduction game where AI agents lie, manipulate,
 
 Powered by [Dapr Workflow](https://docs.dapr.io/developing-applications/building-blocks/workflow/) on [Diagrid Catalyst](https://www.diagrid.io/catalyst). Because even terrible decisions deserve durable execution.
 
+## A perfectly normal day in the village
+
+Adapted from an actual game. Unfortunately.
+
 ![A whole game in under a minute](docs/demo.gif)
 
-*A scripted replay on the real page, in the style of real games. Real games take longer and are, somehow, worse.*
+The fake seer wins the badge, the real seer gets voted out on the sheriff's one and a half votes, and the witch poisons Florida Man on a theory. The storyline comes from a real game, where the real seer's last words were "Leadership lesson: consensus isn't verification." The replay is scripted, on the real page, to fit it in under a minute.
+
+Post-game analysis:
+
+- Real seer: dead.
+- Werewolves: thriving.
+- Village: confidently incorrect.
+- LinkedIn Influencer: already drafting a post about it.
+
+The game master's terminal is a god's-eye feed of the chaos: every public accusation, every private thought, and every read that shifts over the game.
 
 ## Meet the suspects
 
@@ -41,40 +54,6 @@ Powered by [Dapr Workflow](https://docs.dapr.io/developing-applications/building
 - **卡皮巴拉 / 懒羊羊 / 光头强**：一局坐一个。都行，你开心就好；困……；我都说了我不是狼！你们是不是有病啊！
 
 Each character also has a rival at the table, so the bickering is built in.
-
-## A perfectly normal day in the village
-
-Adapted from an actual game. Unfortunately.
-
-```text
-[Day 1] Chronically Online Girl (werewolf):
-  I'm the seer. I checked LinkedIn Influencer: werewolf.
-
-[Day 1] LinkedIn Influencer (actual seer):
-  I'm the seer. Claiming first doesn't fix a false result.
-  Leadership means updating when the competing account arrives.
-
-[Day 1] Sigma Chad (villager):
-  I don't outsource my reads to the NPC crowd.
-
-[Day 1] Karen (werewolf):
-  That's my vote, and I expect my complaint entered in full.
-
-[Day 1] Host:
-  LinkedIn Influencer is voted out.
-
-[Day 1] LinkedIn Influencer (last words):
-  Leadership lesson: consensus isn't verification.
-```
-
-Post-game analysis:
-
-- Real seer: dead.
-- Werewolves: thriving.
-- Village: confidently incorrect.
-- LinkedIn Influencer: already drafting a post about it.
-
-The game master's terminal is a god's-eye feed of the chaos: every public accusation, every private thought, and every read that shifts over the game.
 
 ## The game master is immortal. Unfortunately.
 
