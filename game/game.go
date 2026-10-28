@@ -83,12 +83,14 @@ type Player struct {
 }
 
 // Cast picks the players for a game started without any, in a random seat
-// order, always seating the character named with, if any. A Chinese game
-// seats nine of the eleven: every pair of rivals and one loner, or three pairs
-// and every loner. Rivals sit down together or not at all, so nobody written
-// to play off someone is seated without them, and the 3-in-11 split gives
-// every character the same 9-in-11 chance of a seat.
-func Cast(l Lang, rng *rand.Rand, with string) []Player {
+// order, always seating the characters named in with. A Chinese game seats
+// nine of the eleven: every pair of rivals and one loner, or three pairs and
+// every loner. Rivals sit down together or not at all, so nobody written to
+// play off someone is seated without them, and the 3-in-11 split gives every
+// character the same 9-in-11 chance of a seat when nobody is asked for. It
+// fails if with names characters no table seats together: two loners and
+// someone from every pair.
+func Cast(l Lang, rng *rand.Rand, with []string) ([]Player, error) {
 	var cast []Player
 	if l == English {
 		cast = slices.Clone(englishCast)
@@ -96,13 +98,27 @@ func Cast(l Lang, rng *rand.Rand, with string) []Player {
 		pairs, loners := slices.Clone(chineseRivals), slices.Clone(chineseLoners)
 		rng.Shuffle(len(pairs), func(i, j int) { pairs[i], pairs[j] = pairs[j], pairs[i] })
 		rng.Shuffle(len(loners), func(i, j int) { loners[i], loners[j] = loners[j], loners[i] })
-		if i := slices.IndexFunc(pairs, func(p [2]Player) bool { return p[0].Name == with || p[1].Name == with }); i >= 0 {
-			pairs[0], pairs[i] = pairs[i], pairs[0]
+		// The asked-for go first, so cutting from the end keeps them.
+		slices.SortStableFunc(pairs, func(a, b [2]Player) int { return askedPair(b, with) - askedPair(a, with) })
+		slices.SortStableFunc(loners, func(a, b Player) int { return asked(b.Name, with) - asked(a.Name, with) })
+		var wantPairs, wantLoners int
+		for _, p := range pairs {
+			wantPairs += askedPair(p, with)
 		}
-		if i := slices.IndexFunc(loners, func(p Player) bool { return p.Name == with }); i >= 0 {
-			loners[0], loners[i] = loners[i], loners[0]
+		for _, p := range loners {
+			wantLoners += asked(p.Name, with)
 		}
-		if rng.IntN(11) < 3 {
+		allPairs := rng.IntN(11) < 3
+		switch {
+		case wantLoners > 1 && wantPairs == len(pairs):
+			return nil, fmt.Errorf("no table seats %s together: it seats every pair of rivals and one of %s, or three pairs and all of them",
+				l.List(with), l.List(Names(chineseLoners)))
+		case wantLoners > 1:
+			allPairs = false
+		case wantPairs == len(pairs):
+			allPairs = true
+		}
+		if allPairs {
 			loners = loners[:1]
 		} else {
 			pairs = pairs[:len(pairs)-1]
@@ -113,7 +129,27 @@ func Cast(l Lang, rng *rand.Rand, with string) []Player {
 		cast = append(cast, loners...)
 	}
 	rng.Shuffle(len(cast), func(i, j int) { cast[i], cast[j] = cast[j], cast[i] })
-	return cast
+	return cast, nil
+}
+
+func asked(name string, with []string) int {
+	if slices.Contains(with, name) {
+		return 1
+	}
+	return 0
+}
+
+func askedPair(p [2]Player, with []string) int {
+	return max(asked(p[0].Name, with), asked(p[1].Name, with))
+}
+
+// Names is the players' names, in order.
+func Names(ps []Player) []string {
+	names := make([]string, len(ps))
+	for i, p := range ps {
+		names[i] = p.Name
+	}
+	return names
 }
 
 // Characters is everyone a game in l may seat, for a person to pick whose
@@ -128,36 +164,69 @@ func Characters(l Lang) []string {
 		}
 		pool = append(pool, chineseLoners...)
 	}
-	names := make([]string, len(pool))
-	for i, p := range pool {
-		names[i] = p.Name
-	}
-	return names
+	return Names(pool)
 }
 
-// SeatHuman puts a person named name in the seat of the character replaces,
-// who must be in cast: Cast seats them when asked. Rivalries that name the character who left are
-// dropped, since nobody by that name is at the table. If the person times out,
-// an AI plays their move with persona.
-func SeatHuman(cast []Player, name, replaces string, l Lang) ([]Player, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return nil, errors.New("a human player needs a name")
+// CheckPeople reports what would stop people from taking these seats in a
+// game in l, whichever cast is drawn.
+func CheckPeople(l Lang, people []Person) error {
+	with := make([]string, len(people))
+	for i, h := range people {
+		with[i] = h.Replaces
 	}
-	i := slices.IndexFunc(cast, func(p Player) bool { return p.Name == replaces })
-	if i < 0 {
-		return nil, fmt.Errorf("no character %q to replace: pick one of %v", replaces, Characters(l))
+	if _, err := Cast(l, rand.New(rand.NewPCG(1, 1)), with); err != nil {
+		return err
 	}
-	gone := cast[i].Name
-	for _, p := range cast {
-		if p.Name != gone && (p.Name == name || strings.Contains(name, p.Name) || strings.Contains(p.Name, name)) {
-			return nil, fmt.Errorf("the name %q is too close to %s, who is also at the table", name, p.Name)
+	pool := slices.Clone(englishCast)
+	if l != English {
+		pool = slices.Clone(chineseLoners)
+		for _, pair := range chineseRivals {
+			pool = append(pool, pair[:]...)
 		}
 	}
+	_, err := SeatHumans(pool, people, l)
+	return err
+}
+
+// Person is someone who plays a seat: under their own name, in the seat of
+// the character Replaces.
+type Person struct {
+	Name     string `json:"name"`
+	Replaces string `json:"replaces"`
+}
+
+// SeatHumans puts each person in the seat of the character they replace, who
+// must be in cast: Cast seats them when asked. Rivalries that name a character
+// who left are dropped, since nobody by that name is at the table. If a person
+// times out, an AI plays their move with persona. Names must tell everyone at
+// the table apart, so no name may contain another.
+func SeatHumans(cast []Player, people []Person, l Lang) ([]Player, error) {
 	out := slices.Clone(cast)
-	out[i] = Player{Name: name, Persona: humanPersona[l], Human: true}
+	var gone []string
+	for _, h := range people {
+		name := strings.TrimSpace(h.Name)
+		if name == "" {
+			return nil, errors.New("every human player needs a name")
+		}
+		if slices.Contains(gone, h.Replaces) {
+			return nil, fmt.Errorf("two people cannot both take %s's seat", h.Replaces)
+		}
+		i := slices.IndexFunc(out, func(p Player) bool { return !p.Human && p.Name == h.Replaces })
+		if i < 0 {
+			return nil, fmt.Errorf("no character %q to replace: pick one of %v", h.Replaces, Characters(l))
+		}
+		gone = append(gone, h.Replaces)
+		out[i] = Player{Name: name, Persona: humanPersona[l], Human: true}
+	}
+	for i, p := range out {
+		for j, q := range out {
+			if p.Human && i != j && (p.Name == q.Name || strings.Contains(p.Name, q.Name) || strings.Contains(q.Name, p.Name)) {
+				return nil, fmt.Errorf("the name %q is too close to %s, who is also at the table", p.Name, q.Name)
+			}
+		}
+	}
 	for j := range out {
-		if strings.Contains(out[j].Rivalry, gone) {
+		if slices.ContainsFunc(gone, func(g string) bool { return strings.Contains(out[j].Rivalry, g) }) {
 			out[j].Rivalry = ""
 		}
 	}

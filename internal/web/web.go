@@ -1,15 +1,19 @@
-// Package web serves the page a person plays werewolf from: start a game in
-// a character's seat, watch what that seat sees, and make its moves.
+// Package web serves the page people play werewolf from: start a game with
+// up to nine people in characters' seats, then each, from their own link,
+// watches what their seat sees and makes its moves.
 package web
 
 import (
+	"crypto/rand"
 	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dapr/durabletask-go/workflow"
@@ -39,6 +43,10 @@ func Handler(client *workflow.Client) http.Handler {
 
 type server struct {
 	client *workflow.Client
+	// sent is the moves handed to a game, by game and event. The game takes
+	// moves asked of several people at once in seat order, so a move can
+	// arrive well before the game's status stops asking for it.
+	sent sync.Map
 }
 
 func (s *server) characters(w http.ResponseWriter, r *http.Request) {
@@ -51,9 +59,17 @@ func (s *server) characters(w http.ResponseWriter, r *http.Request) {
 }
 
 type startRequest struct {
-	Lang     game.Lang `json:"lang"`
-	Name     string    `json:"name"`
-	Replaces string    `json:"replaces"`
+	Lang   game.Lang     `json:"lang"`
+	Humans []game.Person `json:"humans"`
+}
+
+// startReply is the new game and the link key for each person's seat. LAN is
+// this machine's address on the local network, for links that work from
+// other devices when the host opened the page as localhost.
+type startReply struct {
+	ID    string           `json:"id"`
+	Seats []werewolf.Human `json:"seats"`
+	LAN   string           `json:"lan,omitempty"`
 }
 
 func (s *server) start(w http.ResponseWriter, r *http.Request) {
@@ -67,21 +83,55 @@ func (s *server) start(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, err)
 		return
 	}
-	if strings.TrimSpace(req.Name) == "" || !slices.Contains(game.Characters(l), req.Replaces) {
-		fail(w, http.StatusBadRequest, errors.New("pick a name and a character whose seat to take"))
+	if len(req.Humans) == 0 || len(req.Humans) > werewolf.MaxHumans {
+		fail(w, http.StatusBadRequest, fmt.Errorf("a table seats 1 to %d people", werewolf.MaxHumans))
 		return
 	}
-	input := werewolf.Game{
-		Lang:       l,
-		PhaseDelay: time.Second,
-		Human:      &werewolf.Human{Name: strings.TrimSpace(req.Name), Replaces: req.Replaces},
+	for i := range req.Humans {
+		req.Humans[i].Name = strings.TrimSpace(req.Humans[i].Name)
+	}
+	if err := game.CheckPeople(l, req.Humans); err != nil {
+		fail(w, http.StatusBadRequest, err)
+		return
+	}
+	input := werewolf.Game{Lang: l, PhaseDelay: time.Second}
+	for _, p := range req.Humans {
+		input.Humans = append(input.Humans, werewolf.Human{Person: p, Key: rand.Text()})
 	}
 	id := fmt.Sprintf("werewolf-web-%d", time.Now().UnixNano())
 	if _, err := s.client.ScheduleWorkflow(r.Context(), "GameWorkflow", workflow.WithInstanceID(id), workflow.WithInput(input)); err != nil {
 		fail(w, http.StatusBadGateway, err)
 		return
 	}
-	reply(w, map[string]string{"id": id})
+	reply(w, startReply{ID: id, Seats: input.Humans, LAN: lanAddress()})
+}
+
+// lanAddress is this machine's private IPv4 address, if it has one.
+func lanAddress() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, a := range addrs {
+		if n, ok := a.(*net.IPNet); ok && n.IP.To4() != nil && n.IP.IsPrivate() {
+			return n.IP.String()
+		}
+	}
+	return ""
+}
+
+// readView is the view of the seat the request's ?seat= key opens.
+func readView(w http.ResponseWriter, r *http.Request, meta *workflow.WorkflowMetadata) (v werewolf.View, ok, failed bool) {
+	v, ok, err := werewolf.ReadView(meta, r.URL.Query().Get("seat"))
+	if errors.Is(err, werewolf.ErrNoSeat) {
+		fail(w, http.StatusForbidden, err)
+		return v, false, true
+	}
+	if err != nil {
+		fail(w, http.StatusInternalServerError, err)
+		return v, false, true
+	}
+	return v, ok, false
 }
 
 // gameReply is a game as the page polls it: the human's view while it runs,
@@ -100,10 +150,14 @@ func (s *server) game(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := gameReply{Status: strings.TrimPrefix(meta.RuntimeStatus.String(), "ORCHESTRATION_STATUS_")}
-	if v, ok, err := werewolf.ReadView(meta); err != nil {
-		fail(w, http.StatusInternalServerError, err)
+	v, ok, failed := readView(w, r, meta)
+	if failed {
 		return
-	} else if ok {
+	}
+	if ok {
+		if v.Pending != nil && s.wasSent(r.PathValue("id"), v.Pending.Event) {
+			v.Pending = nil
+		}
 		out.View = &v
 	}
 	switch meta.RuntimeStatus {
@@ -140,9 +194,8 @@ func (s *server) move(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusNotFound, err)
 		return
 	}
-	v, ok, err := werewolf.ReadView(meta)
-	if err != nil {
-		fail(w, http.StatusInternalServerError, err)
+	v, ok, failed := readView(w, r, meta)
+	if failed {
 		return
 	}
 	if !ok || v.Pending == nil || v.Pending.Event != req.Event {
@@ -153,11 +206,21 @@ func (s *server) move(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, err)
 		return
 	}
+	if _, dup := s.sent.LoadOrStore(id+"/"+req.Event, true); dup {
+		fail(w, http.StatusConflict, errors.New("the game is not waiting for this move any more"))
+		return
+	}
 	if err := s.client.RaiseEvent(r.Context(), id, req.Event, workflow.WithEventPayload(req.Action)); err != nil {
+		s.sent.Delete(id + "/" + req.Event)
 		fail(w, http.StatusBadGateway, err)
 		return
 	}
 	reply(w, map[string]bool{"ok": true})
+}
+
+func (s *server) wasSent(id, event string) bool {
+	_, ok := s.sent.Load(id + "/" + event)
+	return ok
 }
 
 // Check reports what is wrong with a person's move for this turn. It asks

@@ -8,7 +8,7 @@ The real seer gets voted out. Karen demands to speak to the game master. A Linke
 
 Welcome to AI Werewolf: a social deduction game where AI agents lie, manipulate, form alliances, hold grudges, and confidently vote out the only person who knows what's going on.
 
-Or take a seat yourself. The AI doesn't know you're human, and won't go easy on you.
+Or take a seat yourself, and bring up to eight friends. The AI doesn't know you're human, and won't go easy on you.
 
 Powered by [Dapr Workflow](https://docs.dapr.io/developing-applications/building-blocks/workflow/) on [Diagrid Catalyst](https://www.diagrid.io/catalyst). Because even terrible decisions deserve durable execution.
 
@@ -192,7 +192,7 @@ Leave out `--data` for a game in Chinese. When the game is over, get the result 
 diagrid workflow get game-1 --project werewolf --id werewolf
 ```
 
-### Play a seat yourself
+### Play a seat yourself, or bring friends
 
 Add `-web :8080` when you start the game master:
 
@@ -200,7 +200,7 @@ Add `-web :8080` when you start the game master:
 diagrid dev run --project werewolf --id werewolf --approve -- ./bin/werewolf gm -brain llm -web :8080
 ```
 
-Open <http://localhost:8080>, pick a language, your name and whose seat to take, and start. The page shows what your seat sees and asks for your move when it is your turn: a speech with who you suspect and, if you like, a role claim, or a pick for a vote, a check, a potion or a shot. While you wait, it shows what the table is doing: the wolves plotting under a night sky, who is speaking, or everyone voting, and for how long. The game master's terminal is still the god's-eye feed, so keep it out of sight while you play.
+Open <http://localhost:8080>, pick a language and how many people play, from 1 to all 9, and give each a name and whose seat to take. AI plays the other seats. Alone, you go straight to your seat. With friends, the page lists one private link per person, on this machine's address on your network, so everyone opens theirs on their own phone or computer on the same Wi-Fi. A link only opens its own seat, so nobody sees anyone else's role. The page shows what your seat sees and asks for your move when it is your turn: a speech with who you suspect and, if you like, a role claim, or a pick for a vote, a check, a potion or a shot. While you wait, it shows what the table is doing: the wolves plotting under a night sky, who is speaking, or everyone voting, and for how long. The game master's terminal is still the god's-eye feed, so keep it out of sight while you play.
 
 The page can also talk. Click **🔊 Read aloud** and every new line is spoken, each character in a voice, pitch and pace of their own. On your speaking turns, **🎤 Speak** types what you say into the speech box, where you can fix it before you submit. Both use the browser's own speech support, so nothing goes through the game master; voice input needs Chrome or Edge and microphone access, and Chrome sends the audio to Google to transcribe it.
 
@@ -235,7 +235,7 @@ The `--data` for `diagrid workflow start` is JSON, and every field is optional:
 | `lang` | `"zh"` | `"zh"` for Chinese, `"en"` for English |
 | `phaseDelay` | `0` | How long the game waits after the night, the election and each day before going on, so watchers can follow it. It is a durable timer, so it is also a window to kill the gm and watch the game resume. Written in nanoseconds because that is how Go encodes a duration: `2000000000` is 2 seconds |
 | `tactic` | dealt at random | Pins the pack's play, to show one off: `"counterclaim"`, `"deep_cover"` or `"hook"`. Games from the web page are always dealt one at random, so a person never knows the pack's plan |
-| `human` | none | Seats a person: `{"name":"Eileen","replaces":"Karen"}`. The web page sets this for you; the person plays from the page |
+| `humans` | none | Seats people: `[{"name":"Eileen","replaces":"Karen","key":"..."}]`, up to 9. Each `key` opens that person's seat on the page. The web page sets this for you, with a random key each |
 
 ```bash
 diagrid workflow start GameWorkflow --project werewolf --id werewolf --instance-id game-2 \

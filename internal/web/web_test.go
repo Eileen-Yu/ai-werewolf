@@ -22,7 +22,7 @@ import (
 	"github.com/Eileen-Yu/ai-werewolf/werewolf"
 )
 
-func TestAPersonPlaysAWholeGameFromThePage(t *testing.T) {
+func TestPeoplePlayAWholeGameFromThePage(t *testing.T) {
 	werewolf.SetBrain(brain.Random{})
 	srv := httptest.NewServer(Handler(startEngine(t)))
 	t.Cleanup(srv.Close)
@@ -32,60 +32,108 @@ func TestAPersonPlaysAWholeGameFromThePage(t *testing.T) {
 	chars := get[map[string][]string](t, srv.URL+"/api/characters?lang=en", http.StatusOK, true)
 	assert.Contains(t, chars["characters"], "Karen")
 
-	post(t, srv.URL+"/api/games", startRequest{Lang: game.English, Name: "Eileen", Replaces: "华妃"}, http.StatusBadRequest)
+	for _, bad := range [][]game.Person{
+		nil,
+		{{Name: "Eileen", Replaces: "华妃"}},
+		{{Name: "Eileen", Replaces: "Karen"}, {Name: "Bob", Replaces: "Karen"}},
+		{{Name: "Eileen", Replaces: "Karen"}, {Name: "Eileen", Replaces: "Gym Bro"}},
+		{{Name: "Gym", Replaces: "Karen"}},
+	} {
+		post(t, srv.URL+"/api/games", startRequest{Lang: game.English, Humans: bad}, http.StatusBadRequest)
+	}
 	// A villager the wolves kill on the first night never gets a turn, so
-	// play until the person has spoken.
+	// play until Eileen has spoken.
 	for range 5 {
 		if playFromPage(t, srv.URL) {
 			return
 		}
 	}
-	t.Fatal("in five games the person never got a speaking turn")
+	t.Fatal("in five games Eileen never got a speaking turn")
 }
 
-// playFromPage plays one game from the page as Eileen, in Karen's seat. It
-// first offers a bad move on a speaking turn, which the page must refuse, and
-// a move the game is no longer waiting for, which it must too. It reports
-// whether a speaking turn came up.
+// playFromPage plays one game from the page with Eileen in Karen's seat and
+// Bob in Gym Bro's, each from their own link. It first offers a bad move on a
+// speaking turn, which the page must refuse, a move the game is no longer
+// waiting for, which it must too, and a move from the other person's link. It
+// reports whether Eileen got a speaking turn.
 func playFromPage(t *testing.T, url string) bool {
 	t.Helper()
-	id := post(t, url+"/api/games", startRequest{Lang: game.English, Name: "Eileen", Replaces: "Karen"}, http.StatusOK)["id"]
-	require.NotEmpty(t, id)
-	gameURL := url + "/api/games/" + id
+	g := start(t, url, startRequest{Lang: game.English, Humans: []game.Person{{Name: " Eileen ", Replaces: "Karen"}, {Name: "Bob", Replaces: "Gym Bro"}}})
+	require.Len(t, g.Seats, 2)
+	keys := map[string]string{}
+	for _, s := range g.Seats {
+		require.NotEmpty(t, s.Key)
+		keys[s.Name] = s.Key
+	}
+	require.NotEqual(t, keys["Eileen"], keys["Bob"], "each person has their own link")
+	gameURL := url + "/api/games/" + g.ID
+	seatURL := func(name string) string { return gameURL + "?seat=" + keys[name] }
+	movesURL := func(name string) string { return gameURL + "/moves?seat=" + keys[name] }
 	spoke := false
 	deadline := time.Now().Add(time.Minute)
 	for {
 		require.True(t, time.Now().Before(deadline), "the game did not finish")
-		g := get[gameReply](t, gameURL, http.StatusOK, true)
-		require.Empty(t, g.Error)
-		if g.Result != nil {
-			assert.NotEmpty(t, g.Result.Winner)
-			assert.NotEmpty(t, g.Result.MVP.Name)
+		views := map[string]gameReply{}
+		for name := range keys {
+			views[name] = get[gameReply](t, seatURL(name), http.StatusOK, true)
+			require.Empty(t, views[name].Error)
+		}
+		if r := views["Eileen"].Result; r != nil {
+			assert.NotEmpty(t, r.Winner)
+			assert.NotEmpty(t, r.MVP.Name)
 			return spoke
 		}
-		if g.View == nil || g.View.Pending == nil {
-			time.Sleep(20 * time.Millisecond)
-			continue
+		if views["Eileen"].View != nil {
+			get[map[string]string](t, gameURL+"?seat=nobody", http.StatusForbidden, true)
+			e, b := views["Eileen"].View, views["Bob"].View
+			require.NotNil(t, b)
+			assert.Equal(t, "Eileen", e.You)
+			assert.Equal(t, "Bob", b.You)
+			assert.Len(t, b.Seats, len(e.Seats), "both people see the same table")
 		}
-		p := g.View.Pending
-		assert.Equal(t, "Eileen", p.Turn.Me.Name)
-		if p.Turn.Kind.Speaks() && !spoke {
-			post(t, gameURL+"/moves", moveRequest{Event: p.Event, Action: brain.Action{Target: "nobody at all"}}, http.StatusBadRequest)
-			spoke = true
-		}
-		a, err := brain.Random{}.Act(t.Context(), p.Turn)
-		require.NoError(t, err)
-		post(t, gameURL+"/moves", moveRequest{Event: p.Event, Action: a}, http.StatusOK)
-		for {
-			g := get[gameReply](t, gameURL, http.StatusOK, true)
-			if g.View.Pending == nil || g.View.Pending.Event != p.Event {
-				break
+		moved := false
+		for name, g := range views {
+			if g.View == nil || g.View.Pending == nil {
+				continue
 			}
-			require.True(t, time.Now().Before(deadline), "the game never took the move")
-			time.Sleep(10 * time.Millisecond)
+			p := g.View.Pending
+			assert.Equal(t, name, p.Turn.Me.Name)
+			other := "Bob"
+			if name == "Bob" {
+				other = "Eileen"
+			}
+			post(t, movesURL(other), moveRequest{Event: p.Event, Action: brain.Action{}}, http.StatusConflict)
+			if name == "Eileen" && p.Turn.Kind.Speaks() && !spoke {
+				post(t, movesURL(name), moveRequest{Event: p.Event, Action: brain.Action{Target: "nobody at all"}}, http.StatusBadRequest)
+				spoke = true
+			}
+			a, err := brain.Random{}.Act(t.Context(), p.Turn)
+			require.NoError(t, err)
+			post(t, movesURL(name), moveRequest{Event: p.Event, Action: a}, http.StatusOK)
+			post(t, movesURL(name), moveRequest{Event: p.Event, Action: a}, http.StatusConflict)
+			if v := get[gameReply](t, seatURL(name), http.StatusOK, true).View; v != nil && v.Pending != nil {
+				assert.NotEqual(t, p.Event, v.Pending.Event, "a move already sent is not asked for again, even before the game gets to it")
+			}
+			moved = true
 		}
-		post(t, gameURL+"/moves", moveRequest{Event: p.Event, Action: a}, http.StatusConflict)
+		if !moved {
+			time.Sleep(20 * time.Millisecond)
+		}
 	}
+}
+
+func start(t *testing.T, url string, req startRequest) startReply {
+	t.Helper()
+	b, err := json.Marshal(req)
+	require.NoError(t, err)
+	resp, err := http.Post(url+"/api/games", "application/json", bytes.NewReader(b))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var out startReply
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+	require.NotEmpty(t, out.ID)
+	return out
 }
 
 func TestCheckAsksOnlyWhatTheFormCanGetWrong(t *testing.T) {

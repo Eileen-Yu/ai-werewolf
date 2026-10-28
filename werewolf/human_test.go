@@ -27,10 +27,10 @@ func TestAPersonPlaysTheSeatTheyTook(t *testing.T) {
 	// play until the person has spoken.
 	for i := range 5 {
 		id := fmt.Sprintf("human-%d", i)
-		g := Game{Human: &Human{Name: "Eileen", Replaces: "柯南"}}
+		g := Game{Humans: []Human{human("Eileen", "柯南", "")}}
 		_, err := client.ScheduleWorkflow(t.Context(), "GameWorkflow", workflow.WithInstanceID(id), workflow.WithInput(g))
 		require.NoError(t, err)
-		answer(t, client, id, func(p Pending, n int) brain.Action {
+		answer(t, client, id, "", func(p Pending, n int) brain.Action {
 			a, err := brain.Random{}.Act(t.Context(), p.Turn)
 			require.NoError(t, err)
 			if p.Turn.Kind.Speaks() {
@@ -41,7 +41,7 @@ func TestAPersonPlaysTheSeatTheyTook(t *testing.T) {
 		res := waitForGame(t, client, id)
 		meta, err := client.FetchWorkflowMetadata(t.Context(), id)
 		require.NoError(t, err)
-		v, ok, err := ReadView(meta)
+		v, ok, err := ReadView(meta, "")
 		require.NoError(t, err)
 		require.True(t, ok)
 		if !slices.ContainsFunc(v.Log, func(l Line) bool { return l.Speaker == "Eileen" && strings.HasPrefix(l.Text, "真人第") }) {
@@ -82,13 +82,13 @@ func TestAnAIPlaysForAPersonWhoRunsOutOfTime(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
 
-	res := play(t, client, "afk", Game{Lang: game.English, Human: &Human{Name: "Eileen", Replaces: "Karen"}})
+	res := play(t, client, "afk", Game{Lang: game.English, Humans: []Human{human("Eileen", "Karen", "")}})
 
 	assert.NotEmpty(t, res.Winner, "a person who never answers does not stall the game")
 	assert.True(t, slices.ContainsFunc(b.turns, func(turn brain.Turn) bool { return turn.Me.Name == "Eileen" }), "the AI covered the person's moves")
 	meta, err := client.FetchWorkflowMetadata(t.Context(), "afk")
 	require.NoError(t, err)
-	v, _, err := ReadView(meta)
+	v, _, err := ReadView(meta, "")
 	require.NoError(t, err)
 	assert.True(t, slices.ContainsFunc(v.Log, func(l Line) bool { return l.Private && strings.Contains(l.Text, "ran out of time") }), "the person is told an AI played for them")
 
@@ -115,7 +115,7 @@ func TestAGameRefusesAPersonInASeatThatDoesNotExist(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
 	_, err := client.ScheduleWorkflow(t.Context(), "GameWorkflow", workflow.WithInstanceID("nobody"),
-		workflow.WithInput(Game{Lang: game.English, Human: &Human{Name: "Eileen", Replaces: "华妃"}}))
+		workflow.WithInput(Game{Lang: game.English, Humans: []Human{human("Eileen", "华妃", "")}}))
 	require.NoError(t, err)
 	meta, err := client.WaitForWorkflowCompletion(t.Context(), "nobody")
 	require.NoError(t, err)
@@ -123,9 +123,13 @@ func TestAGameRefusesAPersonInASeatThatDoesNotExist(t *testing.T) {
 	assert.Contains(t, meta.FailureDetails.GetErrorMessage(), "华妃")
 }
 
-// answer plays the person's seat: it answers each move the game waits on
+func human(name, replaces, key string) Human {
+	return Human{Person: game.Person{Name: name, Replaces: replaces}, Key: key}
+}
+
+// answer plays the seat key opens: it answers each move the game waits on
 // with move, told how many moves it has made.
-func answer(t *testing.T, client *workflow.Client, id string, move func(p Pending, n int) brain.Action) {
+func answer(t *testing.T, client *workflow.Client, id, key string, move func(p Pending, n int) brain.Action) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
@@ -139,7 +143,7 @@ func answer(t *testing.T, client *workflow.Client, id string, move func(p Pendin
 			if err != nil {
 				continue
 			}
-			v, ok, err := ReadView(meta)
+			v, ok, err := ReadView(meta, key)
 			if err != nil || !ok || v.Pending == nil || answered[v.Pending.Event] {
 				continue
 			}
@@ -148,6 +152,54 @@ func answer(t *testing.T, client *workflow.Client, id string, move func(p Pendin
 		}
 	}()
 	t.Cleanup(func() { cancel(); <-done })
+}
+
+func TestEachPersonAtATableSeesOnlyTheirOwnSeat(t *testing.T) {
+	b := &turnRecorder{}
+	SetBrain(b)
+	client := startEngine(t)
+	startWorker(t, client)
+
+	people := map[string]string{"Eileen": "eileen-key", "Bob": "bob-key"}
+	g := Game{Lang: game.English, Humans: []Human{human("Eileen", "Karen", "eileen-key"), human("Bob", "Gym Bro", "bob-key")}}
+	_, err := client.ScheduleWorkflow(t.Context(), "GameWorkflow", workflow.WithInstanceID("two"), workflow.WithInput(g))
+	require.NoError(t, err)
+	var moves atomic.Int32
+	for _, key := range people {
+		answer(t, client, "two", key, func(p Pending, _ int) brain.Action {
+			moves.Add(1)
+			a, err := brain.Random{}.Act(t.Context(), p.Turn)
+			require.NoError(t, err)
+			return a
+		})
+	}
+	res := waitForGame(t, client, "two")
+	meta, err := client.FetchWorkflowMetadata(t.Context(), "two")
+	require.NoError(t, err)
+
+	assert.Positive(t, moves.Load(), "the people made moves")
+	for _, turn := range b.turns {
+		_, person := people[turn.Me.Name]
+		assert.False(t, person, "the AI played a %s move %s answered in time", turn.Kind, turn.Me.Name)
+	}
+	role := map[string]game.Role{}
+	for _, p := range res.Players {
+		role[p.Name] = p.Role
+	}
+	for name, key := range people {
+		v, ok, err := ReadView(meta, key)
+		require.NoError(t, err)
+		require.True(t, ok)
+		assert.Equal(t, name, v.You)
+		assert.Equal(t, game.English.Say(string(role[name])), v.Role)
+		assert.Equal(t, role[name] == game.Werewolf, v.Pack != nil, "only a wolf is shown the pack")
+		for _, l := range v.Log {
+			assert.False(t, l.Private && l.Speaker != "" && l.Speaker != name && !(role[name] == game.Werewolf && role[l.Speaker] == game.Werewolf),
+				"%s saw %s's private line: %s", name, l.Speaker, l.Text)
+		}
+	}
+	_, _, err = ReadView(meta, "")
+	assert.ErrorIs(t, err, ErrNoSeat, "a link without a key opens nobody's seat")
 }
 
 func TestThePageIsToldOnlyWhatTheTableCanSee(t *testing.T) {

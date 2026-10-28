@@ -15,17 +15,22 @@ import (
 )
 
 // Human is a person who takes a character's seat. They play under their own
-// name, and their role is dealt like anyone's.
+// name, and their role is dealt like anyone's. Key opens their seat on the
+// page, so nobody else at the table can open it.
 type Human struct {
-	Name     string `json:"name"`
-	Replaces string `json:"replaces"`
+	game.Person
+	Key string `json:"key,omitempty"`
 }
+
+// MaxHumans is how many people a table seats: all of it, with AI only
+// covering the moves a person runs out of time for.
+const MaxHumans = 9
 
 // HumanTimeout is how long a person has for a move before an AI plays it.
 var HumanTimeout = 3 * time.Minute
 
-// View is the game as the human player sees it, kept in the workflow's custom
-// status for the web page to read.
+// View is the game as one person sees it, cut by ReadView from what the
+// workflow publishes for the web page.
 type View struct {
 	You   string       `json:"you"`
 	Lang  game.Lang    `json:"lang"`
@@ -47,7 +52,7 @@ type View struct {
 	Words map[string]string `json:"words"`
 }
 
-// Line is one event the human saw.
+// Line is one event the person saw.
 type Line struct {
 	When    string `json:"when"`
 	Speaker string `json:"speaker,omitempty"`
@@ -134,7 +139,7 @@ func (t *table) doing() *Activity {
 	return &out
 }
 
-// Pending is a move the game is waiting on the human for. The move is raised
+// Pending is a move the game is waiting on a person for. The move is raised
 // as an event named Event, before Deadline or the AI plays it.
 type Pending struct {
 	Event    string     `json:"event"`
@@ -142,16 +147,52 @@ type Pending struct {
 	Turn     brain.Turn `json:"turn"`
 }
 
-// ReadView decodes the human's view from a game's custom status. It reports
-// false if the game has no human or has not dealt yet.
-func ReadView(meta *workflow.WorkflowMetadata) (View, bool, error) {
-	var v View
+// board is the workflow's custom status: the table as everyone sees it, the
+// record with who may see each line, and each person's own seat. It holds
+// every person's secrets, so the page is only ever given a View cut from it.
+// The record is kept once rather than once per person, since the custom
+// status is rewritten on every move.
+type board struct {
+	View
+	Record []game.Event `json:"record"`
+	Humans []humanSeat  `json:"humans"`
+}
+
+// humanSeat is what only one person may see.
+type humanSeat struct {
+	Key     string   `json:"key,omitempty"`
+	Name    string   `json:"name"`
+	Role    string   `json:"role"`
+	Pack    []string `json:"pack,omitempty"`
+	Alive   bool     `json:"alive"`
+	Pending *Pending `json:"pending,omitempty"`
+}
+
+// ErrNoSeat is a key that opens no seat at the table.
+var ErrNoSeat = errors.New("this link does not open a seat at this table")
+
+// ReadView cuts the view of the person whose seat key opens from a game's
+// custom status. It reports false if the game has not dealt yet, and
+// ErrNoSeat if no seat opens with key.
+func ReadView(meta *workflow.WorkflowMetadata, key string) (View, bool, error) {
+	var b board
 	s := meta.CustomStatus.GetValue()
 	if s == "" {
-		return v, false, nil
+		return View{}, false, nil
 	}
-	if err := json.Unmarshal([]byte(s), &v); err != nil {
-		return v, false, fmt.Errorf("read the human's view: %w", err)
+	if err := json.Unmarshal([]byte(s), &b); err != nil {
+		return View{}, false, fmt.Errorf("read the table: %w", err)
+	}
+	i := slices.IndexFunc(b.Humans, func(h humanSeat) bool { return h.Key == key })
+	if i < 0 {
+		return View{}, false, ErrNoSeat
+	}
+	me, v := b.Humans[i], b.View
+	v.You, v.Role, v.Pack, v.Alive, v.Pending = me.Name, me.Role, me.Pack, me.Alive, me.Pending
+	for _, e := range b.Record {
+		if e.VisibleTo(me.Name) {
+			v.Log = append(v.Log, Line{When: e.When(v.Lang), Speaker: e.Speaker, Text: e.Said(v.Lang), Private: len(e.Audience) > 0})
+		}
 	}
 	return v, true, nil
 }
@@ -178,7 +219,7 @@ func (t *table) askHuman(turn brain.Turn) move {
 		Turn:     turn,
 	}
 	p.Turn.Transcript, p.Turn.Notes, p.Turn.Ballots = nil, game.Notes{}, nil // the page has the log and votes already
-	t.pending = p
+	t.pending[turn.Me.Name] = p
 	t.publish()
 	return &humanMove{t: t, turn: turn, wait: t.ctx.WaitForExternalEvent(p.Event, HumanTimeout)}
 }
@@ -186,7 +227,7 @@ func (t *table) askHuman(turn brain.Turn) move {
 func (m *humanMove) Await(v any) error {
 	var a brain.Action
 	err := m.wait.Await(&a)
-	m.t.pending = nil
+	delete(m.t.pending, m.turn.Me.Name)
 	if errors.Is(err, task.ErrTaskCanceled) {
 		m.t.add("", m.t.h.takeover, m.turn.Me.Name)
 		return m.t.ctx.CallActivity(ActActivity, workflow.WithActivityInput(m.turn), retry).Await(v)
@@ -204,55 +245,52 @@ func (m *humanMove) Await(v any) error {
 	return nil
 }
 
-// publish puts the human's view in the custom status. It runs on replay too,
-// since the status is rebuilt with each run of the workflow.
+// publish puts the table, with every person's seat, in the custom status. It
+// runs on replay too, since the status is rebuilt with each run of the
+// workflow.
 func (t *table) publish() {
-	var me *game.Player
-	for i, p := range t.s.Players {
-		if p.Human {
-			me = &t.s.Players[i]
-		}
-	}
-	if me == nil {
-		return
-	}
 	l := t.s.Lang
-	v := View{
-		You:     me.Name,
-		Lang:    l,
-		Role:    t.say(string(me.Role)),
-		Alive:   me.Alive,
-		Round:   t.s.Round,
-		Phase:   t.s.Phase,
-		When:    l.When(t.s.Round, t.s.Phase),
-		Pending: t.pending,
-		Now:     t.doing(),
-		Words:   map[string]string{game.Pass: t.say(game.Pass), game.Nobody: t.say(game.Nobody)},
-	}
-	if me.Role == game.Werewolf {
-		v.Pack = t.s.Living(game.Werewolf)
-	}
-	if b := t.s.LastExile(); b != nil {
-		v.LastVote = &LastVote{When: l.When(b.Round, game.Day), Votes: b.Votes, Sheriff: b.Sheriff}
-	}
+	b := board{View: View{
+		Lang:  l,
+		Round: t.s.Round,
+		Phase: t.s.Phase,
+		When:  l.When(t.s.Round, t.s.Phase),
+		Now:   t.doing(),
+		Words: map[string]string{game.Pass: t.say(game.Pass), game.Nobody: t.say(game.Nobody)},
+	}}
 	for _, p := range t.s.Players {
-		v.Seats = append(v.Seats, brain.Seat{Name: p.Name, Death: p.Death, Sheriff: p.Name == t.s.Sheriff})
-	}
-	for _, r := range brain.Claimable {
-		v.Words[string(r)] = t.say(string(r))
-	}
-	for _, w := range []string{game.Good, string(game.Werewolf)} {
-		v.Words[w] = t.say(w)
-	}
-	for _, e := range t.s.VisibleTo(me.Name) {
-		if e.Thought {
+		if !p.Human {
 			continue
 		}
-		v.Log = append(v.Log, Line{When: e.When(l), Speaker: e.Speaker, Text: e.Said(l), Private: len(e.Audience) > 0})
+		me := humanSeat{Key: t.keys[p.Name], Name: p.Name, Role: t.say(string(p.Role)), Alive: p.Alive, Pending: t.pending[p.Name]}
+		if p.Role == game.Werewolf {
+			me.Pack = t.s.Living(game.Werewolf)
+		}
+		b.Humans = append(b.Humans, me)
 	}
-	b, err := json.Marshal(v)
+	if len(b.Humans) == 0 {
+		return
+	}
+	if x := t.s.LastExile(); x != nil {
+		b.LastVote = &LastVote{When: l.When(x.Round, game.Day), Votes: x.Votes, Sheriff: x.Sheriff}
+	}
+	for _, p := range t.s.Players {
+		b.Seats = append(b.Seats, brain.Seat{Name: p.Name, Death: p.Death, Sheriff: p.Name == t.s.Sheriff})
+	}
+	for _, r := range brain.Claimable {
+		b.Words[string(r)] = t.say(string(r))
+	}
+	for _, w := range []string{game.Good, string(game.Werewolf)} {
+		b.Words[w] = t.say(w)
+	}
+	for _, e := range t.s.Log {
+		if !e.Thought {
+			b.Record = append(b.Record, e)
+		}
+	}
+	out, err := json.Marshal(b)
 	if err != nil {
-		return // a view of plain strings always marshals
+		return // a board of plain strings always marshals
 	}
-	t.ctx.SetCustomStatus(string(b))
+	t.ctx.SetCustomStatus(string(out))
 }

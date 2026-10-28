@@ -42,9 +42,11 @@ type Game struct {
 	// Tactic pins how the pack plays, for a demo; left out, one is dealt at
 	// random. It only takes effect when the game is dealt.
 	Tactic game.Tactic `json:"tactic,omitempty"`
-	// Human seats a person in place of one of the cast, to play from the
-	// web page. It only takes effect when the game is dealt.
-	Human *Human `json:"human,omitempty"`
+	// Humans seats people in place of some of the cast, to play from the web
+	// page. It only takes effect when the game is dealt.
+	Humans []Human `json:"humans,omitempty"`
+	// Keys is which key opens which person's seat on the page, by name.
+	Keys map[string]string `json:"keys,omitempty"`
 }
 
 type Result struct {
@@ -99,14 +101,26 @@ func GameWorkflow(ctx *workflow.WorkflowContext) (any, error) {
 			return nil, fmt.Errorf("unknown tactic %q: use one of %v", g.Tactic, game.Tactics)
 		}
 		g.State.Tactic = g.Tactic
-		if h := g.Human; h != nil && !slices.Contains(game.Characters(lang), h.Replaces) {
-			return nil, fmt.Errorf("a human can replace one of %v, not %q", game.Characters(lang), h.Replaces)
+		for _, h := range g.Humans {
+			if !slices.Contains(game.Characters(lang), h.Replaces) {
+				return nil, fmt.Errorf("a human can replace one of %v, not %q", game.Characters(lang), h.Replaces)
+			}
+			if h.Key != "" {
+				if g.Keys == nil {
+					g.Keys = map[string]string{}
+				}
+				g.Keys[strings.TrimSpace(h.Name)] = h.Key
+			}
 		}
 	}
-	t := &table{ctx: ctx, s: &g.State, h: hostFor(g.State.Lang), delay: g.PhaseDelay}
+	t := &table{ctx: ctx, s: &g.State, h: hostFor(g.State.Lang), delay: g.PhaseDelay, keys: g.Keys, pending: map[string]*Pending{}}
 
 	if g.State.Round == 0 {
-		if err := t.setup(g.Human); err != nil {
+		people := make([]game.Person, len(g.Humans))
+		for i, h := range g.Humans {
+			people[i] = h.Person
+		}
+		if err := t.setup(people); err != nil {
 			return nil, fmt.Errorf("setup: %w", err)
 		}
 	}
@@ -146,9 +160,11 @@ type table struct {
 	s     *game.State
 	h     *host
 	delay time.Duration
-	// asked counts the human's moves this round, to name the event for each.
-	asked   int
-	pending *Pending
+	keys  map[string]string
+	// asked counts the people's moves this round, to name the event for each.
+	asked int
+	// pending is the move the game waits on each person for, by name.
+	pending map[string]*Pending
 	// now is what the table is waiting on from the AI players, for the page.
 	now []*Activity
 }
@@ -156,10 +172,10 @@ type table struct {
 func (t *table) say(word string) string     { return t.s.Lang.Say(word) }
 func (t *table) list(names []string) string { return t.s.Lang.List(names) }
 
-func (t *table) setup(human *Human) error {
+func (t *table) setup(people []game.Person) error {
 	t.s.Round, t.s.Phase = 1, game.Night
 	var dealt deal
-	in := deal{Players: t.s.Players, Lang: t.s.Lang, Tactic: t.s.Tactic, Human: human}
+	in := deal{Players: t.s.Players, Lang: t.s.Lang, Tactic: t.s.Tactic, Humans: people}
 	if err := t.ctx.CallActivity(AssignRolesActivity, workflow.WithActivityInput(in)).Await(&dealt); err != nil {
 		return err
 	}
@@ -655,7 +671,7 @@ func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brai
 
 func (t *table) act(turn brain.Turn) move {
 	if turn.Me.Human {
-		return t.askHuman(turn)
+		return t.busy(turn, t.askHuman(turn))
 	}
 	m := t.ctx.CallActivity(ActActivity, workflow.WithActivityInput(turn), retry)
 	if turn.Kind == brain.Prepare {
@@ -806,7 +822,7 @@ type deal struct {
 	Players []game.Player `json:"players,omitempty"`
 	Lang    game.Lang     `json:"lang,omitempty"`
 	Tactic  game.Tactic   `json:"tactic,omitempty"`
-	Human   *Human        `json:"human,omitempty"`
+	Humans  []game.Person `json:"humans,omitempty"`
 }
 
 // AssignRolesActivity picks a cast and a tactic if there are none, and deals
@@ -822,14 +838,18 @@ func AssignRolesActivity(ctx workflow.ActivityContext) (any, error) {
 
 func (d deal) fill(rng *rand.Rand) (deal, error) {
 	if len(d.Players) == 0 {
-		var with string
-		if d.Human != nil {
-			with = d.Human.Replaces
+		with := make([]string, len(d.Humans))
+		for i, h := range d.Humans {
+			with[i] = h.Replaces
 		}
-		d.Players = game.Cast(d.Lang, rng, with)
+		cast, err := game.Cast(d.Lang, rng, with)
+		if err != nil {
+			return d, err
+		}
+		d.Players = cast
 	}
-	if d.Human != nil {
-		seated, err := game.SeatHuman(d.Players, d.Human.Name, d.Human.Replaces, d.Lang)
+	if len(d.Humans) > 0 {
+		seated, err := game.SeatHumans(d.Players, d.Humans, d.Lang)
 		if err != nil {
 			return d, err
 		}
