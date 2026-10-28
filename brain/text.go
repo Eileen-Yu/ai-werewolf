@@ -47,6 +47,7 @@ type text struct {
 	alive, you, host, none, beliefLine, intends      string
 	claimLine, now, order, planLine, noFaker         string
 	faker, hook, mustFakeLine, hookLine, habitNow    string
+	badgeNow                                         string
 	nobodySpoke, silent                              string
 	shootAlive, selfCheck, onlyJSON, seatLine, known string
 	// twoReadings asks a good player to explain a suspect's behaviour both
@@ -198,7 +199,7 @@ var chineseText = text{
 		Poison:    "决定要不要用毒药：选一个名字表示毒死他，选\"放弃\"表示不用。毒错了好人会很伤，没有把握就别用。",
 		Shoot:     "你出局了，作为猎人可以开枪带走一个人：选一个名字表示开枪，选\"放弃\"表示不开枪。",
 		Run: "竞选警长：选你自己的名字表示上警，选\"放弃\"表示不上警。所有人同时决定，看不到别人的选择。" +
-			"警长的1.5票和归票权很有用。预言家一定上警，靠竞选发言报查验、拿警徽带队。" +
+			"警长的1.5票和归票权很有用。上警不是神职专属：想带队、想抢话语权、想在台上看清谁在说谎的好人也可以上警。但上警的人越多，警下能投票的人越少。预言家一定上警，靠竞选发言报查验、拿警徽带队。" +
 			"狼队为了赢面也一定要有狼上警：悍跳的狼必须上警，和预言家正面对跳；其他打法也要派狼上警抢警徽、站边或搅局。一般一到两只狼上警就够了，夜里说好谁上。上警的人不能投票选警长。",
 		Campaign: "你上警了，这是你的竞选发言：说清楚为什么大家该把警徽给你，比如报出你的身份和查验，或者你会怎么带队找狼。不超过80字。",
 		Withdraw: "竞选发言都结束了，正式投票前你可以退水：选你自己的名字表示继续竞选，选\"放弃\"表示退水。所有还在竞选的人同时决定。" +
@@ -258,6 +259,7 @@ var chineseText = text{
 	hook:         "%s倒钩",
 	hookLine:     "你就是倒钩的狼：今天要像最坚定的好人一样发言和投票，站边你认为是真的预言家，必要时可以怀疑、投票给狼同伴。\n",
 	habitNow:     "你的习惯倾向是：%s。但这一轮先看局势：证据和票型明确时，就照局势来。\n",
+	badgeNow:     "你对上警的态度：%s。这是你性格的倾向，身份和狼队计划可以改变它。\n",
 	mustFakeLine: "你就是要悍跳的人：这次发言必须跳预言家，claim.role 写预言家，并报一个查验结果。\n",
 	known:        "你确定知道的事，和任何人的说法冲突时以这些为准：\n",
 	nobodySpoke: "到现在为止还没有任何人公开发过言，也没有任何公开信息，谁是什么身份完全不知道。" +
@@ -450,7 +452,7 @@ Write everything in English.`,
 		Poison:    "Decide whether to use the poison: pick a name to poison them, or \"pass\" not to. Poisoning a good player hurts badly, so do not use it unless you are sure.",
 		Shoot:     "You are out. As the hunter you may shoot one person and take them with you: pick a name to shoot, or \"pass\" not to.",
 		Run: "Sheriff election: pick your own name to run for sheriff, or \"pass\" not to. Everyone decides at once, without seeing anyone else's choice. " +
-			"The sheriff's one and a half votes and the right to call the vote are worth a lot. The seer always runs, reporting their checks in the campaign to take the badge and lead. " +
+			"The sheriff's one and a half votes and the right to call the vote are worth a lot. Running is not just for power roles: a good player who wants to lead, to be heard, or to watch the liars up close may run too. But the more who run, the fewer are left to vote. The seer always runs, reporting their checks in the campaign to take the badge and lead. " +
 			"To keep their chances, the pack always has a wolf running too: a wolf set to fake the seer must run and take the seer on head to head, and under any other play a wolf runs to grab the badge, pick a side or stir things up. One or two wolves running is usually enough; agree at night who runs. Those who run do not vote for sheriff.",
 		Campaign: "You are running for sheriff. This is your campaign speech: say why the table should give you the badge, such as your role and your checks, or how you will lead the hunt. At most 40 words.",
 		Withdraw: "The campaign speeches are over. Before the vote you may withdraw: pick your own name to stay in the race, or \"pass\" to withdraw. Everyone still running decides at once. " +
@@ -510,6 +512,7 @@ Write everything in English.`,
 	hook:         "%s plays the hook",
 	hookLine:     "You are the hook: speak and vote today like the staunchest good player, back whoever you judge the real seer, and suspect or vote for a teammate if you must.\n",
 	habitNow:     "Your lean is: %s. But read the situation first this round: when the evidence and the votes are clear, go with them.\n",
+	badgeNow:     "How you feel about running: %s. That is your character's lean; your role and the pack's plan can override it.\n",
 	mustFakeLine: "You are the one claiming seer: this speech must claim seer, with claim.role seer and a check result.\n",
 	known:        "What you know for certain; where anyone's word contradicts it, this wins:\n",
 	nobodySpoke: "Nobody has said anything in public yet and there is no public information at all; nobody knows anyone's role. " +

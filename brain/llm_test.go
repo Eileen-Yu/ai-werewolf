@@ -355,6 +355,22 @@ func TestAPlayersHabitIsInTheirPrompt(t *testing.T) {
 	assert.Contains(t, system, "Your personality: emotional.\nYour lean: holds a grudge. It is a lean, not a rule: when the situation and the evidence are clear, go with them.")
 }
 
+func TestALeanOnRunningIsOnlyInTheRunTurn(t *testing.T) {
+	turn := Turn{Kind: Run, Round: 1, Phase: game.Day, Me: game.Player{Name: "摸鱼王", Persona: "打工人", Habit: "想早点下班", Badge: "当警长等于加班"}}
+	_, user := prompt(turn)
+	assert.Contains(t, user, "你对上警的态度：当警长等于加班。")
+	assert.Contains(t, user, "上警不是神职专属")
+
+	turn.Kind = Speech
+	_, user = prompt(turn)
+	assert.NotContains(t, user, "当警长等于加班")
+
+	turn.Lang, turn.Kind = game.English, Run
+	_, user = prompt(turn)
+	assert.Contains(t, user, "How you feel about running: 当警长等于加班.")
+	assert.Contains(t, user, "Running is not just for power roles")
+}
+
 func TestARivalryOnTheSameTeamIsBanterNotSabotage(t *testing.T) {
 	karen := game.Player{Name: "Karen", Persona: "loud", Habit: "revenge-votes", Rivalry: "Discord Mod acts like the manager"}
 	turn := Turn{Lang: game.English, Kind: WolfChat, Round: 1, Phase: game.Night}

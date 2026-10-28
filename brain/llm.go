@@ -250,6 +250,9 @@ func prompt(t Turn) (system, user string) {
 	if t.Me.Habit != "" {
 		fmt.Fprintf(&b, tx.habitNow, t.Me.Habit)
 	}
+	if t.Kind == Run && t.Me.Badge != "" {
+		fmt.Fprintf(&b, tx.badgeNow, t.Me.Badge)
+	}
 	if known.Len() > 0 {
 		b.WriteString(tx.known + known.String())
 	}
