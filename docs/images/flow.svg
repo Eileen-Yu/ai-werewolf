@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="320" viewBox="0 0 900 320" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#3ddc84"/></marker>
+    <marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#e0a84a"/></marker>
+    <marker id="n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c9ccd6"/></marker>
+  </defs>
+  <rect width="900" height="320" rx="14" fill="#0d0f14"/>
+
+  <!-- human event path -->
+  <rect x="30" y="18" width="180" height="52" rx="8" fill="#16130c" stroke="#e0a84a" stroke-width="1.5"/>
+  <text x="120" y="41" text-anchor="middle" fill="#f3f3f5" font-size="15" font-weight="600">Human seat</text>
+  <text x="120" y="59" text-anchor="middle" fill="#a8a08c" font-size="12">web page &#183; gm -web</text>
+  <line x1="120" y1="72" x2="120" y2="116" stroke="#e0a84a" stroke-width="1.5" marker-end="url(#o)"/>
+  <text x="132" y="99" fill="#e0a84a" font-size="12">external event &#183; 3-minute timeout, then an AI moves</text>
+
+  <!-- main path -->
+  <rect x="30" y="120" width="180" height="62" rx="8" fill="#0c1a12" stroke="#3ddc84" stroke-width="1.5"/>
+  <text x="120" y="147" text-anchor="middle" fill="#f3f3f5" font-size="15" font-weight="600">GameWorkflow</text>
+  <text x="120" y="166" text-anchor="middle" fill="#9fb8a8" font-size="12">holds the whole truth</text>
+
+  <line x1="212" y1="151" x2="248" y2="151" stroke="#c9ccd6" stroke-width="1.5" marker-end="url(#n)"/>
+  <rect x="250" y="120" width="180" height="62" rx="8" fill="#14171e" stroke="#3a3f4b" stroke-width="1.5"/>
+  <text x="340" y="147" text-anchor="middle" fill="#f3f3f5" font-size="15" font-weight="600">brain.Turn</text>
+  <text x="340" y="166" text-anchor="middle" fill="#8b90a0" font-size="12">one player's filtered view</text>
+
+  <line x1="432" y1="151" x2="468" y2="151" stroke="#c9ccd6" stroke-width="1.5" marker-end="url(#n)"/>
+  <rect x="470" y="120" width="180" height="62" rx="8" fill="#14171e" stroke="#3a3f4b" stroke-width="1.5"/>
+  <text x="560" y="147" text-anchor="middle" fill="#f3f3f5" font-size="15" font-weight="600">ActActivity</text>
+  <text x="560" y="166" text-anchor="middle" fill="#8b90a0" font-size="12">asks, checks, re-asks</text>
+
+  <line x1="652" y1="151" x2="688" y2="151" stroke="#c9ccd6" stroke-width="1.5" marker-end="url(#n)"/>
+  <rect x="690" y="120" width="180" height="62" rx="8" fill="#14171e" stroke="#3a3f4b" stroke-width="1.5"/>
+  <text x="780" y="147" text-anchor="middle" fill="#f3f3f5" font-size="15" font-weight="600">Conversation API</text>
+  <text x="780" y="166" text-anchor="middle" fill="#8b90a0" font-size="12">the LLM</text>
+
+  <!-- history path -->
+  <line x1="120" y1="184" x2="120" y2="234" stroke="#3ddc84" stroke-width="1.5" marker-start="url(#g)" marker-end="url(#g)"/>
+  <line x1="560" y1="184" x2="560" y2="234" stroke="#3ddc84" stroke-width="1.5" marker-end="url(#g)"/>
+  <text x="572" y="214" fill="#3ddc84" font-size="12">the checked move</text>
+  <rect x="30" y="236" width="620" height="62" rx="8" fill="#0c1a12" stroke="#3ddc84" stroke-width="1.5"/>
+  <text x="340" y="263" text-anchor="middle" fill="#f3f3f5" font-size="15" font-weight="600">Catalyst workflow history</text>
+  <text x="340" y="282" text-anchor="middle" fill="#9fb8a8" font-size="12">each result recorded once &#183; after a restart, replay reads it back instead of calling the LLM</text>
+</svg>

@@ -8,6 +8,8 @@ The game master has to keep them playing by the rules without telling them who i
 
 The game has one source of truth: a durable Dapr Workflow, `GameWorkflow`. It owns the game state and decides what happens next. Activities do everything that is not deterministic: dealing roles, every LLM call, every random pick. Each agent gets a filtered view of the game, keeps its own notes, and hands back a move that the game master checks before applying.
 
+![GameWorkflow builds one player's filtered view, ActActivity asks the LLM through the Conversation API and checks the answer, a human seat's move arrives as an external event, and every result is recorded in Catalyst's workflow history](images/flow.svg)
+
 The boundaries that matter:
 
 - **The workflow knows the truth.** Agents only see their own filtered views.
@@ -27,7 +29,7 @@ The result is a game where the characters can be unreliable without making the s
 | `internal/web/` | The page a person plays a seat from, and the JSON API behind it, served by `gm -web` |
 | `cmd/werewolf/` | The command line: `engine`, `gm` and `start` |
 
-One execution of the workflow is one round: night, then day. `AssignRolesActivity` deals the cast and roles in the first one. At the end of a round with no winner, the workflow continues as new with the state as its input; once there is a winner, `JudgeActivity` names the MVP and the workflow returns the result.
+A game is one workflow instance, and each round, night then day, is one execution of it. `AssignRolesActivity` deals the cast and roles in the first. At the end of a round with no winner, continue-as-new starts a new execution of the same instance, with the same instance ID, a fresh history and the state as its input; once there is a winner, `JudgeActivity` names the MVP and the workflow returns the result.
 
 ## The game master knows everything. Nobody else does.
 
@@ -99,13 +101,13 @@ The English cast is exactly nine, so everyone is always seated. The Chinese cast
 
 **Decision.** The pack's tactic is dealt with the roles, and only the wolves are told it: `counterclaim` (one wolf fakes the seer), `deep_cover` (nobody claims a power role) or `hook` (one wolf earns trust by turning on an exposed teammate).
 
-**Tradeoff.** A dealt tactic can be the wrong one for the cards. So it changes what the wolves are told and what the night-1 plan asks for, never what they may do. After the first night the pack may drop it, and wolves are offered ways to change course when a play fails, as options rather than rules: a wolf called out while no wolf has claimed seer may claim seer on the spot; a refuted reason is dropped rather than pushed again at the same player; and they weigh whom the good side trusts and how to set good players against each other. Each plays it in their own character, so the pack does not all sound alike.
+**Tradeoff.** A dealt tactic can be the wrong one for the cards. So it changes what the wolves are told and what the night-1 plan asks for, never what they may do. After the first night the pack may drop it, and when a play fails, wolves are offered ways to change course, such as a called-out wolf counter-claiming seer on the spot, as options to weigh rather than rules. Each plays it in their own character, so the pack does not all sound alike.
 
-The rest of what the wolves are told is about not being read as a team, since the good side reads the votes: protect teammates as a rule and turn on one only for a concrete reason, at most two wolves on the same vote unless that vote decides who goes, never with the same teammate two days running, and a fake seer never vouches for a teammate. They are told to play hard: push, accuse and drive the vote rather than hide.
+The rest of the two playbooks follows three principles. The exact wording, in both languages, is in `brain/text.go`.
 
-The good side is told the other half. A vote is for getting a wolf out, not for registering a personal suspicion, so a split good vote should join the likeliest of its suspects. One shared vote proves nothing, but a group that keeps voting together and vouching for each other is the pack. After a tie, repeating the same split hands the wolves the game. Joining a vote is not following the crowd, though: when the table swings one way fast, they ask whether it rests on one fact and who started the push, and agree only with a new reason of their own. How readily they go along is down to their character.
-
-Before a good player suspects, votes for, shoots or poisons someone, they read that player both ways: if they are a wolf, what does their behaviour say about everyone else, and does it fit; if they are good, how else would it be explained. They write one sentence for each in their thinking, and treat the player as a wolf only if that reading clearly fits better. Wolves are not asked, since they know.
+- **The pack hides in the votes, not just the speeches.** The good side is told to read the votes across days, so the wolves are told how not to look like a bloc: split votes, no public defence of a teammate, and a teammate sacrificed only for a concrete reason. Both sides get the same model of what a pack looks like, from opposite ends.
+- **A vote is a team decision, not a personal opinion.** Good players are told to join the likeliest suspect rather than split, and to break a repeated tie, since the wolves win by waiting. But they must agree with a reason of their own, and the prompt warns that a fast one-sided swing is exactly where wolves hide.
+- **Read a suspect both ways before acting on them.** Before a good player suspects, votes for, shoots or poisons someone, they write one sentence for the wolf reading and one for the good reading, and act only if the wolf reading clearly fits better. Wolves skip this, since they know.
 
 The random brain keeps its wolves off teammates while it has anyone else to pick, since a sacrifice is a judgement and a random pick is not one.
 
@@ -175,9 +177,9 @@ Random numbers and LLM calls only happen inside activities, so the workflow itse
 
 **Problem.** A game is hundreds of activities, and a replay re-reads the whole history.
 
-**Decision.** Each round is its own execution: at the end of a round the workflow continues as new, with the state as its input.
+**Decision.** At the end of each round the workflow continues as new. That is not a new workflow instance: it is a new execution within the same instance, with the same instance ID, whose history starts empty and whose input is the game state.
 
-**Tradeoff.** The history stays one round long, so replays stay fast, but the Catalyst workflow view only shows the current round.
+**Tradeoff.** The history stays one round long, so replays stay fast, but the Catalyst workflow view only shows the current execution, that is, the current round. Anything a later round needs has to be in the state, since the earlier history is gone.
 
 Never connect two `gm` processes with different code to the same app ID. Swapping `gm` mid-game is safe if only `brain/` changed. If the workflow code in `werewolf/` changed, for example the order of activities, a game in progress may no longer replay; start a new one.
 
@@ -186,6 +188,8 @@ Never connect two `gm` processes with different code to the same app ID. Swappin
 The language is set when roles are dealt, stored in the state and kept for every round, so one `gm` can run Chinese and English games side by side. The game's own words (roles, sides, phases, pass and nobody) are always stored in English, and the rules only compare those values. The language decides how they are shown and which words an answer may use: a Chinese game still holds `werewolf`, `good` and `pass`, and a Chinese answer is read back into the English word. All player-facing text is in `brain/text.go` and `werewolf/text.go`, one copy per language; the logic is shared. An unknown language fails the workflow.
 
 ## Testing the impossible
+
+The hardest bugs in a werewolf game aren't crashes. They're things the players were never supposed to know.
 
 ```bash
 go test ./...

@@ -92,7 +92,7 @@ Nine AI agents. One durable workflow. Parallel moves, private decisions, and a c
 
 *Click to see the whole final round.*
 
-That is the end of a real game: the five players still alive vote at once, each taking 9 to 23 seconds, so the vote takes as long as the slowest one rather than all five added up. Then come the last words of the player voted out, a pause, and the MVP judge. Earlier in the round, the day's speeches run two at a time: one player speaks while the next one prepares. Earlier rounds are earlier executions of the same workflow, since it continues as new each round.
+That is the end of a real game: the five players still alive vote at once, each taking 9 to 23 seconds, so the vote takes as long as the slowest one rather than all five added up. Then come the last words of the player voted out, a pause, and the MVP judge. Earlier in the round, the day's speeches run two at a time: one player speaks while the next one prepares. Earlier rounds are earlier executions of the same workflow instance, since it continues as new each round.
 
 How each part works is in [docs/design.md](docs/design.md).
 
