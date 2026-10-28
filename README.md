@@ -1,16 +1,50 @@
 # AI Werewolf 🐺
 
-**Nine AI agents. Three werewolves. Zero trust issues resolved.**
+**9 AI agents. 3 werewolves. 1 shared brain cell.**
 
-A game of Werewolf where LLM agents lie, form alliances, hold grudges, accuse their rivals, and now and then vote out the only person telling the truth.
+What happens when you put nine LLM agents in a village, give three of them permission to murder, and tell everyone else to trust the process?
 
-The cast includes Florida Man, Karen, Discord Mod, Sigma Chad and other internet personalities who should not be trusted with a group decision. The Chinese cast is its own kind of chaos: 华妃 and 安陵容 carry their palace feud to the village, 柯南 insists there is only one truth while 派大星 asks whether the werewolf might be one of us, 摸鱼王 just wants the vote over before clocking off, and 闪电 is still… finishing… his… first… sentence.
+The real seer gets voted out. Karen demands to speak to the game master. A LinkedIn influencer turns his dying words into a leadership lesson. And somehow, the werewolves are the most functional team in the room.
 
-And the game master? A [Dapr Workflow](https://docs.dapr.io/developing-applications/building-blocks/workflow/) running on [Diagrid Catalyst](https://www.diagrid.io/catalyst). Kill the process mid-argument, start it again, and the game carries on exactly where it stopped. No forgotten accusations, and no LLM call made twice.
+Welcome to AI Werewolf: a social deduction game where AI agents lie, manipulate, form alliances, hold grudges, and confidently vote out the only person who knows what's going on.
+
+Powered by [Dapr Workflow](https://docs.dapr.io/developing-applications/building-blocks/workflow/) on [Diagrid Catalyst](https://www.diagrid.io/catalyst). Because even terrible decisions deserve durable execution.
+
+![A whole game in under a minute](docs/demo.gif)
+
+*A scripted replay on the real page, in the style of real games. Real games take longer and are, somehow, worse.*
+
+## Meet the suspects
+
+**The English village**
+
+- **Karen**: wants to speak to the manager. Whoever accused her or voted for her is her top suspect, and gets her vote at the first chance.
+- **LinkedIn Influencer**: every speech is a post, every post ends in "Agree?". Backs whoever the room likes and switches sides the moment it does. Calls it agility.
+- **Sigma Chad**: if the table agrees on something, he doesn't. Once he has a read, he keeps it.
+- **Discord Mod**: finally has authority outside a Discord server. Keeps a public strike count and votes for whoever has the most.
+- **Florida Man**: pitches one unhinged scheme a day, usually involving an alligator. Would rather vote wrong than vote safe.
+- **Conspiracy Carl**: ties three players together through one theory a day. Every death only proves how deep it goes.
+- **Gym Bro**: follows whoever sounds most confident, bro. Doubts anyone who hesitates.
+- **NPC Steve**: "Okay." Votes with the table, unless you plainly said one thing and did another.
+- **Chronically Online Girl**: reads vibes, calls out red flags, roasts every LinkedIn post.
+
+**The Chinese village** (a game seats four rival pairs and one loner)
+
+- **华妃**：贱人就是矫情。谁投过本宫，本宫就投回去，除非你拿出铁证。
+- **安陵容**：姐姐说这话，是在怀疑我吗？当面不吵，三轮之后悄悄投你。
+- **柯南**：真相只有一个。只认证据，可惜派大星不认。
+- **派大星**：所以狼人是我们中间的一个人吗？凭直觉投票，推理说服不了他。
+- **龙傲天**：早就看穿了一切。第一天认定的狼，第三天还是那只。
+- **皇后**：本宫只是觉得，此事未免太过巧合。从不点名，等别人冲完再收票。
+- **摸鱼王**：先对齐一下颗粒度。谁发言最长就怀疑谁，投票跟人多的一边，好早点下班。
+- **闪电**：我……觉……得……反应永远慢一拍，今天在回应昨天的事。
+- **卡皮巴拉 / 懒羊羊 / 光头强**：一局坐一个。都行，你开心就好；困……；我都说了我不是狼！你们是不是有病啊！
+
+Each character also has a rival at the table, so the bickering is built in.
 
 ## A perfectly normal day in the village
 
-Adapted from a real game.
+Adapted from an actual game. Unfortunately.
 
 ```text
 [Day 1] Chronically Online Girl (werewolf):
@@ -33,21 +67,36 @@ Adapted from a real game.
   Leadership lesson: consensus isn't verification.
 ```
 
-*The real seer was voted out. He turned it into a leadership lesson.*
+Post-game analysis:
+
+- Real seer: dead.
+- Werewolves: thriving.
+- Village: confidently incorrect.
+- LinkedIn Influencer: already drafting a post about it.
 
 The game master's terminal is a god's-eye feed of the chaos: every public accusation, every private thought, and every read that shifts over the game.
 
+## The game master is immortal. Unfortunately.
+
+The whole game runs as a durable Dapr Workflow on Diagrid Catalyst. Kill the game master in the middle of a heated accusation. Restart it. The village picks up right where it left off.
+
+- No lost game state.
+- No repeated LLM calls.
+- No forgotten betrayals.
+- Karen is still mad at you.
+
+The process may die. The drama persists. [Try it yourself](#6-try-killing-the-game-master).
+
 ## What makes it interesting
 
-- **Personalities with consequences.** Characters do not just sound different; they decide differently. Some follow evidence, some follow the crowd, some hold grudges, and Karen revenge-votes whoever voted for her.
-- **Rivals, even on the same team.** Each character has a rival at the table. Rivals bicker, argue over strategy, and accuse each other, but only with real evidence, like anyone else. Two rival werewolves fight in public and over the plan at night, and still play as a team.
-- **Three ways to be evil.** The pack is secretly dealt a tactic each game: have one wolf fake a seer claim, stay in deep cover, or have one wolf earn the village's trust by turning on an exposed teammate. Whatever the tactic, they work together without voting as a bloc, because the village reads the votes. They may also kill one of their own at night, to bait the witch's antidote.
-- **Real memory, limited knowledge.** Everyone keeps notes on who they trust, who they suspect and why. Each player receives only the role information they are entitled to know, a werewolf their pack and a seer their checks, and that is enforced in code, not left to the prompt.
-- **No made-up alibis.** Voting for someone not at the table, quoting someone who never spoke, or "there is no proof" as a reason all get the answer sent back to try again.
-- **Take a seat yourself.** From a web page, play in place of any character under your own name. Your role is dealt like anyone's, and if you take more than three minutes over a move, an AI plays it for you.
-- **An MVP every game.** At the end an LLM judge reads the whole record, every role revealed, and names the most valuable player with a reason.
-- **Kill the game master. It comes back.** State and history live in the workflow Catalyst hosts. Finished turns and LLM calls are not repeated after a restart.
-- **Two casts.** English with internet archetypes, or Chinese with meme characters. Roles and seats are random every game.
+- **Different personalities. Same terrible judgment.** Characters don't just sound different; they decide differently. Some follow evidence, some follow the crowd, some hold grudges, and Karen revenge-votes whoever voted for her.
+- **Enemies by day. Teammates by murder.** Rivals bicker, argue over strategy and accuse each other, but only with real evidence, like anyone else. Two rival werewolves fight in public and over the plan at night, and still play as a team.
+- **Three strategies. Zero ethics.** The pack is secretly dealt a tactic each game: one wolf fakes a seer claim, all of them stay in deep cover, or one wolf earns the village's trust by turning on an exposed teammate. They split their votes, because the village reads the votes, change course when a play fails, and may kill one of their own at night to bait the witch's antidote.
+- **Long-term memory. Short-term grudges.** Everyone keeps notes on who they trust, who they suspect and why. Each player gets only what their role entitles them to, a werewolf their pack and a seer their checks, and that is enforced in code, not left to the prompt.
+- **Hallucinations are not a valid defense.** Voting for someone not at the table, quoting someone who never spoke, or "there is no proof" as a reason all get the answer sent back to try again.
+- **Think you're smarter than nine LLMs? Prove it.** From a web page, play in place of any character under your own name. Your role is dealt like anyone's, and if you take more than three minutes over a move, an AI plays it for you.
+- **Even murder gets a performance review.** At the end an LLM judge reads the whole record, every role revealed, and names the most valuable player with a reason.
+- **Two villages.** English with internet archetypes, or Chinese with meme characters. Roles and seats are random every game.
 - **Try it without an API key.** Local mode plays with random players on a SQLite-backed engine. LLM games use Catalyst's Dapr Conversation API.
 
 Jump to the [Quick start](#quick-start-play-with-llms-on-catalyst) for an LLM game, or [Play locally](#play-locally-no-account-needed) to try it without an account.
@@ -236,3 +285,5 @@ go test ./...
 ## License
 
 [MIT](LICENSE)
+
+*No werewolves were harmed in the making of this README. Several seers were.*
