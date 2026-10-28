@@ -719,6 +719,8 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 			case brain.Speech:
 				if !elected {
 					elected, sheriff = true, left[0]
+					unopposed := slices.ContainsFunc(turn.Transcript, func(e game.Event) bool { return e.Text == fmt.Sprintf(chineseHost.unopposed, sheriff) })
+					assert.Equal(t, len(left) == 1, unopposed, "the host says when a lone candidate wins without a vote")
 				}
 				if turn.Round == 1 {
 					lastDay1Speaker = turn.Me.Name
@@ -741,7 +743,9 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 			}
 			assert.Equal(t, sheriff, holder(turn.Seats), "%s's %s turn on round %d shows the wrong sheriff", turn.Me.Name, turn.Kind, turn.Round)
 		}
-		require.NotEmpty(t, runners, "game %d had no election", i)
+		if runners == nil {
+			continue // night 1 ended the game: a kill, a poison and a hunter's shot leave three against three
+		}
 		withdrewOnce = withdrewOnce || withdrawn
 		assert.Equal(t, runners[0], lastDay1Speaker, "the sheriff speaks last")
 	}
@@ -949,5 +953,50 @@ func (p preparer) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
 		return a, err
 	}
 	a.Notes = &game.Notes{Beliefs: map[string]game.Belief{}}
+	return a, err
+}
+
+func TestALoneCandidateIsElectedWithoutAVote(t *testing.T) {
+	client := startEngine(t)
+	startWorker(t, client)
+
+	// A game whose seer dies on night 1 has nobody running, so play until one
+	// has a candidate.
+	var b *loneRunner
+	var seer string
+	for i := 0; i < 10 && seer == ""; i++ {
+		b = &loneRunner{}
+		SetBrain(b)
+		play(t, client, fmt.Sprintf("lone-%d", i), newGame())
+		for _, turn := range b.rec.turns {
+			require.NotEqual(t, brain.SheriffVote, turn.Kind, "nobody votes for a lone candidate")
+			if turn.Kind == brain.Campaign {
+				seer = turn.Me.Name
+			}
+		}
+	}
+	require.NotEmpty(t, seer, "the seer never ran in ten games")
+	for _, turn := range b.rec.turns {
+		if turn.Kind == brain.Speech && turn.Round == 1 {
+			assert.True(t, slices.ContainsFunc(turn.Transcript, func(e game.Event) bool { return e.Text == fmt.Sprintf(chineseHost.unopposed, seer) }), "the host says there is no vote")
+			assert.Equal(t, seer, holder(turn.Seats))
+			return
+		}
+	}
+	t.Fatal("no day 1 speech")
+}
+
+// loneRunner plays randomly, except that only the seer, who must, runs for
+// sheriff.
+type loneRunner struct{ rec turnRecorder }
+
+func (b *loneRunner) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
+	a, err := b.rec.Act(ctx, t)
+	if t.Kind == brain.Run {
+		a.Target = game.Pass
+		if t.Me.Role == game.Seer {
+			a.Target = t.Me.Name
+		}
+	}
 	return a, err
 }

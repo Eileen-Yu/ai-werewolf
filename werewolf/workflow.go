@@ -453,7 +453,9 @@ func (t *table) election() error {
 		return t.pause()
 	}
 	sheriff := runners[0]
-	if len(runners) > 1 {
+	if len(runners) == 1 {
+		t.add("", fmt.Sprintf(t.h.unopposed, sheriff))
+	} else {
 		votes, err := t.chooseAll(brain.SheriffVote, voters, func(string) []string { return append(slices.Clone(runners), game.Pass) })
 		if err != nil {
 			return err
