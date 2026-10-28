@@ -16,8 +16,7 @@ import (
 type TurnKind string
 
 const (
-	Speech    TurnKind = "speech"     // daytime speech, first time round the table
-	Rebuttal  TurnKind = "rebuttal"   // daytime, second time round: answer and challenge
+	Speech    TurnKind = "speech"     // daytime speech, once round the table before the vote
 	WolfChat  TurnKind = "wolf_chat"  // night, wolves only
 	WolfPlan  TurnKind = "wolf_plan"  // one wolf sets tonight's victim and the pack's plan for the day
 	LastWords TurnKind = "last_words" // after being voted out
@@ -26,6 +25,7 @@ const (
 	Save      TurnKind = "save"       // witch decides whether to save tonight's victim
 	Poison    TurnKind = "poison"     // witch decides whether to poison someone
 	Shoot     TurnKind = "shoot"      // hunter, on the way out, decides whether to shoot
+	Aftermath TurnKind = "aftermath"  // once the game is over: looking back on it, roles known
 
 	Run         TurnKind = "run"          // first day: pick yourself to run for sheriff, or pass
 	Campaign    TurnKind = "campaign"     // a candidate's speech for the badge
@@ -56,7 +56,7 @@ func (k TurnKind) Speaks() bool {
 // Declares reports whether a speech must also state, on the record, who the
 // player suspects and what they claim to be.
 func (k TurnKind) Declares() bool {
-	return k == Speech || k == Rebuttal || k == Campaign
+	return k == Speech || k == Campaign
 }
 
 // Seat is what everyone knows about a player: their name, whether they hold
@@ -250,7 +250,7 @@ func (t Turn) SuspectsSomeone() bool {
 		return false
 	}
 	switch t.Kind {
-	case Speech, Rebuttal, Campaign, LastWords, Vote, Shoot, Poison:
+	case Speech, Campaign, LastWords, Vote, Shoot, Poison:
 		return true
 	}
 	return false

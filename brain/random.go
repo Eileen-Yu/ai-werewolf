@@ -32,6 +32,8 @@ func (Random) Act(_ context.Context, t Turn) (Action, error) {
 		return a, nil
 	case LastWords:
 		return Action{Speech: tx.lastWords}, nil
+	case Aftermath:
+		return Action{Speech: tx.aftermath}, nil
 	case WolfChat:
 		return Action{Speech: fmt.Sprintf(pick(tx.wolfLines), pick(t.Candidates))}, nil
 	case Prepare:

@@ -7,18 +7,19 @@ type host struct {
 	welcome, yourRole, pack, nightFalls, noKill, victim, survived, potionsLeft string
 	antidote, poison, noPotions, selfVictim, saved, poisoned                   string
 	inspected, peaceful, died, dawnDead, shot, diedNow, order                  string
-	rebuttals, stance, stances, vote, votes, abstain, tie, allAbstained        string
+	stance, stances, vote, votes, abstain, tie, allAbstained                   string
 	votedOut, exiled, plan, runner, noFaker, faker, hook, undecided, gameOver  string
 	tactic                                                                     string
 	tactics                                                                    map[game.Tactic]string
 	revealed, comma, semicolon, result, silence                                string
-	mvp, takeover                                                              string
+	mvp, takeover, aftermath                                                   string
 
 	// The sheriff: the election, the badge's weight in a vote, and passing it on.
 	election, noRunners, allRun, runners, campaign, sheriffVotes string
 	withdrew, allWithdrew, unopposed                             string
 	sheriffTie, sheriffAbstained, elected, sheriffVote           string
 	badgePassed, badgeTorn                                       string
+	peacefulAfterElection, deadAfterElection                     string
 
 	// The god's-eye feed: asides, thoughts and secret lines.
 	observed, rejudged, judged, fromNothing, thinks, onlyFor, narrator string
@@ -53,7 +54,6 @@ var chineseHost = host{
 	shot:         "你开枪带走了%s。",
 	diedNow:      "%s死亡了。",
 	order:        "今天的发言顺序：%s。",
-	rebuttals:    "回应环节：每人再说一次，可以回应怀疑或者质疑别人。",
 	stance:       "%s：%s",
 	stances:      "投票前，各人的最新表态：%s。",
 	vote:         "%s→%s",
@@ -79,8 +79,9 @@ var chineseHost = host{
 	silence:      "（沉默）",
 	mvp:          "本局MVP：%s！%s",
 	takeover:     "你超时了，这一手由AI代打。",
+	aftermath:    "赛后复盘：身份都公开了，大家说说自己哪里看对了、哪里被骗了。",
 
-	election:         "竞选警长：想当警长的上警。警长的放逐票算1.5票，每天最后发言、可以归票，出局时可以移交警徽。",
+	election:         "天亮了。先竞选警长，竞选结束后再公布昨晚的死讯。想当警长的上警。警长的放逐票算1.5票，每天最后发言、可以归票，出局时可以移交警徽。",
 	noRunners:        "没有人上警，本局没有警长。",
 	allRun:           "所有人都上警了，没有人投票，本局没有警长。",
 	runners:          "上警的有：%s。",
@@ -95,6 +96,9 @@ var chineseHost = host{
 	sheriffVote:      "%s（警长）",
 	badgePassed:      "警长%s把警徽移交给了%s。",
 	badgeTorn:        "警长%s撕掉了警徽，从此没有警长。",
+
+	peacefulAfterElection: "警长竞选结束，公布昨晚的情况：昨晚是平安夜。",
+	deadAfterElection:     "警长竞选结束，公布昨晚的死讯：%s。",
 
 	observed:    "观察",
 	rejudged:    "改判",
@@ -127,7 +131,6 @@ var englishHost = host{
 	shot:         "You shot %s.",
 	diedNow:      "%s has died.",
 	order:        "Today's speaking order: %s.",
-	rebuttals:    "Reply round: everyone speaks once more, to answer suspicion or challenge someone.",
 	stance:       "%s: %s",
 	stances:      "Before the vote, everyone's latest stance: %s.",
 	vote:         "%s→%s",
@@ -153,8 +156,9 @@ var englishHost = host{
 	silence:      "(silence)",
 	mvp:          "MVP of the game: %s! %s",
 	takeover:     "You ran out of time, so an AI played this move for you.",
+	aftermath:    "After the game: the roles are out, so everyone says what they read right and where they were fooled.",
 
-	election:         "Sheriff election: whoever wants the badge, run now. The sheriff's vote to exile counts one and a half; the sheriff speaks last each day, may call the vote, and may pass the badge on when they go.",
+	election:         "Day breaks. First the sheriff election; last night's deaths are announced once it is over. whoever wants the badge, run now. The sheriff's vote to exile counts one and a half; the sheriff speaks last each day, may call the vote, and may pass the badge on when they go.",
 	noRunners:        "Nobody runs, so there is no sheriff this game.",
 	allRun:           "Everyone runs, so nobody is left to vote and there is no sheriff this game.",
 	runners:          "Running for sheriff: %s.",
@@ -169,6 +173,9 @@ var englishHost = host{
 	sheriffVote:      "%s (sheriff)",
 	badgePassed:      "Sheriff %s passes the badge to %s.",
 	badgeTorn:        "Sheriff %s tears up the badge; there is no sheriff any more.",
+
+	peacefulAfterElection: "The election is over, so now last night: nobody died.",
+	deadAfterElection:     "The election is over, so now last night's deaths: %s.",
 
 	observed:    "observes",
 	rejudged:    "rethinks",

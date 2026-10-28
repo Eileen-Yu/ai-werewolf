@@ -117,7 +117,7 @@ func publicActivity(turn brain.Turn) (kind, name string) {
 		return "night", ""
 	case brain.Shoot:
 		return "wait", ""
-	case brain.Speech, brain.Rebuttal, brain.Campaign, brain.LastWords, brain.Badge:
+	case brain.Speech, brain.Campaign, brain.LastWords, brain.Badge:
 		return string(turn.Kind), turn.Me.Name
 	}
 	return string(turn.Kind), ""
@@ -302,7 +302,11 @@ func (t *table) publish() {
 		}
 		me := humanSeat{Key: t.keys[p.Name], Name: p.Name, Role: t.say(string(p.Role)), Alive: p.Alive, Pending: t.pending[p.Name]}
 		if p.Role == game.Werewolf {
-			me.Pack = t.s.Living(game.Werewolf)
+			for _, q := range t.s.Players {
+				if q.Role == game.Werewolf {
+					me.Pack = append(me.Pack, q.Name) // the dead too, or a wolf left alone sees no pack
+				}
+			}
 		}
 		b.Humans = append(b.Humans, me)
 	}

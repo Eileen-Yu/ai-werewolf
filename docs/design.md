@@ -29,7 +29,7 @@ The result is a game where the characters can be unreliable without making the s
 | `internal/web/` | The page a person plays a seat from, and the JSON API behind it, served by `gm -web` |
 | `cmd/werewolf/` | The command line: `engine`, `gm` and `start` |
 
-A game is one workflow instance, and each round, night then day, is one execution of it. `AssignRolesActivity` deals the cast and roles in the first. At the end of a round with no winner, continue-as-new starts a new execution of the same instance, with the same instance ID, a fresh history and the state as its input; once there is a winner, `JudgeActivity` names the MVP and the workflow returns the result.
+A game is one workflow instance, and each round, night then day, is one execution of it. `AssignRolesActivity` deals the cast and roles in the first. At the end of a round with no winner, continue-as-new starts a new execution of the same instance, with the same instance ID, a fresh history and the state as its input; once there is a winner, `JudgeActivity` names the MVP, the AI players look back on the game, and the workflow returns the result.
 
 ## The game master knows everything. Nobody else does.
 
@@ -146,22 +146,26 @@ A round is mostly waiting on LLMs, so the workflow runs every move at once that 
 |---|---|---|
 | Night | The seer's check runs alongside the wolves, since it needs nothing they decide | The wolves talk in turn, the next one preparing; then the plan; then the witch, who has to be told the victim |
 | Sheriff | Everyone decides whether to run; then every candidate but the seer decides whether to withdraw; then the sheriff vote | Campaign speeches, in seat order, the next one preparing |
-| Day | Every vote | Speeches, then a reply round, each answering the last, the next one preparing |
+| Day | Every vote | Speeches, each answering the last, the next one preparing, the sheriff last; the vote straight after |
 | A death | | A player voted out gives last words; then a dead sheriff passes the badge; then a dead hunter shoots. A sheriff the hunter shoots passes the badge in turn |
 
 A durable timer (`phaseDelay`) pauses between phases, so watchers can follow, and the workflow's custom status says what the table is waiting on (`View.Now`) for the page.
 
 ### The sheriff
 
-The election runs once, on Day 1 after the deaths are announced, among the living. It is simpler than the table game: a tie loses the badge instead of going to a run-off, and candidates may withdraw only once, together, after every campaign speech. Those who never ran vote; a candidate does not, even one who withdrew. A lone candidate left wins without a vote, and the host says so. No candidates, everyone a candidate, everyone withdrawing, or a tie all mean no sheriff.
+The election runs once, on Day 1, before the first night's deaths are announced, as at a real table: whoever died that night runs and votes like anyone, and a sheriff among them passes the badge as soon as the deaths are out. `night` returns its deaths and `daybreak` announces them, after the election on Day 1 and straight away after any other night. It is simpler than the table game: a tie loses the badge instead of going to a run-off, and candidates may withdraw only once, together, after every campaign speech. Those who never ran vote; a candidate does not, even one who withdrew. A lone candidate left wins without a vote, and the host says so. No candidates, everyone a candidate, everyone withdrawing, or a tie all mean no sheriff.
 
 The seer is offered only their own name and always runs, since their checks are worth the most with the badge, and is told to give a badge flow in the campaign: who they check next and who gets the badge if they fall. The first night's wolf plan names a `runner`, and that wolf runs too, as does a faker, so the pack always contests the badge; left to choose, the wolves often all stayed out. Both count as running whatever their brain answers. A wolf a person plays is never sent: the plan is advice to them, not a rule. Everyone else's decision comes from their badge lean. The `run` instruction adds that running is not just for power roles and that the more who run, the fewer are left to vote, aiming for three to five candidates rather than the seer and a wolf alone.
 
-The sheriff speaks last every day: the speaking order starts at the seat after them. `game.Tally` counts in half votes, 3 for the sheriff and 2 for anyone else, so the sheriff breaks a tie but cannot outvote two players. When the sheriff is out and the game is not over, they get a `badge` turn: a living player, or `pass` to tear the badge up. A night death passes it at dawn; a day exile after their last words. Either way that comes before a hunter's shot, and a sheriff the hunter shoots passes it on in turn.
+The sheriff speaks last every day: the speaking order starts at the seat after them. Theirs is the closing speech that calls the vote, so the vote follows it at once; there is no second time round the table. `game.Tally` counts in half votes, 3 for the sheriff and 2 for anyone else, so the sheriff breaks a tie but cannot outvote two players. When the sheriff is out and the game is not over, they get a `badge` turn: a living player, or `pass` to tear the badge up. A night death passes it at dawn; a day exile after their last words. Either way that comes before a hunter's shot, and a sheriff the hunter shoots passes it on in turn.
 
 ### The MVP
 
 When the game is over, `JudgeActivity` names an MVP. The LLM judge is sent the whole record with every role revealed and night secrets included, but not anyone's private thinking, and asked for a name and a reason that cites what happened. If it fails, names someone not at the table, or the brain cannot judge, `brain.Rules` picks one: from the winning side, a survivor before the dead, and the seer, witch and hunter before the rest.
+
+### Looking back
+
+After the MVP, every AI player, out or not, takes one `aftermath` turn in seat order: the roles are on the record by then, so each holds their own notes up to the truth and says what they read right, who fooled them, and answers those who spoke before them. It is the chat a real table has before it breaks up, and the moment the players' notes, otherwise private, pay off for the audience. A person at the table says what they like in person, so they get no turn. The judge has already been sent the record, so nothing said here sways the MVP.
 
 ## A human enters the village
 
@@ -204,7 +208,9 @@ go test ./...
 - **Crash recovery**: the game master worker is killed mid-game and a new one takes over; the game must still finish.
 - **Secrets stay secret**: in random games where the witch saves and poisons and the hunter shoots, no public host line may mention a kill, a potion, a shot or a power role, and every seat shows only when its player died or that they were voted out. The hunter always shoots, only by day, and only the hunter is told who he shot.
 - **Night order**: the seer is asked while the wolves are still plotting, and the pack's first plan only gets through if the two run at once. A witch scripted to save the victim gives a night with no death, and only the wolves are told their victim survived. A pack that kills its own plan-writer, saved by the witch, sees him speak on Day 1.
-- **The sheriff**: only the living are asked to run, the seer and the wolf the plan sends always run, and some wolf runs in every game, only candidates campaign, a candidate who withdraws neither stands nor votes, a lone candidate wins without a vote, the sheriff speaks last, and a sheriff who is out passes the badge to someone alive or tears it up.
+- **The sheriff**: everyone is asked to run before the night's deaths are announced, those who died that night included, the seer and the wolf the plan sends always run, only candidates campaign, a candidate who withdraws neither stands nor votes, a lone candidate wins without a vote, the sheriff speaks last, and a sheriff who is out passes the badge to someone alive or tears it up.
+- **Days**: everyone speaks once and the vote follows straight on, with nothing in between.
+- **Looking back**: once the game is over, every AI player takes one look back, with the roles on the record, and nothing comes after.
 - **Votes**: every vote offers `pass`, and a day where everyone abstains sends nobody out, and the host says so rather than calling it a tie.
 - **Preparing**: while one player speaks, the next prepares from a record without that speech; their own turn hears it, is marked prepared, and keeps the prepared notes when it writes none.
 

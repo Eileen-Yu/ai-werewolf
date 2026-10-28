@@ -124,8 +124,17 @@ func GameWorkflow(ctx *workflow.WorkflowContext) (any, error) {
 			return nil, fmt.Errorf("setup: %w", err)
 		}
 	}
-	if err := t.night(); err != nil {
+	deaths, err := t.night()
+	if err != nil {
 		return nil, fmt.Errorf("night %d: %w", g.State.Round, err)
+	}
+	if g.State.Round == 1 {
+		if err := t.election(); err != nil {
+			return nil, fmt.Errorf("sheriff election: %w", err)
+		}
+	}
+	if err := t.daybreak(deaths); err != nil {
+		return nil, fmt.Errorf("daybreak %d: %w", g.State.Round, err)
 	}
 	if g.State.Winner() == "" {
 		if err := t.day(); err != nil {
@@ -147,6 +156,9 @@ func GameWorkflow(ctx *workflow.WorkflowContext) (any, error) {
 		}
 		if mvp.Name != "" {
 			t.announce(game.KindResult, fmt.Sprintf(t.h.mvp, mvp.Name, mvp.Reason))
+		}
+		if err := t.aftermath(); err != nil {
+			return nil, fmt.Errorf("aftermath: %w", err)
 		}
 		return Result{Winner: winner, Rounds: g.State.Round, Players: g.State.Players, MVP: mvp}, nil
 	}
@@ -192,9 +204,9 @@ func (t *table) setup(people []game.Person) error {
 	return nil
 }
 
-// night runs the wolves, then the witch, then the seer, and at dawn
-// announces who died without saying how.
-func (t *table) night() error {
+// night runs the wolves, then the witch, then the seer, and returns who died,
+// for daybreak to announce without saying how.
+func (t *table) night() (nightDeaths, error) {
 	s := t.s
 	s.Phase, s.Stage = game.Night, game.StageNight
 	t.add("", fmt.Sprintf(t.h.nightFalls, s.Lang.When(s.Round, game.Night)))
@@ -202,44 +214,80 @@ func (t *table) night() error {
 	checked := t.seerChecks()
 	victim, err := t.wolvesHunt()
 	if err != nil {
-		return err
+		return nightDeaths{}, err
 	}
 	saved, poisoned, err := t.witchActs(victim)
 	if err != nil {
-		return err
+		return nightDeaths{}, err
 	}
 	if err := checked(); err != nil {
-		return err
+		return nightDeaths{}, err
 	}
 	if err := t.pause(); err != nil {
-		return err
+		return nightDeaths{}, err
 	}
 
-	var dead []string
-	for _, p := range s.Players {
+	d := nightDeaths{poisoned: poisoned}
+	for _, p := range s.Players { // table order, so the list gives away nothing
 		if (p.Name == victim && !saved) || p.Name == poisoned {
-			dead = append(dead, p.Name)
-			s.Remove(p.Name, t.h.died) // still night, so they died "on Night n"
+			d.dead = append(d.dead, p.Name)
 		}
 	}
 	if victim != "" && saved {
 		t.add("", fmt.Sprintf(t.h.survived, victim), s.Living(game.Werewolf)...)
 	}
-	slices.SortFunc(dead, func(a, b string) int { return seat(s, a) - seat(s, b) }) // table order, so the list gives away nothing
 	s.Phase, s.Stage = game.Day, game.StageDawn
-	if len(dead) == 0 {
-		t.announce(game.KindResult, t.h.peaceful)
+	return d, nil
+}
+
+// nightDeaths is who died in the night, not yet announced.
+type nightDeaths struct {
+	dead     []string
+	poisoned string
+}
+
+// daybreak announces the night's deaths, which takes the dead out of the
+// game. On the first day that waits for the sheriff election, so the night's
+// dead run and vote in it as anyone else does.
+func (t *table) daybreak(d nightDeaths) error {
+	s := t.s
+	s.Stage = game.StageDawn
+	for _, name := range d.dead {
+		s.RemoveAt(name, t.h.died, game.Night)
+	}
+	peaceful, dawnDead := t.h.peaceful, t.h.dawnDead
+	if s.Round == 1 {
+		peaceful, dawnDead = t.h.peacefulAfterElection, t.h.deadAfterElection
+	}
+	if len(d.dead) == 0 {
+		t.announce(game.KindResult, peaceful)
 		return nil
 	}
-	t.announce(game.KindDeath, fmt.Sprintf(t.h.dawnDead, t.list(dead)))
-	if err := t.passBadge(dead...); err != nil {
+	t.announce(game.KindDeath, fmt.Sprintf(dawnDead, t.list(d.dead)))
+	if err := t.passBadge(d.dead...); err != nil {
 		return err
 	}
 	// A hunter only shoots by day: one the wolves killed takes his shot once
 	// the deaths are announced. A poisoned hunter cannot shoot.
-	for _, d := range dead {
-		if s.Player(d).Role == game.Hunter && d != poisoned {
-			return t.hunterGoes(d)
+	for _, name := range d.dead {
+		if s.Player(name).Role == game.Hunter && name != d.poisoned {
+			return t.hunterGoes(name)
+		}
+	}
+	return nil
+}
+
+// aftermath has every AI player, out or not, look back once the roles are
+// public: what their notes got right and who fooled them, in seat order, so
+// each can answer those before them. People say what they like in person.
+func (t *table) aftermath() error {
+	t.add("", t.h.aftermath)
+	for _, p := range t.s.Players {
+		if p.Human {
+			continue
+		}
+		if _, err := t.speak(t.turn(brain.Aftermath, p.Name, nil)); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -398,11 +446,6 @@ func (t *table) hunterGoes(hunter string) error {
 	return t.passBadge(shot)
 }
 
-// seat is where name sits at the table.
-func seat(s *game.State, name string) int {
-	return slices.IndexFunc(s.Players, func(p game.Player) bool { return p.Name == name })
-}
-
 // passBadge lets a sheriff among the dead pass the badge to someone alive or
 // tear it up. Once the game is decided there is nothing left to pass on.
 func (t *table) passBadge(dead ...string) error {
@@ -425,8 +468,8 @@ func (t *table) passBadge(dead ...string) error {
 	return nil
 }
 
-// election runs the first day's sheriff election, before the day's speeches.
-// Everyone decides at once whether to run; those running give a campaign
+// election runs the first day's sheriff election, before the night's deaths
+// are announced. Everyone decides at once whether to run; those running give a campaign
 // speech in seat order, then decide at once whether to withdraw, and those who
 // never ran vote. A candidate who withdraws loses their vote too. Nobody
 // running, nobody left to vote, everyone withdrawing, or a tie leaves the game
@@ -565,20 +608,13 @@ func (t *table) speakingOrder(alive []string) []string {
 
 func (t *table) day() error {
 	s := t.s
-	if s.Round == 1 {
-		if err := t.election(); err != nil {
-			return err
-		}
-	}
 	alive := s.Living()
 	order := t.speakingOrder(alive)
 	s.Stage = game.StageDay
 	t.add("", fmt.Sprintf(t.h.order, t.list(order)))
-	if _, err := t.goRound(brain.Speech, order, nil); err != nil {
-		return err
-	}
-	t.add("", t.h.rebuttals)
-	stances, err := t.goRound(brain.Rebuttal, order, nil)
+	// The sheriff speaks last and may call the vote, so the vote follows
+	// straight on.
+	stances, err := t.goRound(brain.Speech, order, nil)
 	if err != nil {
 		return err
 	}

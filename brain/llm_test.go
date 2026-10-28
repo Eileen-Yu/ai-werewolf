@@ -118,7 +118,8 @@ func TestOnlyAGoodPlayerWhoSuspectsSomeoneIsToldToReadItBothWays(t *testing.T) {
 		want bool
 	}{
 		{game.Villager, Speech, true},
-		{game.Seer, Rebuttal, true},
+		{game.Seer, Speech, true},
+		{game.Villager, Aftermath, false},
 		{game.Villager, Campaign, true},
 		{game.Hunter, LastWords, true},
 		{game.Villager, Vote, true},
@@ -218,7 +219,7 @@ func TestParseAction(t *testing.T) {
 }
 
 func TestPromptForADeclaringSpeechAsksForAStance(t *testing.T) {
-	turn := Turn{Kind: Rebuttal, Round: 1, Phase: game.Day, Me: game.Player{Name: "阿杰"}, Suspects: []string{"老王", "小红", game.Nobody}}
+	turn := Turn{Kind: Speech, Round: 1, Phase: game.Day, Me: game.Player{Name: "阿杰"}, Suspects: []string{"老王", "小红", game.Nobody}}
 
 	_, user := prompt(turn)
 
@@ -316,7 +317,7 @@ func TestCheckRejectsEmptyReasoning(t *testing.T) {
 	lastWords := Turn{Kind: LastWords, Me: game.Player{Name: "小林"}}
 	assert.ErrorContains(t, lastWords.Check(Action{Speech: "小红的说法没有其他人证实"}), "其他人证实")
 
-	en := Turn{Lang: game.English, Kind: Rebuttal, Me: game.Player{Name: "Leo"}, Suspects: []string{"Kai", game.Nobody}}
+	en := Turn{Lang: game.English, Kind: Speech, Me: game.Player{Name: "Leo"}, Suspects: []string{"Kai", game.Nobody}}
 	assert.ErrorContains(t, en.Check(Action{Speech: "Kai has No Proof at all.", Suspect: "Kai"}), `"no proof"`)
 	assert.ErrorContains(t, en.Check(Action{Speech: "Leo is not a wolf.", Suspect: "Kai"}), "you are Leo")
 }
@@ -420,7 +421,7 @@ func TestEnglishPromptsAreAllEnglish(t *testing.T) {
 			{Round: 1, Sheriff: "Mia", Votes: []game.Vote{{Voter: "Mia", Target: "Ruby"}, {Voter: "Dave"}}},
 		},
 	}
-	for _, kind := range []TurnKind{Speech, Rebuttal, WolfChat, WolfPlan, LastWords, Vote, Inspect, Save, Poison, Shoot, Run, Campaign, Withdraw, SheriffVote, Badge, Prepare} {
+	for _, kind := range []TurnKind{Speech, WolfChat, WolfPlan, LastWords, Vote, Inspect, Save, Poison, Shoot, Aftermath, Run, Campaign, Withdraw, SheriffVote, Badge, Prepare} {
 		turn := base
 		turn.Kind = kind
 		system, user := prompt(turn)

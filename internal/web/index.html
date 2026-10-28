@@ -198,7 +198,7 @@ const UI = {
     linksHint: "把链接分别发给每位玩家，在同一个 Wi-Fi 下用各自的手机或电脑打开。每条链接只能看到自己的座位，别点开别人的。",
     youAre: "你是", pack: "狼队：", waiting: "等待其他玩家……", dead: "你已出局，继续观战。", submit: "提交",
     timeLeft: s => `剩余 ${s} 秒，超时由AI代打`,
-    kinds: { speech: "轮到你发言", rebuttal: "第二轮：回应和质疑", wolf_chat: "狼队夜聊", wolf_plan: "你来定今晚的计划",
+    kinds: { speech: "轮到你发言", wolf_chat: "狼队夜聊", wolf_plan: "你来定今晚的计划",
       last_words: "留下遗言", vote: "投票放逐", inspect: "今晚查验谁", save: "要用解药救他吗", poison: "要用毒药吗", shoot: "开枪带走谁",
       run: "竞选警长：要上警吗", campaign: "警长竞选发言", withdraw: "竞选结束：要退水吗", sheriff_vote: "投票选警长", badge: "移交警徽" },
     run: "上警", noRun: "不上警", stay: "继续竞选", withdraw: "退水", tearBadge: "撕掉警徽", sheriff: "警长", sheriffBallot: "（警长，1.5票）",
@@ -224,23 +224,24 @@ const UI = {
 <li>预言家查验一个人是好人还是狼人。</li>
 <li>女巫知道谁被杀了：一瓶解药可以救他，一瓶毒药可以毒死任何人。两瓶各用一次，一晚最多用一瓶，只有第1夜能救自己。</li></ul>
 <h4>天亮</h4><ul>
-<li>主持人只公布谁死了，不说怎么死的。</li>
+<li>主持人只公布谁死了，不说怎么死的。第1天要等警长竞选结束才公布，昨晚死的人也照常参加竞选。</li>
 <li>猎人出局时可以开枪带走一个人，只能在白天开枪；被女巫毒死的不能开枪。开枪也不会公布，主持人只说又有谁死了。</li></ul>
 <h4>警长（第1天）</h4><ul>
 <li>想当警长的上警。上警的人轮流竞选发言，发言完可以退水。</li>
 <li>没上警的人投票选警长；上警的人（包括退水的）不能投。只剩一个候选人时直接当选；平票、没人上警或都退水，就没有警长。</li>
 <li>警长每天最后发言、可以归票，放逐票算1.5票。警长出局时可以把警徽交给活着的人，或者撕掉。</li></ul>
 <h4>白天</h4><ul>
-<li>每人发言一次，再每人回应一次，然后投票放逐一人。可以弃票；平票或都弃票，就没人出局。</li>
+<li>每人发言一次，警长最后发言归票，说完直接投票放逐一人。可以弃票；平票或都弃票，就没人出局。</li>
 <li>被放逐的人留遗言。</li></ul>
 <h4>胜负</h4><ul>
 <li>好人：所有狼人出局。</li>
-<li>狼人：村民全部出局，或神职（预言家、女巫、猎人）全部出局，或活着的狼人不少于其他人。</li></ul>
+<li>狼人：村民全部出局，或神职（预言家、女巫、猎人）全部出局，或活着的狼人不少于其他人。</li>
+<li>游戏结束、身份公开后，AI 玩家会挨个复盘：哪里看对了、被谁骗了。</li></ul>
 <h4>你怎么玩</h4><ul>
 <li>轮到你时，右边会出现操作框；3分钟没操作，AI 会替你走这一步。</li>
 <li>发言时要选你怀疑谁（会公开记录），也可以声称一个身份。狼人也可以假装成任何身份。</li></ul>`,
     stage: { wolves: "狼人正在密谋", wolvesSub: "天黑请闭眼，狼人请睁眼", night: "夜色深沉，有人正悄悄行动", nightIdle: "夜深了",
-      wait: "主持人正在等待", speech: n => `${n} 正在发言`, rebuttal: n => `${n} 正在回应`, campaign: n => `${n} 正在竞选发言`,
+      wait: "主持人正在等待", speech: n => `${n} 正在发言`, aftermath: n => `${n} 正在复盘`, campaign: n => `${n} 正在竞选发言`,
       last_words: n => `${n} 正在留遗言`, badge: n => `${n} 正在决定警徽交给谁`, vote: "大家正在投票", sheriff_vote: "大家正在投票选警长",
       run: "大家正在决定要不要上警", withdraw: "候选人正在考虑要不要退水", left: n => `还有 ${n} 人在想`, elapsed: s => `已经 ${s} 秒` },
   },
@@ -250,7 +251,7 @@ const UI = {
     linksHint: "Send each player their own link, to open on their own phone or computer on the same Wi-Fi. A link only shows its own seat, so don't open anyone else's.",
     youAre: "You are", pack: "Your pack: ", waiting: "Waiting for the others…", dead: "You are out. Keep watching.", submit: "Submit",
     timeLeft: s => `${s}s left before an AI plays this for you`,
-    kinds: { speech: "Your turn to speak", rebuttal: "Second round: answer and challenge", wolf_chat: "Wolf chat", wolf_plan: "Set tonight's plan",
+    kinds: { speech: "Your turn to speak", wolf_chat: "Wolf chat", wolf_plan: "Set tonight's plan",
       last_words: "Your last words", vote: "Vote someone out", inspect: "Who to check tonight", save: "Use the antidote on them?", poison: "Use the poison?", shoot: "Who to shoot",
       run: "Sheriff election: will you run?", campaign: "Your campaign speech", withdraw: "Campaign over: withdraw?", sheriff_vote: "Vote for sheriff", badge: "Pass on the badge" },
     run: "Run for sheriff", noRun: "Stay out", stay: "Stay in the race", withdraw: "Withdraw", tearBadge: "Tear up the badge", sheriff: "Sheriff", sheriffBallot: " (sheriff, 1.5 votes)",
@@ -276,23 +277,24 @@ const UI = {
 <li>The seer checks whether one player is good or a werewolf.</li>
 <li>The witch learns who was killed: her antidote can save them, her poison can kill anyone. Each works once, at most one a night, and she may only save herself on the first night.</li></ul>
 <h4>Dawn</h4><ul>
-<li>The host only says who died, never how.</li>
+<li>The host only says who died, never how. On Day 1 that waits until the sheriff election is over, so whoever died that night still takes part in it.</li>
 <li>A hunter who is out may shoot one player, by day only, unless the witch poisoned him. The shot is not announced either: the host only says who else has died.</li></ul>
 <h4>Sheriff (Day 1)</h4><ul>
 <li>Whoever wants the badge runs. Candidates give a campaign speech and may then withdraw.</li>
 <li>Those who never ran vote; candidates, even ones who withdrew, do not. A lone candidate wins without a vote; a tie, nobody running or everyone withdrawing means no sheriff.</li>
 <li>The sheriff speaks last each day, may call the vote, and their vote counts 1.5. A sheriff who is out passes the badge to a living player or tears it up.</li></ul>
 <h4>Day</h4><ul>
-<li>Everyone speaks once, then replies once, then everyone votes someone out. You may abstain; a tie, or everyone abstaining, means nobody goes.</li>
+<li>Everyone speaks once, the sheriff last to call the vote, and then everyone votes someone out. You may abstain; a tie, or everyone abstaining, means nobody goes.</li>
 <li>Whoever is voted out gets last words.</li></ul>
 <h4>Winning</h4><ul>
 <li>Good: every werewolf is out.</li>
-<li>Werewolves: every villager is out, or every power role (seer, witch, hunter) is out, or the living werewolves are at least as many as everyone else.</li></ul>
+<li>Werewolves: every villager is out, or every power role (seer, witch, hunter) is out, or the living werewolves are at least as many as everyone else.</li>
+<li>Once the game is over and the roles are out, each AI player looks back: what they read right and who fooled them.</li></ul>
 <h4>How you play</h4><ul>
 <li>On your turn a move box appears on the right; after three minutes, an AI plays the move for you.</li>
 <li>When you speak, you pick who you suspect (it goes on the record) and may claim a role. Werewolves may claim anything.</li></ul>`,
     stage: { wolves: "The werewolves are plotting", wolvesSub: "Everyone close your eyes. Werewolves, open yours", night: "Deep in the night, someone is on the move", nightIdle: "Night falls",
-      wait: "The host is waiting", speech: n => `${n} is speaking`, rebuttal: n => `${n} is answering`, campaign: n => `${n} is campaigning`,
+      wait: "The host is waiting", speech: n => `${n} is speaking`, aftermath: n => `${n} is looking back`, campaign: n => `${n} is campaigning`,
       last_words: n => `${n} is saying last words`, badge: n => `${n} is passing on the badge`, vote: "Everyone is voting", sheriff_vote: "Everyone is voting for sheriff",
       run: "Everyone is deciding whether to run", withdraw: "The candidates are deciding whether to withdraw", left: n => `${n} still deciding`, elapsed: s => `${s}s so far` },
   },
@@ -556,7 +558,7 @@ function showTurn(p, t, w) {
   $("turnTitle").textContent = t.kinds[k] || k;
   const opts = (xs, blank) => (blank ? `<option value="">${t.none}</option>` : "") + xs.map(x => `<option value="${esc(x)}">${esc(w(x))}</option>`).join("");
   const choice = ["vote", "wolf_plan", "inspect", "save", "poison", "shoot", "run", "withdraw", "sheriff_vote", "badge"].includes(k);
-  const speaks = !choice || k === "wolf_plan", declares = ["speech", "rebuttal", "campaign"].includes(k);
+  const speaks = !choice || k === "wolf_plan", declares = ["speech", "campaign"].includes(k);
   let h = "";
   if (k === "run") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${x === "pass" ? t.noRun : t.run}</option>`).join("")}</select>`;
   else if (k === "withdraw") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${x === "pass" ? t.withdraw : t.stay}</option>`).join("")}</select>`;

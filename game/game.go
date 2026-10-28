@@ -595,10 +595,14 @@ func (s *State) Think(name, text string) Event {
 
 // Remove takes a player out of the game; how is the public account, e.g.
 // "voted out".
-func (s *State) Remove(name, how string) {
+func (s *State) Remove(name, how string) { s.RemoveAt(name, how, s.Phase) }
+
+// RemoveAt is Remove for a death in a phase other than the current one, such
+// as a night death announced only once the day is under way.
+func (s *State) RemoveAt(name, how string, phase Phase) {
 	p := s.Player(name)
 	p.Alive = false
-	p.Death = s.Lang.Death(s.Lang.When(s.Round, s.Phase), how)
+	p.Death = s.Lang.Death(s.Lang.When(s.Round, phase), how)
 }
 
 // VisibleTo is the part of the transcript the named player is allowed to see.

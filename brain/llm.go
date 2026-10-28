@@ -259,7 +259,7 @@ func prompt(t Turn) (system, user string) {
 	if t.Kind.Declares() {
 		fmt.Fprintf(&b, tx.order, len(t.Spoken)+1, orNobody(l, t.Spoken), orNobody(l, t.Waiting))
 	}
-	if (t.Kind == Speech || t.Kind == Rebuttal) && t.IsSheriff() {
+	if t.Kind == Speech && t.IsSheriff() {
 		b.WriteString(tx.sheriffLine)
 	}
 	if p := t.Plan; p != nil && t.Phase == game.Day {

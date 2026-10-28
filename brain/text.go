@@ -68,6 +68,7 @@ type text struct {
 	// Random's lines.
 	speechLines, wolfLines []string
 	lastWords, randomPlan  string
+	aftermath              string
 }
 
 // fields describe each JSON field of the answer.
@@ -93,9 +94,9 @@ var chineseText = text{
 - 女巫：有一瓶解药和一瓶毒药，各只能用一次，同一晚最多用一瓶。每晚会知道谁被狼人杀了，可以用解药救他（只有第1夜可以救自己），也可以用毒药毒死任何一个人。
 - 猎人：出局时可以开枪带走一个人，只能在白天开枪：晚上被狼人杀的猎人，天亮公布死讯后再开枪；被女巫毒死时不能开枪。
 - 村民：没有特殊能力。
-流程：天亮后只公布昨晚谁死了，不公布死因（可能被狼人杀，也可能被女巫毒死；被救的人不会死）。猎人开枪也不公布，主持人只会说被带走的人死亡了。
-白天先按顺序每人发言一次，再进入回应环节每人再说一次，最后投票放逐一人，平票则无人出局。被放逐的人有遗言。
-警长：第1天天亮后先竞选警长。想当的人上警，按座位顺序发表竞选发言，没上警的人投票选警长，得票最多的当选；平票、没人上警或者所有人都上警，则没有警长。警长放逐投票算1.5票，每天最后一个发言，可以归票。警长出局时可以把警徽移交给一个活着的人，也可以撕掉警徽，从此没有警长。
+流程：天亮后只公布昨晚谁死了（第1天要等警长竞选结束才公布），不公布死因（可能被狼人杀，也可能被女巫毒死；被救的人不会死）。猎人开枪也不公布，主持人只会说被带走的人死亡了。
+白天按顺序每人发言一次，有警长时警长最后发言归票，发完就直接投票放逐一人，没有第二轮发言，平票则无人出局。被放逐的人有遗言。
+警长：第1天天亮后先竞选警长，竞选结束后才公布第1夜的死讯，所以昨晚死的人也照常参加竞选，当选后出局就移交警徽。想当的人上警，按座位顺序发表竞选发言，没上警的人投票选警长，得票最多的当选；平票、没人上警或者所有人都上警，则没有警长。警长放逐投票算1.5票，每天最后一个发言，可以归票。警长出局时可以把警徽移交给一个活着的人，也可以撕掉警徽，从此没有警长。
 胜负：狼人全部出局则好人胜利；所有村民出局，或者预言家、女巫、猎人全部出局，或者活着的狼人不少于其他活着的人（狼人从此控制每一次投票），则狼人胜利。
 
 你是%s，身份是%s，性格：%s。
@@ -192,7 +193,6 @@ var chineseText = text{
 	instructions: map[TurnKind]string{
 		Prepare:  "现在还没轮到你发言，别人正在发言。先把到目前为止新发生的事整理进你的笔记：observations、beliefs、strategy 照常写，这一步不说话。轮到你的时候，只需要再看这之后的新发言。",
 		Speech:   "白天发言环节，轮到你了。",
-		Rebuttal: "回应环节：所有人都已经发过一次言。回应别人对你的怀疑，或者质疑某个人的说法（比如对跳的预言家、前后矛盾的人）。不超过80字。",
 		WolfChat: "现在是夜里，只有狼同伴能听到你说话。和同伴商量：今晚杀谁；白天怎么按本局的打法来打，票往谁身上引；第1夜还要说好明天谁上警。",
 		WolfPlan: "夜聊结束，你代表狼队定下最终计划，同伴白天会照着执行，主持人也会检查你的计划和局势是否一致。" +
 			"target 是今晚要杀的人，优先杀可能是神职、或者发言最有威胁的人；也可以自刀，选自己或同伴。" +
@@ -200,7 +200,8 @@ var chineseText = text{
 			"第1夜还要定 runner：明天上警的狼。警徽是狼队抢主动权的机会；悍跳的狼自己一定上警，runner 可以是他，也可以再派一只。" +
 			"speech 写白天按本局打法的具体打法，不超过80字。",
 		LastWords: "你被投票放逐了，发表遗言，不超过80字。",
-		Vote:      "根据今天的发言、回应和主持人汇总的表态，投票放逐一人。也可以选\"放弃\"弃票，不算任何人的票。",
+		Aftermath: "游戏结束了，所有人的身份都在【公开记录】的最后公开了。这是赛后复盘，像真人玩家散场前那样自然地聊：拿【你的笔记】对照真相，你哪里看对了、哪里看错了，被谁骗了、服不服，哪一手是关键，也可以接前面的人的话吐槽或者认错。按你的性格说，要具体到人和事，不超过100字。",
+		Vote:      "根据今天的发言、警长的归票和主持人汇总的表态，投票放逐一人。也可以选\"放弃\"弃票，不算任何人的票。",
 		Inspect:   "选择今晚要查验的人。优先查最可疑、或者发言最能带动大家的人。",
 		Save:      "今晚谁被狼人杀了在【你的秘密信息】里。决定要不要用解药救他：选他的名字表示救，选\"放弃\"表示不救。",
 		Poison:    "决定要不要用毒药：选一个名字表示毒死他，选\"放弃\"表示不用。毒错了好人会很伤，没有把握就别用。",
@@ -319,7 +320,7 @@ var chineseText = text{
 	onlyJSON:         "只回复一个JSON对象，不要任何其他内容：",
 	seatLine:         "- %s：%s\n",
 	sheriffMark:      "，警长",
-	sheriffLine:      "你是警长：你最后一个发言，你的放逐票算1.5票。发言时可以归票，明确告诉大家今天投谁、为什么。\n",
+	sheriffLine:      "你是警长：你最后一个发言，你说完就直接投票，没有人再发言，你的放逐票算1.5票。回应今天所有人的发言，然后归票：明确告诉大家今天投谁、为什么。\n",
 	line:             "[%s] %s：%s\n",
 	targetOnly:       "target 只能是这些名字之一：%s。\n",
 	fakerOnly:        "faker 只能是：%s。\n",
@@ -344,6 +345,7 @@ var chineseText = text{
 		"随便，%s也行。",
 	},
 	lastWords:  "我是好人，你们一定要找出狼人！",
+	aftermath:  "原来是这样，下把我一定看出来！",
 	randomPlan: "今晚杀%s，白天把票引向%s。",
 }
 
@@ -356,9 +358,9 @@ Roles:
 - Witch: has one antidote and one poison, each usable once, and at most one per night. Each night she learns who the werewolves killed and may save them with the antidote (herself only on the first night), or poison anyone.
 - Hunter: when out of the game, may shoot one person and take them out too, but only by day: a hunter the werewolves kill at night shoots after the deaths are announced. Not if the witch poisoned them.
 - Villager: no power.
-Flow: at dawn only who died is announced, never how (killed by werewolves or poisoned by the witch; a saved player does not die). A hunter's shot is not announced either: the host only says the player shot has died.
-By day everyone speaks once in order, then once more in a reply round, then everyone votes one person out; a tie means nobody goes. The exiled player gets last words.
-Sheriff: on Day 1, before the day's speeches, there is a sheriff election. Whoever wants the badge runs and gives a campaign speech in seat order; everyone not running votes, and the most votes wins. A tie, nobody running, or everyone running means no sheriff. The sheriff's vote to exile counts one and a half, the sheriff speaks last each day and may call the vote. A sheriff who goes out may pass the badge to someone alive, or tear it up, and then there is no sheriff.
+Flow: at dawn only who died is announced (on Day 1, only once the sheriff election is over), never how (killed by werewolves or poisoned by the witch; a saved player does not die). A hunter's shot is not announced either: the host only says the player shot has died.
+By day everyone speaks once in order, the sheriff, if there is one, last, calling the vote, and then everyone votes one person out, with no second round; a tie means nobody goes. The exiled player gets last words.
+Sheriff: on Day 1, before the day's speeches, there is a sheriff election, and Night 1's deaths are announced only once it is over: whoever died that night takes part like anyone, and passes the badge on if elected. Whoever wants the badge runs and gives a campaign speech in seat order; everyone not running votes, and the most votes wins. A tie, nobody running, or everyone running means no sheriff. The sheriff's vote to exile counts one and a half, the sheriff speaks last each day and may call the vote. A sheriff who goes out may pass the badge to someone alive, or tear it up, and then there is no sheriff.
 Winning: the good side wins when every werewolf is out; the werewolves win when every villager is out, when the seer, witch and hunter are all out, or when the living werewolves are at least as many as everyone else alive (from then on they control every vote).
 
 You are %s. Your role is %s. Your personality: %s.
@@ -456,7 +458,6 @@ Write everything in English.`,
 	instructions: map[TurnKind]string{
 		Prepare:  "It is not your turn to speak yet; someone else is speaking. Bring your notes up to date with everything new so far: write observations, beliefs and strategy as usual, and say nothing this time. When your turn comes, you will only need to read what was said after this.",
 		Speech:   "It is the day's speeches and your turn to speak.",
-		Rebuttal: "Reply round: everyone has spoken once. Answer suspicion aimed at you, or challenge someone's story (a counter-claimed seer, someone who contradicts themselves). At most 40 words.",
 		WolfChat: "It is night, and only your fellow werewolves can hear you. Agree on who to kill tonight and how to play the day the way this game's play calls for, and who to push the vote onto; on the first night, also agree who runs for sheriff tomorrow.",
 		WolfPlan: "The night chat is over. Set the pack's final plan; your teammates will follow it by day, and the host will check it against the game. " +
 			"target is who to kill tonight: ideally someone who may hold a power role, or whose speeches are most dangerous to you; you may also self-kill, picking yourself or a teammate. " +
@@ -464,7 +465,8 @@ Write everything in English.`,
 			"On the first night, also set runner: the werewolf who runs for sheriff tomorrow. The badge is the pack's chance to take the lead; a faker always runs, and runner may be the faker or one more wolf. " +
 			"speech is how you play the day this game's way, at most 40 words.",
 		LastWords: "You have been voted out. Give your last words, at most 40 words.",
-		Vote:      "Based on today's speeches, replies and the stances the host summed up, vote one person out. You may also pick \"pass\" to abstain, which counts for nobody.",
+		Aftermath: "The game is over, and everyone's role was revealed at the end of the [Public record]. This is the chat after the game, as real players have before they leave: check [Your notes] against the truth, say what you read right and wrong, who fooled you and whether you saw it coming, which move decided it; answer those who spoke before you, tease them or own up. In character, about real people and moments, at most 50 words.",
+		Vote:      "Based on today's speeches, the sheriff's call and the stances the host summed up, vote one person out. You may also pick \"pass\" to abstain, which counts for nobody.",
 		Inspect:   "Choose who to check tonight. Check whoever is most suspicious, or whose speeches sway the table most.",
 		Save:      "Who the werewolves killed tonight is in [Your secrets]. Decide whether to save them with the antidote: pick their name to save them, or \"pass\" not to.",
 		Poison:    "Decide whether to use the poison: pick a name to poison them, or \"pass\" not to. Poisoning a good player hurts badly, so do not use it unless you are sure.",
@@ -583,7 +585,7 @@ Write everything in English.`,
 	onlyJSON:         "Reply with a single JSON object and nothing else: ",
 	seatLine:         "- %s: %s\n",
 	sheriffMark:      ", sheriff",
-	sheriffLine:      "You are the sheriff: you speak last, and your vote to exile counts one and a half. You may call the vote: tell the table plainly who to vote out today and why.\n",
+	sheriffLine:      "You are the sheriff: you speak last, the vote follows straight after you with no more speeches, and your vote to exile counts one and a half. Answer today's speeches, then call the vote: tell the table plainly who to vote out today and why.\n",
 	line:             "[%s] %s: %s\n",
 	targetOnly:       "target must be one of: %s.\n",
 	fakerOnly:        "faker must be one of: %s.\n",
@@ -608,5 +610,6 @@ Write everything in English.`,
 		"Whatever, %s works.",
 	},
 	lastWords:  "I'm good! You have to find the werewolves!",
+	aftermath:  "So that's how it was. Next time I'll see it!",
 	randomPlan: "Kill %s tonight, and steer the vote onto %s tomorrow.",
 }

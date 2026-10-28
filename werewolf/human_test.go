@@ -220,7 +220,8 @@ func TestASpectatorFollowsTheGameStageByStage(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok, "a game nobody plays in is still published for spectators")
 
-	order := map[game.Stage]int{game.StageNight: 0, game.StageDawn: 1, game.StageElection: 2, game.StageDay: 3, game.StageEnd: 4}
+	// The first night's deaths are announced only after the election.
+	order := map[game.Stage]int{game.StageNight: 0, game.StageElection: 1, game.StageDawn: 2, game.StageDay: 3, game.StageEnd: 4}
 	last, kinds := 0, map[string]bool{}
 	for i, l := range v.Log {
 		assert.False(t, l.Private, "a spectator saw a private line: %s", l.Text)

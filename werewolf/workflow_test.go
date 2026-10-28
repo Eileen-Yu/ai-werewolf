@@ -57,7 +57,7 @@ func TestWitchSavingTheVictimMakesAPeacefulNight(t *testing.T) {
 		playGame(t, client, fmt.Sprintf("saved-%d", i))
 	}
 
-	assert.Contains(t, b.firstDawn, "天亮了，昨晚是平安夜。")
+	assert.Contains(t, b.firstDawn, chineseHost.peacefulAfterElection)
 	assert.Equal(t, 1, b.kinds[brain.Save])
 	assert.Zero(t, b.kinds[brain.Poison], "the witch who saved has no second potion that night")
 	assert.Positive(t, b.wolvesTold, "the wolves were not told their victim survived")
@@ -295,7 +295,7 @@ func TestTheHostNeverSaysHowAnyoneDied(t *testing.T) {
 		playGame(t, client, fmt.Sprintf("facts-%d", i))
 		for _, turn := range b.turns {
 			for _, e := range turn.Transcript {
-				if e.Speaker != "" || len(e.Audience) > 0 || strings.HasPrefix(e.Text, "欢迎") {
+				if e.Speaker != "" || len(e.Audience) > 0 || strings.HasPrefix(e.Text, "欢迎") || e.Stage == game.StageEnd {
 					continue
 				}
 				for _, c := range causes {
@@ -331,7 +331,7 @@ func TestTheHuntersShotIsNeverAnnounced(t *testing.T) {
 				if strings.HasPrefix(e.Text, "你开枪带走了") {
 					assert.Equal(t, shot.hunter, turn.Me.Name, "only the hunter is told who he shot")
 				}
-				if len(e.Audience) == 0 && e.Speaker == "" && !strings.HasPrefix(e.Text, "欢迎") {
+				if len(e.Audience) == 0 && e.Speaker == "" && !strings.HasPrefix(e.Text, "欢迎") && e.Stage != game.StageEnd {
 					assert.NotContains(t, e.Text, "猎人", "the host never says who the hunter is")
 				}
 			}
@@ -677,22 +677,41 @@ func holder(seats []brain.Seat) string {
 func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
-	passed, torn, withdrewOnce, sentOnce := false, false, false, false
-	for i := 0; i < 30 && !(passed && torn); i++ {
+	passed, torn, withdrewOnce, sentOnce, deadRan := false, false, false, false, false
+	for i := 0; i < 30 && !(passed && torn && deadRan); i++ {
 		b := &campaigner{tear: i%2 == 1}
 		SetBrain(b)
-		play(t, client, fmt.Sprintf("sheriff-%d", i), newGame())
+		res := play(t, client, fmt.Sprintf("sheriff-%d", i), newGame())
+		diedNight1 := map[string]bool{}
+		for _, p := range res.Players {
+			diedNight1[p.Name] = p.Death == "第1夜死亡"
+		}
 
 		var runners, left, sent []string
 		withdrawn := false
 		sheriff, elected := "", false
-		var lastDay1Speaker string
+		var lastDay1Speaker, day1Sheriff string
 		for _, turn := range b.turns {
 			switch turn.Kind {
 			case brain.Prepare:
 				continue // runs alongside a speech, so it may be recorded before it
+			case brain.Run, brain.Campaign, brain.Withdraw, brain.SheriffVote:
+			default:
+				// The election is over: the night's deaths, and a sheriff
+				// among them passing the badge, come next.
+				if runners != nil && !elected {
+					elected, sheriff = true, left[0]
+					unopposed := slices.ContainsFunc(turn.Transcript, func(e game.Event) bool { return e.Text == fmt.Sprintf(chineseHost.unopposed, sheriff) })
+					assert.Equal(t, len(left) == 1, unopposed, "the host says when a lone candidate wins without a vote")
+				}
+			}
+			switch turn.Kind {
 			case brain.Run:
 				assert.Equal(t, 1, turn.Round, "the election is on the first day only")
+				for _, s := range turn.Seats {
+					assert.Empty(t, s.Death, "%s's death is announced before the election", s.Name)
+				}
+				deadRan = deadRan || diedNight1[turn.Me.Name]
 				if turn.Me.Role == game.Seer {
 					assert.Equal(t, []string{turn.Me.Name}, turn.Candidates, "the seer always runs")
 				} else if turn.Plan != nil && (turn.Plan.Runner == turn.Me.Name || turn.Plan.Faker == turn.Me.Name) {
@@ -720,13 +739,8 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 				assert.NotContains(t, runners, turn.Me.Name, "a candidate, even one who withdrew, does not vote for sheriff")
 				assert.Equal(t, append(slices.Clone(left), game.Pass), turn.Candidates, "only those still running stand, and a voter may abstain")
 			case brain.Speech:
-				if !elected {
-					elected, sheriff = true, left[0]
-					unopposed := slices.ContainsFunc(turn.Transcript, func(e game.Event) bool { return e.Text == fmt.Sprintf(chineseHost.unopposed, sheriff) })
-					assert.Equal(t, len(left) == 1, unopposed, "the host says when a lone candidate wins without a vote")
-				}
 				if turn.Round == 1 {
-					lastDay1Speaker = turn.Me.Name
+					lastDay1Speaker, day1Sheriff = turn.Me.Name, sheriff
 				}
 			case brain.Badge:
 				require.Equal(t, sheriff, turn.Me.Name, "only the sheriff passes the badge")
@@ -746,11 +760,11 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 			}
 			assert.Equal(t, sheriff, holder(turn.Seats), "%s's %s turn on round %d shows the wrong sheriff", turn.Me.Name, turn.Kind, turn.Round)
 		}
-		if runners == nil {
-			continue // night 1 ended the game: a kill, a poison and a hunter's shot leave three against three
-		}
+		require.NotNil(t, runners, "nobody was asked to run")
 		withdrewOnce = withdrewOnce || withdrawn
-		assert.Equal(t, runners[0], lastDay1Speaker, "the sheriff speaks last")
+		if day1Sheriff != "" {
+			assert.Equal(t, day1Sheriff, lastDay1Speaker, "the sheriff speaks last")
+		}
 		assert.Subset(t, runners, sent, "a wolf the plan sent did not run")
 		sentOnce = sentOnce || len(sent) > 0
 	}
@@ -758,6 +772,7 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 	assert.True(t, sentOnce, "the plan sent no wolf to run in any game")
 	assert.True(t, passed, "no sheriff passed the badge on in thirty games")
 	assert.True(t, torn, "no sheriff tore up the badge in thirty games")
+	assert.True(t, deadRan, "nobody who died on the first night was asked to run in thirty games")
 }
 
 type turnRecorder struct {
@@ -770,6 +785,62 @@ func (b *turnRecorder) Act(ctx context.Context, t brain.Turn) (brain.Action, err
 	defer b.mu.Unlock()
 	b.turns = append(b.turns, t)
 	return brain.Random{}.Act(ctx, t)
+}
+
+// Everyone speaks once a day, the sheriff last, and the vote follows straight
+// on: there is no second time round the table.
+func TestTheVoteFollowsTheDaysOneRoundOfSpeeches(t *testing.T) {
+	client := startEngine(t)
+	startWorker(t, client)
+	b := &turnRecorder{}
+	SetBrain(b)
+	playGame(t, client, "one-round")
+
+	speeches, votes := map[int]int{}, map[int]int{}
+	var last brain.TurnKind
+	for _, turn := range b.turns {
+		switch turn.Kind {
+		case brain.Prepare:
+			continue
+		case brain.Speech:
+			speeches[turn.Round]++
+		case brain.Vote:
+			votes[turn.Round]++
+			if last != brain.Vote {
+				assert.Equal(t, brain.Speech, last, "something came between the day's speeches and the vote on day %d", turn.Round)
+			}
+		}
+		last = turn.Kind
+	}
+	require.NotEmpty(t, votes, "no day reached the vote")
+	for round, n := range votes {
+		assert.Equal(t, n, speeches[round], "day %d: everyone who votes speaks once", round)
+	}
+}
+
+// Once the game is over, every AI player looks back on it with the roles
+// known, once each, and nothing else happens after.
+func TestEveryAIPlayerLooksBackOnceTheGameIsOver(t *testing.T) {
+	client := startEngine(t)
+	startWorker(t, client)
+	b := &turnRecorder{}
+	SetBrain(b)
+	res := playGame(t, client, "aftermath")
+
+	looked := map[string]int{}
+	after := false
+	for _, turn := range b.turns {
+		if turn.Kind != brain.Aftermath {
+			assert.False(t, after, "a %s turn came after the game was over", turn.Kind)
+			continue
+		}
+		after = true
+		looked[turn.Me.Name]++
+		assert.True(t, slices.ContainsFunc(turn.Transcript, func(e game.Event) bool { return strings.HasPrefix(e.Text, "游戏结束") }), "%s looks back without the roles", turn.Me.Name)
+	}
+	for _, p := range res.Players {
+		assert.Equal(t, 1, looked[p.Name], "%s looked back %d times", p.Name, looked[p.Name])
+	}
 }
 
 func TestPlayersGetBackTheNotesTheyLastWrote(t *testing.T) {
@@ -966,30 +1037,26 @@ func TestALoneCandidateIsElectedWithoutAVote(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
 
-	// A game whose seer dies on night 1 has nobody running, so play until one
-	// has a candidate.
-	var b *loneRunner
-	var seer string
-	for i := 0; i < 10 && seer == ""; i++ {
-		b = &loneRunner{}
+	// A seer who dies on the first night passes the badge as soon as they win
+	// it, so play until one still holds it on Day 1.
+	for i := range 10 {
+		b := &loneRunner{}
 		SetBrain(b)
 		play(t, client, fmt.Sprintf("lone-%d", i), newGame())
+		var seer string
 		for _, turn := range b.rec.turns {
 			require.NotEqual(t, brain.SheriffVote, turn.Kind, "nobody votes for a lone candidate")
-			if turn.Kind == brain.Campaign {
+			switch {
+			case turn.Kind == brain.Campaign:
 				seer = turn.Me.Name
+			case turn.Kind == brain.Speech && turn.Round == 1 && holder(turn.Seats) == seer:
+				require.NotEmpty(t, seer, "the seer never ran")
+				assert.True(t, slices.ContainsFunc(turn.Transcript, func(e game.Event) bool { return e.Text == fmt.Sprintf(chineseHost.unopposed, seer) }), "the host says there is no vote")
+				return
 			}
 		}
 	}
-	require.NotEmpty(t, seer, "the seer never ran in ten games")
-	for _, turn := range b.rec.turns {
-		if turn.Kind == brain.Speech && turn.Round == 1 {
-			assert.True(t, slices.ContainsFunc(turn.Transcript, func(e game.Event) bool { return e.Text == fmt.Sprintf(chineseHost.unopposed, seer) }), "the host says there is no vote")
-			assert.Equal(t, seer, holder(turn.Seats))
-			return
-		}
-	}
-	t.Fatal("no day 1 speech")
+	t.Fatal("no seer held the badge on Day 1 in ten games")
 }
 
 // loneRunner plays randomly, except that only the seer, who must, runs for
