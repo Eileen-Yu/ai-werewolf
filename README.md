@@ -101,6 +101,12 @@ flowchart LR
 - **A person is just another event.** Your seat's move arrives as an external event, with a three-minute timer; if it fires, an AI plays the move for you.
 - **Restarts are free.** After a crash the workflow replays its history: finished moves return their recorded answers, no LLM is called twice, and the game carries on from the line it stopped at.
 
+Here is what one round looks like from inside Catalyst, the final night and day of a real game, read left to right:
+
+![One round of a game in the Catalyst workflow view](docs/catalyst-round.png)
+
+The night's moves and a pause, then the day's speeches: each pair is one player speaking while the next one prepares, which is why they run side by side. Then the reply round in the same shape, five votes fanning out at once, the last words of the player voted out, and the MVP judge. Earlier rounds are earlier executions of the same workflow, since it continues as new each round.
+
 How each part works is in [docs/design.md](docs/design.md).
 
 ## What makes it interesting
