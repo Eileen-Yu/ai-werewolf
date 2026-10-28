@@ -60,7 +60,7 @@ A standard nine-player game: 3 werewolves, a seer, a witch, a hunter and 3 villa
 
 - **Night**: the werewolves talk in private and pick who to kill (they may pick one of their own). The witch learns who was killed and may save them or poison someone: each potion works once, at most one per night, and she may only save herself on the first night. The seer checks one player.
 - **Dawn**: only who died is announced, not how. A hunter who is out may shoot one player, by day only, unless the witch poisoned him. A hunter killed at night shoots once the deaths are announced, and a hunter voted out shoots after his last words. The shot is not announced either: the host only says who has died.
-- **Sheriff**: on Day 1, after the deaths are announced, the living elect a sheriff. The seer always runs and everyone else decides whether to; the candidates give a campaign speech, then any candidate but the seer may withdraw, and those who never ran vote. A candidate who withdraws cannot vote either. If nobody runs, everybody runs, every candidate withdraws, or the vote ties, there is no sheriff. The sheriff speaks last each day and their vote counts 1.5. A sheriff who is out passes the badge to a living player or tears it up. The page marks the sheriff with 🎖️ and shows the 1.5 in the vote card.
+- **Sheriff**: on Day 1, after the deaths are announced, the living elect a sheriff. Each of them decides whether to run; the candidates give a campaign speech, then any of them may withdraw, and those who never ran vote. A candidate who withdraws cannot vote either. If nobody runs, everybody runs, every candidate withdraws, or the vote ties, there is no sheriff. The sheriff speaks last each day and their vote counts 1.5. A sheriff who is out passes the badge to a living player or tears it up. The page marks the sheriff with 🎖️ and shows the 1.5 in the vote card.
 - **Day**: everyone speaks once, then everyone gets one reply. Then a vote, where anyone may abstain: a tie, or everyone abstaining, means nobody goes. Whoever is voted out gets last words.
 - **Winning**: the good side wins when every werewolf is out. The werewolves win when every villager is out, every power role is out, or the living werewolves are at least as many as everyone else, since from then on they control every vote.
 
@@ -175,7 +175,7 @@ The `--data` for `diagrid workflow start` is JSON, and every field is optional:
 | Field | Default | Meaning |
 |---|---|---|
 | `lang` | `"zh"` | `"zh"` for Chinese, `"en"` for English |
-| `phaseDelay` | `0` | Pause between phases, in nanoseconds: `2000000000` is 2 seconds. A longer pause makes it easier to kill something mid-game |
+| `phaseDelay` | `0` | How long the game waits after the night, the election and each day before going on, so watchers can follow it. It is a durable timer, so it is also a window to kill the gm and watch the game resume. Written in nanoseconds because that is how Go encodes a duration: `2000000000` is 2 seconds |
 | `tactic` | dealt at random | Pins the pack's play, to show one off: `"counterclaim"`, `"deep_cover"` or `"hook"` |
 | `human` | none | Seats a person: `{"name":"Eileen","replaces":"Karen"}`. The web page sets this for you; the person plays from the page |
 
