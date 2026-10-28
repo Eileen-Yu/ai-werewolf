@@ -6,10 +6,7 @@
 
 A social deduction game powered by [Dapr Workflow](https://docs.dapr.io/developing-applications/building-blocks/workflow/) and [Diagrid Catalyst](https://www.diagrid.io/catalyst)
 
-![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
-![Dapr Workflow](https://img.shields.io/badge/Dapr-Workflow-0D2192?logo=dapr&logoColor=white)
-![Multi-agent AI](https://img.shields.io/badge/Multi--Agent-AI-8A2BE2)
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
+![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white) ![Dapr Workflow](https://img.shields.io/badge/Dapr-Workflow-0D2192?logo=dapr&logoColor=white) ![Multi-agent AI](https://img.shields.io/badge/Multi--Agent-AI-8A2BE2) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
 
 </div>
 
