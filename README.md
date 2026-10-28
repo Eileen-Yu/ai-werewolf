@@ -1,22 +1,25 @@
-# AI Werewolf 🐺
+<div align="center">
+
+# 🐺 AI Werewolf
 
 **9 AI agents. 3 werewolves. 1 shared brain cell.**
 
-What happens when you put nine LLM agents in a village, give three of them permission to murder, and tell everyone else to trust the process?
+A social deduction game powered by [Dapr Workflow](https://docs.dapr.io/developing-applications/building-blocks/workflow/) and [Diagrid Catalyst](https://www.diagrid.io/catalyst)
 
-The real seer gets voted out. Karen demands to speak to the game master. A LinkedIn influencer turns his dying words into a leadership lesson. And somehow, the werewolves are the most functional team in the room.
+![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
+![Dapr Workflow](https://img.shields.io/badge/Dapr-Workflow-0D2192?logo=dapr&logoColor=white)
+![Multi-agent AI](https://img.shields.io/badge/Multi--Agent-AI-8A2BE2)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
 
-Welcome to AI Werewolf: a social deduction game where AI agents lie, manipulate, form alliances, hold grudges, and confidently vote out the only person who knows what's going on.
+</div>
 
-Or take a seat yourself, and bring up to eight friends. The AI doesn't know you're human, and won't go easy on you.
+![A whole game in under a minute](docs/demo.gif)
 
-Powered by [Dapr Workflow](https://docs.dapr.io/developing-applications/building-blocks/workflow/) on [Diagrid Catalyst](https://www.diagrid.io/catalyst). Because even terrible decisions deserve durable execution.
+<p align="center"><sub>The real seer was voted out. He turned it into a leadership lesson.</sub></p>
 
 ## A perfectly normal day in the village
 
-Adapted from an actual game. Unfortunately.
-
-![A whole game in under a minute](docs/demo.gif)
+Put nine LLM agents in a village, give three of them permission to murder, and tell everyone else to trust the process. They lie, form alliances, hold grudges, and confidently vote out the only person who knows what's going on. Or take a seat yourself, and bring up to eight friends. The AI doesn't know you're human, and won't go easy on you.
 
 The fake seer wins the badge, the real seer gets voted out on the sheriff's one and a half votes, and the witch poisons Florida Man on a theory. The storyline comes from a real game, where the real seer's last words were "Leadership lesson: consensus isn't verification." The replay is scripted, on the real page, to fit it in under a minute.
 
@@ -65,7 +68,7 @@ Each character also has a rival at the table, so the bickering is built in.
 
 ## The game master is immortal. Unfortunately.
 
-The whole game runs as a durable Dapr Workflow on Diagrid Catalyst. Kill the game master in the middle of a heated accusation. Restart it. The village picks up right where it left off.
+The whole game runs as a durable Dapr Workflow on Diagrid Catalyst, because even terrible decisions deserve durable execution. Kill the game master in the middle of a heated accusation. Restart it. The village picks up right where it left off.
 
 - No lost game state.
 - No repeated LLM calls.
