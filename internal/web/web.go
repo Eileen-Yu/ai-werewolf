@@ -47,14 +47,13 @@ func (s *server) characters(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, err)
 		return
 	}
-	reply(w, map[string]any{"characters": game.Characters(l), "tactics": game.Tactics})
+	reply(w, map[string]any{"characters": game.Characters(l)})
 }
 
 type startRequest struct {
-	Lang     game.Lang   `json:"lang"`
-	Tactic   game.Tactic `json:"tactic"`
-	Name     string      `json:"name"`
-	Replaces string      `json:"replaces"`
+	Lang     game.Lang `json:"lang"`
+	Name     string    `json:"name"`
+	Replaces string    `json:"replaces"`
 }
 
 func (s *server) start(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +73,6 @@ func (s *server) start(w http.ResponseWriter, r *http.Request) {
 	}
 	input := werewolf.Game{
 		Lang:       l,
-		Tactic:     req.Tactic,
 		PhaseDelay: time.Second,
 		Human:      &werewolf.Human{Name: strings.TrimSpace(req.Name), Replaces: req.Replaces},
 	}

@@ -234,7 +234,7 @@ The `--data` for `diagrid workflow start` is JSON, and every field is optional:
 |---|---|---|
 | `lang` | `"zh"` | `"zh"` for Chinese, `"en"` for English |
 | `phaseDelay` | `0` | How long the game waits after the night, the election and each day before going on, so watchers can follow it. It is a durable timer, so it is also a window to kill the gm and watch the game resume. Written in nanoseconds because that is how Go encodes a duration: `2000000000` is 2 seconds |
-| `tactic` | dealt at random | Pins the pack's play, to show one off: `"counterclaim"`, `"deep_cover"` or `"hook"` |
+| `tactic` | dealt at random | Pins the pack's play, to show one off: `"counterclaim"`, `"deep_cover"` or `"hook"`. Games from the web page are always dealt one at random, so a person never knows the pack's plan |
 | `human` | none | Seats a person: `{"name":"Eileen","replaces":"Karen"}`. The web page sets this for you; the person plays from the page |
 
 ```bash

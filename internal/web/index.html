@@ -97,8 +97,6 @@
     <input id="name" maxlength="20">
     <label id="replacesLabel"></label>
     <select id="replaces"></select>
-    <label id="tacticLabel"></label>
-    <select id="tactic"></select>
     <button id="startBtn"></button>
     <div id="setupErr" class="err"></div>
   </section>
@@ -132,8 +130,7 @@
 <script>
 const UI = {
   zh: {
-    title: "AI 狼人杀", name: "你的名字", replaces: "替换哪个角色的座位", tactic: "狼队打法", random: "随机", start: "开始游戏",
-    tactics: { counterclaim: "悍跳", deep_cover: "潜水", hook: "倒钩" },
+    title: "AI 狼人杀", name: "你的名字", replaces: "替换哪个角色的座位", start: "开始游戏",
     youAre: "你是", pack: "狼队：", waiting: "等待其他玩家……", dead: "你已出局，继续观战。", submit: "提交",
     timeLeft: s => `剩余 ${s} 秒，超时由AI代打`,
     kinds: { speech: "轮到你发言", rebuttal: "第二轮：回应和质疑", wolf_chat: "狼队夜聊", wolf_plan: "你来定今晚的计划",
@@ -180,8 +177,7 @@ const UI = {
       run: "大家正在决定要不要上警", withdraw: "候选人正在考虑要不要退水", left: n => `还有 ${n} 人在想`, elapsed: s => `已经 ${s} 秒` },
   },
   en: {
-    title: "AI Werewolf", name: "Your name", replaces: "Whose seat to take", tactic: "Pack tactic", random: "Random", start: "Start game",
-    tactics: { counterclaim: "Counterclaim", deep_cover: "Deep cover", hook: "Hook" },
+    title: "AI Werewolf", name: "Your name", replaces: "Whose seat to take", start: "Start game",
     youAre: "You are", pack: "Your pack: ", waiting: "Waiting for the others…", dead: "You are out. Keep watching.", submit: "Submit",
     timeLeft: s => `${s}s left before an AI plays this for you`,
     kinds: { speech: "Your turn to speak", rebuttal: "Second round: answer and challenge", wolf_chat: "Wolf chat", wolf_plan: "Set tonight's plan",
@@ -259,16 +255,15 @@ async function loadSetup() {
   renderRules(lang);
   $("title").textContent = t.title;
   $("nameLabel").textContent = t.name; $("replacesLabel").textContent = t.replaces;
-  $("tacticLabel").textContent = t.tactic; $("startBtn").textContent = t.start;
-  const { characters, tactics } = await api(`/api/characters?lang=${lang}`);
+  $("startBtn").textContent = t.start;
+  const { characters } = await api(`/api/characters?lang=${lang}`);
   $("replaces").innerHTML = characters.map(c => `<option>${esc(c)}</option>`).join("");
-  $("tactic").innerHTML = `<option value="">${t.random}</option>` + tactics.map(x => `<option value="${x}">${t.tactics[x] || x}</option>`).join("");
 }
 $("lang").onchange = loadSetup;
 $("startBtn").onclick = async () => {
   $("setupErr").textContent = "";
   try {
-    const { id } = await api("/api/games", { lang: $("lang").value, name: $("name").value, replaces: $("replaces").value, tactic: $("tactic").value });
+    const { id } = await api("/api/games", { lang: $("lang").value, name: $("name").value, replaces: $("replaces").value });
     location.search = `?game=${encodeURIComponent(id)}`;
   } catch (e) { $("setupErr").textContent = e.message; }
 };
