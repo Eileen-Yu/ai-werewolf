@@ -8,7 +8,7 @@ type host struct {
 	antidote, poison, noPotions, selfVictim, saved, poisoned                   string
 	inspected, peaceful, died, dawnDead, shot, diedNow, order                  string
 	stance, stances, vote, votes, abstain, tie, allAbstained                   string
-	votedOut, exiled, plan, runner, noFaker, faker, hook, undecided, gameOver  string
+	votedOut, exiled, plan, noFaker, faker, hook, undecided, gameOver          string
 	tactic                                                                     string
 	tactics                                                                    map[game.Tactic]string
 	revealed, comma, semicolon, result, silence                                string
@@ -64,12 +64,11 @@ var chineseHost = host{
 	votedOut:     "被投票放逐",
 	exiled:       "%s被放逐了。",
 	plan:         "狼队计划（%s定）：今晚杀%s；明天%s，票投%s。打法：%s",
-	runner:       "。%s上警",
-	noFaker:      "不悍跳",
+	noFaker:      "没人悍跳",
 	faker:        "%s悍跳预言家",
-	hook:         "%s倒钩",
+	hook:         "，%s倒钩",
 	tactic:       "本局狼队的打法是%s。",
-	tactics:      map[game.Tactic]string{game.Counterclaim: "悍跳", game.DeepCover: "潜水", game.Hook: "倒钩"},
+	tactics:      map[game.Tactic]string{game.Counterclaim: "悍跳加冲锋", game.Hook: "悍跳加倒钩"},
 	undecided:    "未定",
 	gameOver:     "游戏结束，%s胜利！身份公开：%s",
 	revealed:     "%s=%s",
@@ -141,12 +140,11 @@ var englishHost = host{
 	votedOut:     "voted out",
 	exiled:       "%s is voted out.",
 	plan:         "Pack plan (set by %s): kill %s tonight; tomorrow %s, and vote out %s. How: %s",
-	runner:       ". %s runs for sheriff",
 	noFaker:      "nobody claims seer",
 	faker:        "%s claims seer",
-	hook:         "%s plays the hook",
+	hook:         ", %s plays the hook",
 	tactic:       "This game the pack plays %s.",
-	tactics:      map[game.Tactic]string{game.Counterclaim: "the counter-claim", game.DeepCover: "deep cover", game.Hook: "the hook"},
+	tactics:      map[game.Tactic]string{game.Counterclaim: "a counter-claim the pack backs", game.Hook: "a counter-claim with a hook"},
 	undecided:    "undecided",
 	gameOver:     "Game over: the %s side wins! Roles: %s",
 	revealed:     "%s=%s",

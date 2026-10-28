@@ -97,11 +97,11 @@ The English cast is exactly nine, so everyone is always seated. The Chinese cast
 
 ### Two sides, two playbooks
 
-**Problem.** Left to choose, the wolves settle on the same best play, a seer counter-claim, every game.
+**Problem.** A pack that leaves the real seer unchallenged loses: the seer checks one player a night, takes the badge, and the good side follows the checks to the last wolf. An earlier version also dealt `deep_cover`, where nobody claimed anything, and the hook on its own; in those games the pack never ran, nobody contested the seer, and the wolves lost while looking as if they were not trying. But a pack that plays exactly the same way every game is easy to read.
 
-**Decision.** The pack's tactic is dealt with the roles, and only the wolves are told it: `counterclaim` (one wolf fakes the seer), `deep_cover` (nobody claims a power role) or `hook` (one wolf earns trust by turning on an exposed teammate).
+**Decision.** Every pack fakes the seer: the first night's plan must name a `faker`, who runs for sheriff and counter-claims in the campaign. What is dealt with the roles, and told only to the wolves, is how the rest of the pack plays around the faker: `counterclaim` (they back the faker) or `hook` (one more wolf backs the real seer, even against the faker, to be trusted later). The faker is told what a convincing claim needs: a check, a reason for it and a badge flow at once, the real seer or the most dangerous good player reported as a werewolf, an attack that builds one case, and a story that takes in each new death and vote. It also has to hold together, and the game master enforces that part (below).
 
-**Tradeoff.** A dealt tactic can be the wrong one for the cards. So it changes what the wolves are told and what the night-1 plan asks for, never what they may do. After the first night the pack may drop it, and when a play fails, wolves are offered ways to change course, such as a called-out wolf counter-claiming seer on the spot, as options to weigh rather than rules. Each plays it in their own character, so the pack does not all sound alike.
+**Tradeoff.** A dealt tactic can be the wrong one for the cards. So it changes what the wolves are told and what the night-1 plan asks for, never what they may do. After the first night the pack may drop the faker or the hook, and when a play fails, wolves are offered ways to change course, such as a called-out wolf counter-claiming seer on the spot, as options to weigh rather than rules. Each plays it in their own character, so the pack does not all sound alike.
 
 The rest of the two playbooks follows three principles. The exact wording, in both languages, is in `brain/text.go`.
 
@@ -115,14 +115,14 @@ The random brain keeps its wolves off teammates while it has anyone else to pick
 
 ## Making nine LLMs play by the rules
 
-**The line.** Lying about the game is legal: a wolf may claim any role and report any check. Making things up about the table is not: a player who is not seated, a vote that is not allowed, a speech nobody gave.
+**The line.** Lying about the game is legal: a wolf may claim any role and report any check, as long as they do not contradict their own earlier claims. Making things up about the table is not: a player who is not seated, a vote that is not allowed, a speech nobody gave.
 
 So the game master checks every answer. If it is not valid, all the problems are sent back together and the player answers again, up to 2 more times.
 
 - `target` and `suspect` must be on the list given; for example, you cannot vote for yourself.
-- `claim` may only claim seer, witch, hunter or villager. Anyone it names must be at the table, and a seer's result must be good or werewolf.
+- `claim` may only claim seer, witch, hunter or villager. Anyone it names must be at the table, and a seer's result must be good or werewolf. Someone who has claimed seer cannot then claim anything else, and cannot report a check they already gave the other way round. A villager claim may still give way to a power role coming out, as at a real table.
 - Notes may not name anyone not at the table, and a read must be werewolf, good or unsure.
-- The wolf plan: tomorrow's vote target must be a living good player who is not tonight's victim. A counter-claim names a wolf as faker, who must then claim seer in their campaign or speech that day; the hook names a wolf as the hook; deep cover names neither. Only the first night's plan must name one, so the pack can change course once its faker is out.
+- The wolf plan: tomorrow's vote target must be a living good player who is not tonight's victim. Every plan names a wolf as faker, who must then claim seer in their campaign or speech that day; the hook names another wolf as the hook. Only the first night's plan must name them, so the pack can change course once its faker is out.
 - No speech, night talk included, may quote someone who has never spoken in public ("said", "mentioned", "'s speech"), and nobody may say what someone still waiting for their turn "just" said. On Night 1 the prompt says outright that nobody has spoken.
 - Day speeches and last words may not use "no evidence", "no proof" or "nobody else confirmed it" as a reason: that is true of every claim.
 - A speech may not refer to the speaker by their own name.
@@ -155,7 +155,7 @@ A durable timer (`phaseDelay`) pauses between phases, so watchers can follow, an
 
 The election runs once, on Day 1, before the first night's deaths are announced, as at a real table: whoever died that night runs and votes like anyone, and a sheriff among them passes the badge as soon as the deaths are out. `night` returns its deaths and `daybreak` announces them, after the election on Day 1 and straight away after any other night. It is simpler than the table game: a tie loses the badge instead of going to a run-off, and candidates may withdraw only once, together, after every campaign speech. Those who never ran vote; a candidate does not, even one who withdrew. A lone candidate left wins without a vote, and the host says so. No candidates, everyone a candidate, everyone withdrawing, or a tie all mean no sheriff.
 
-The seer is offered only their own name and always runs, since their checks are worth the most with the badge, and is told to give a badge flow in the campaign: who they check next and who gets the badge if they fall. The first night's wolf plan names a `runner`, and that wolf runs too, as does a faker, so the pack always contests the badge; left to choose, the wolves often all stayed out. Both count as running whatever their brain answers. A wolf a person plays is never sent: the plan is advice to them, not a rule. Everyone else's decision comes from their badge lean. The `run` instruction adds that running is not just for power roles and that the more who run, the fewer are left to vote, aiming for three to five candidates rather than the seer and a wolf alone.
+The seer is offered only their own name and always runs, since their checks are worth the most with the badge, and is told to give a badge flow in the campaign: who they check next and who gets the badge if they fall. The first night's wolf plan names a faker, who runs too, so the pack always contests the badge; left to choose, the wolves often all stayed out. Both count as running whatever their brain answers. A wolf a person plays is never sent: the plan is advice to them, not a rule. Everyone else's decision comes from their badge lean. The `run` instruction adds that running is not just for power roles and that the more who run, the fewer are left to vote, aiming for three to five candidates rather than the seer and a wolf alone.
 
 The sheriff speaks last every day: the speaking order starts at the seat after them. Theirs is the closing speech that calls the vote, so the vote follows it at once; there is no second time round the table. `game.Tally` counts in half votes, 3 for the sheriff and 2 for anyone else, so the sheriff breaks a tie but cannot outvote two players. When the sheriff is out and the game is not over, they get a `badge` turn: a living player, or `pass` to tear the badge up. A night death passes it at dawn; a day exile after their last words. Either way that comes before a hunter's shot, and a sheriff the hunter shoots passes it on in turn.
 

@@ -179,9 +179,10 @@ func TestCheckAsksOnlyWhatTheFormCanGetWrong(t *testing.T) {
 	assert.NoError(t, Check(vote, brain.Action{Target: "Karen"}))
 	assert.Error(t, Check(vote, brain.Action{Target: "Eileen"}))
 
-	plan := brain.Turn{Lang: game.English, Kind: brain.WolfPlan, Tactic: game.DeepCover, Pack: []string{"Eileen", "Karen"}, Candidates: []string{"Gym Bro"}}
-	assert.NoError(t, Check(plan, brain.Action{Target: "Gym Bro", Speech: "quiet day", Faker: game.Nobody}))
-	assert.Error(t, Check(plan, brain.Action{Target: "Gym Bro", Speech: "quiet day", Faker: "Karen"}), "deep cover has no fake seer")
+	plan := brain.Turn{Lang: game.English, Kind: brain.WolfPlan, Round: 1, Tactic: game.Hook, Pack: []string{"Eileen", "Karen"}, Candidates: []string{"Gym Bro"}}
+	assert.NoError(t, Check(plan, brain.Action{Target: "Gym Bro", Speech: "Karen claims", Faker: "Karen", Hook: "Eileen"}))
+	assert.Error(t, Check(plan, brain.Action{Target: "Gym Bro", Speech: "Gym Bro claims", Faker: "Gym Bro"}), "only a packmate fakes the seer")
+	assert.Error(t, Check(plan, brain.Action{Target: "Gym Bro", Speech: "Karen does both", Faker: "Karen", Hook: "Karen"}), "the hook is not the faker")
 }
 
 func get[T any](t *testing.T, url string, code int, decode bool) T {

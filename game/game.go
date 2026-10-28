@@ -519,27 +519,24 @@ type Plan struct {
 	Hook string `json:"hook,omitempty"`
 	// Focus is who the pack pushes the vote onto tomorrow.
 	Focus string `json:"focus,omitempty"`
-	// Runner is the wolf who runs for sheriff on the first day, besides the
-	// faker, who always runs.
-	Runner string `json:"runner,omitempty"`
-	Notes  string `json:"notes,omitempty"`
+	Notes string `json:"notes,omitempty"`
 }
 
-// Tactic is how the pack plays a whole game. It is dealt with the roles, so
-// that the wolves do not settle on the same best play every game.
+// Tactic is how the rest of the pack plays a whole game around the faker:
+// every pack has a wolf claim to be the seer on Day 1, since a pack that
+// leaves the real seer unchallenged loses. It is dealt with the roles, so that
+// the wolves do not settle on the same play every game.
 type Tactic string
 
 const (
-	// Counterclaim has a wolf claim to be the seer and the pack back him.
+	// Counterclaim has the rest of the pack back the faker.
 	Counterclaim Tactic = "counterclaim"
-	// DeepCover has no wolf claim anything; they blend in and never vote as a bloc.
-	DeepCover Tactic = "deep_cover"
-	// Hook has one wolf side with the good players, even against a teammate,
-	// to be trusted later.
+	// Hook has one more wolf side with the good players, even against the
+	// faker, to be trusted later.
 	Hook Tactic = "hook"
 )
 
-var Tactics = []Tactic{Counterclaim, DeepCover, Hook}
+var Tactics = []Tactic{Counterclaim, Hook}
 
 type State struct {
 	Lang    Lang     `json:"lang,omitempty"`

@@ -264,11 +264,11 @@ func prompt(t Turn) (system, user string) {
 	}
 	if p := t.Plan; p != nil && t.Phase == game.Day {
 		day := tx.noFaker
-		switch {
-		case p.Faker != "":
+		if p.Faker != "" {
 			day = fmt.Sprintf(tx.faker, p.Faker)
-		case p.Hook != "":
-			day = fmt.Sprintf(tx.hook, p.Hook)
+		}
+		if p.Hook != "" {
+			day += fmt.Sprintf(tx.hook, p.Hook)
 		}
 		fmt.Fprintf(&b, tx.planLine, day, p.Focus)
 		if t.MustFakeSeer() && (t.Kind == Speech || t.Kind == Campaign) {
@@ -306,15 +306,9 @@ func prompt(t Turn) (system, user string) {
 	switch {
 	case t.Kind == Prepare:
 	case t.Kind == WolfPlan:
-		fields = append(fields, f.victim)
-		switch t.Tactic {
-		case game.Counterclaim:
-			fields = append(fields, f.faker)
-		case game.Hook:
+		fields = append(fields, f.victim, f.faker)
+		if t.NamesHook() {
 			fields = append(fields, f.hook)
-		}
-		if t.NamesRunner() {
-			fields = append(fields, f.runner)
 		}
 		fields = append(fields, f.focus, f.plan)
 	case t.Kind.IsChoice():
@@ -329,14 +323,9 @@ func prompt(t Turn) (system, user string) {
 		fmt.Fprintf(&b, tx.targetOnly, l.List(l.SayAll(t.Candidates)))
 	}
 	if t.Kind == WolfPlan {
-		switch t.Tactic {
-		case game.Counterclaim:
-			fmt.Fprintf(&b, tx.fakerOnly, l.List(l.SayAll(t.PlanNames())))
-		case game.Hook:
+		fmt.Fprintf(&b, tx.fakerOnly, l.List(l.SayAll(t.PlanNames())))
+		if t.NamesHook() {
 			fmt.Fprintf(&b, tx.hookOnly, l.List(l.SayAll(t.PlanNames())))
-		}
-		if t.NamesRunner() {
-			fmt.Fprintf(&b, tx.runnerOnly, l.List(t.Pack))
 		}
 		fmt.Fprintf(&b, tx.focusOnly, l.List(l.SayAll(t.Suspects)))
 	}

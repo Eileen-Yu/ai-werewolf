@@ -247,11 +247,11 @@ func Check(t brain.Turn, a brain.Action) error {
 		}
 	}
 	if t.Kind == brain.WolfPlan {
-		if a.Faker != "" && a.Faker != game.Nobody && (t.Tactic != game.Counterclaim || !slices.Contains(t.Pack, a.Faker)) {
-			problems = append(problems, "only a packmate may fake the seer, and only when the pack counterclaims")
+		if a.Faker != "" && a.Faker != game.Nobody && !slices.Contains(t.Pack, a.Faker) {
+			problems = append(problems, "only a packmate may fake the seer")
 		}
-		if a.Hook != "" && a.Hook != game.Nobody && (t.Tactic != game.Hook || !slices.Contains(t.Pack, a.Hook)) {
-			problems = append(problems, "only a packmate may be the hook, and only when the pack plays the hook")
+		if a.Hook != "" && a.Hook != game.Nobody && (!t.NamesHook() || !slices.Contains(t.HookNames(a.Faker), a.Hook)) {
+			problems = append(problems, "only a packmate other than the faker may be the hook, and only when the pack plays the hook")
 		}
 	}
 	if len(problems) > 0 {

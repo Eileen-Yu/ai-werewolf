@@ -26,7 +26,7 @@ type text struct {
 	badTarget, emptySpeech, badSuspect, badRole, badClaimTarget, badResult string
 	noNotes                                                                string
 	badFaker, badHook, badFocus, focusIsVictim, mustFake, quoted, notYet   string
-	badRunner                                                              string
+	leftSeer, changedCheck                                                 string
 	badBelief                                                              string
 	// quoteCues are ways of quoting what someone said, which cannot follow
 	// the name of someone who has not said anything in public yet; justNow
@@ -60,7 +60,7 @@ type text struct {
 	sheriffMark, sheriffLine                                                   string
 	line                                                                       string
 	fields                                                                     fields
-	targetOnly, fakerOnly, hookOnly, focusOnly, runnerOnly                     string
+	targetOnly, fakerOnly, hookOnly, focusOnly                                 string
 	declareOnly, notesLine                                                     string
 	// preparedLine and changedNotesLine are for a turn after a Prepare turn.
 	preparedLine, changedNotesLine string
@@ -74,7 +74,6 @@ type text struct {
 // fields describe each JSON field of the answer.
 type fields struct {
 	observations, notes, changedNotes, thinking, victim, faker, hook, focus, plan string
-	runner                                                                        string
 	target, speech, suspect, claim                                                string
 }
 
@@ -171,15 +170,20 @@ var chineseText = text{
 			"村民也可以很强势：认准一个人就穷追猛打，强势带队归票，不必等别人先开口。",
 	},
 	tactics: map[game.Tactic]string{
-		game.Counterclaim: "本局狼队的打法是悍跳：计划里指定一只狼，上警竞选（没有竞选的日子就是当天第一次发言）就跳预言家，报假的查验结果，和真预言家对跳争夺信任。" +
-			"悍跳就要往死里干：把自己当成真预言家，一心想带好人赢，所以你认定对面那个预言家一定是狼。查杀报给他或者他最信任的人，每一轮都咬死他：拿他发言里的漏洞、他的查验和死亡、投票对不上的地方，盘出一套完整的逻辑证明你才是真的。口气越笃定，越有人信你、投你；不要犹豫，不要退让。" +
-			"悍跳的狼不要给同伴报好人：给狼报金水、金水再跟着他投票，等于把同伴亮出来。金水报给好人，查杀报给真预言家或者发言最有威胁的好人。" +
-			"其他狼最多一只站边悍跳的狼，另一只装中立甚至站边真预言家，投票时分开投。如果悍跳的狼已经被识破、保不住了，其他狼可以和他切割，像倒钩一样跟着踩他、投他。",
-		game.DeepCover: "本局狼队的打法是潜水：一般谁都不跳神职，全都装成普通村民。" +
-			"潜水不等于不说话：要像一个很想赢的强势村民，主动带节奏、抓好人的漏洞、点名推人。白天不要几只狼一起冲同一个人，也不要互相维护，免得被看出是一伙的。" +
-			"计划里的 focus 是你们各自顺势推一把的人，不是一起冲的人。你们装的是互不相识的村民，所以同伴已经暴露、救不回来时，跟着大家投他反而更符合人设。",
-		game.Hook: "本局狼队的打法是倒钩：计划里指定一只狼当倒钩，他白天装成最坚定的好人：站边真预言家，同伴暴露了就跟着踩，甚至投他，用一个同伴换来好人的信任，留到后面关键的时候再带偏票。" +
-			"其他狼一般不跳预言家，也不要和倒钩的狼互相维护。倒钩是计划里主动牺牲同伴换信任的人；其他狼也可以踩同伴，但只在局势真的需要时。",
+		game.Counterclaim: "本局狼队一定悍跳：第1夜的计划指定一只狼，第1天上警，在竞选发言里跳预言家，和真预言家正面对跳抢警徽。这一步不能省：没人对跳，真预言家就能独自带着好人一路验下去，狼队必输。" +
+			"悍跳的狼要比真预言家更像预言家，也更犀利。起跳就报全：一个查验，为什么验他，再报警徽流（接下来两晚验谁、你出局时警徽交给谁）。含糊、犹豫、不报警徽流，一眼就假。" +
+			"查杀给谁看局势：真预言家已经跳了，就直接把他打成来抢警徽的狼；还没跳，就报给发言最有威胁、或者最可能被真预言家报金水的好人。金水只给好人，绝不给同伴：给狼报金水、金水再跟着你投票，等于把同伴亮出来。" +
+			"进攻是你的主线：把对面预言家的每一个破绽都抓出来，验人理由站不站得住，警徽流合不合理，查验和死亡、票型对不对得上，盘成一条完整的逻辑链，结论只有一个：他是狼。语气笃定，敢点名，敢归票，不要退让。" +
+			"打法要灵活：每天根据新的死亡、票型和发言更新说法，新发生的事要解释进你的逻辑，不能装没看见；局势变了，攻击点也跟着换。" +
+			"但必须自洽：每天报新一晚的查验，按你自己的警徽流验；报过的查验、身份和说过的理由都不能改，主持人会把改口的发言打回去。编之前先想好，这个结果和你之前说的、和场上发生的能不能对上。" +
+			"其他狼冲锋：明着站边悍跳的狼，用你自己的理由去打真预言家和他的金水，不要复述悍跳狼的话。但不要几只狼一起冲同一个人、同一票：最多一只铁站边，另一只晚一点、像被说服一样站过来。悍跳的狼被识破、保不住时，可以和他切割。",
+		game.Hook: "本局狼队一定悍跳：第1夜的计划指定一只狼，第1天上警，在竞选发言里跳预言家，和真预言家正面对跳抢警徽。这一步不能省：没人对跳，真预言家就能独自带着好人一路验下去，狼队必输。" +
+			"悍跳的狼要比真预言家更像预言家，也更犀利。起跳就报全：一个查验，为什么验他，再报警徽流（接下来两晚验谁、你出局时警徽交给谁）。含糊、犹豫、不报警徽流，一眼就假。" +
+			"查杀给谁看局势：真预言家已经跳了，就直接把他打成来抢警徽的狼；还没跳，就报给发言最有威胁、或者最可能被真预言家报金水的好人。金水只给好人，绝不给同伴：给狼报金水、金水再跟着你投票，等于把同伴亮出来。" +
+			"进攻是你的主线：把对面预言家的每一个破绽都抓出来，验人理由站不站得住，警徽流合不合理，查验和死亡、票型对不对得上，盘成一条完整的逻辑链，结论只有一个：他是狼。语气笃定，敢点名，敢归票，不要退让。" +
+			"打法要灵活：每天根据新的死亡、票型和发言更新说法，新发生的事要解释进你的逻辑，不能装没看见；局势变了，攻击点也跟着换。" +
+			"但必须自洽：每天报新一晚的查验，按你自己的警徽流验；报过的查验、身份和说过的理由都不能改，主持人会把改口的发言打回去。编之前先想好，这个结果和你之前说的、和场上发生的能不能对上。" +
+			"其他狼里指定一只倒钩：他装成最坚定的好人，站边真预言家，甚至踩悍跳的同伴、投他，用这份信任换后面关键时候带偏的一票。倒钩的狼不要和悍跳的狼有任何默契，剩下的狼可以站边悍跳的狼，但同样要有自己的理由。",
 	},
 	goodVoting: "投票的目的不是投出你个人最怀疑的人，而是让好人真的放逐一只狼。投票前想一想：你的票能不能帮放逐一个可疑的人？" +
 		"如果场上有好几个都像狼的人，好人的票却分散在他们身上，宁可并到其中最有可能出局的那个，除非你有很强的证据说明那个人是好人。但不要为了跟大多数而放弃自己的判断。" +
@@ -189,15 +193,15 @@ var chineseText = text{
 		"但合票不等于跟风。全场很快一边倒时反而要多想一层：这个怀疑是不是只建立在一件事上？被怀疑的人的解释说得通吗？是谁最先带的节奏、谁一直在推？狼人最喜欢混进现成的共识，借好人的手推出好人。这时候看谁拿出了自己的新理由、谁只是在复述：只复述、只跟票的那几个，往往就是狼坑。" +
 		"首日投票和大家不一样本身不算狼的证据：狼会投同伴做身份，好人也会独立判断出错。要附和别人，就说出你自己新的理由；说不出，就说明你只是在跟票。" +
 		"愿不愿意跟别人走，由你的性格决定：有人容易被说服，有人认死理，有人专门唱反调。",
-	adapt: "这个打法是狼队开局的倾向，不是整局的硬规定。第一夜的计划必须按这个打法来。之后局势变了，比如悍跳的狼已经出局或被识破、倒钩已经没用，可以不再派人，改打别的：抓好人真实的破绽、他们自己说过却没做到的话，比编造更有效。",
+	adapt: "第一夜的计划必须派悍跳，倒钩局还要派倒钩。之后局势变了，比如悍跳的狼已经出局、倒钩已经没用，可以不再派人，改打别的：抓好人真实的破绽、他们自己说过却没做到的话，比编造更有效。已经跳了预言家的狼即使被识破，也只能咬死到底，不能改口。",
 	instructions: map[TurnKind]string{
 		Prepare:  "现在还没轮到你发言，别人正在发言。先把到目前为止新发生的事整理进你的笔记：observations、beliefs、strategy 照常写，这一步不说话。轮到你的时候，只需要再看这之后的新发言。",
 		Speech:   "白天发言环节，轮到你了。",
-		WolfChat: "现在是夜里，只有狼同伴能听到你说话。和同伴商量：今晚杀谁；白天怎么按本局的打法来打，票往谁身上引；第1夜还要说好明天谁上警。",
+		WolfChat: "现在是夜里，只有狼同伴能听到你说话。和同伴商量：今晚杀谁；白天怎么按本局的打法来打，票往谁身上引；第1夜还要说好谁悍跳、查杀报给谁、警徽流怎么报。",
 		WolfPlan: "夜聊结束，你代表狼队定下最终计划，同伴白天会照着执行，主持人也会检查你的计划和局势是否一致。" +
 			"target 是今晚要杀的人，优先杀可能是神职、或者发言最有威胁的人；也可以自刀，选自己或同伴。" +
 			"focus 是明天要把票引向的人：他明天必须还活着，所以不能是今晚要杀的人。引票靠好人的票，不靠狼队一起投：speech 里说清楚谁投 focus、谁投别人。" +
-			"第1夜还要定 runner：明天上警的狼。警徽是狼队抢主动权的机会；悍跳的狼自己一定上警，runner 可以是他，也可以再派一只。" +
+			"faker 是上警悍跳预言家的狼，第1夜必须定一只；之后悍跳的狼还在，一般就是他接着跳。" +
 			"speech 写白天按本局打法的具体打法，不超过80字。",
 		LastWords: "你被投票放逐了，发表遗言，不超过80字。",
 		Aftermath: "游戏结束了，所有人的身份都在【公开记录】的最后公开了。这是赛后复盘，像真人玩家散场前那样自然地聊：拿【你的笔记】对照真相，你哪里看对了、哪里看错了，被谁骗了、服不服，哪一手是关键，也可以接前面的人的话吐槽或者认错。按你的性格说，要具体到人和事，不超过100字。",
@@ -208,7 +212,7 @@ var chineseText = text{
 		Shoot:     "你出局了，作为猎人可以开枪带走一个人：选一个名字表示开枪，选\"放弃\"表示不开枪。",
 		Run: "竞选警长：选你自己的名字表示上警，选\"放弃\"表示不上警。所有人同时决定，看不到别人的选择。" +
 			"警长的1.5票和归票权很有用。上警不是神职专属：想带队、想抢话语权、想在台上看清谁在说谎的好人也可以上警。但上警的人越多，警下能投票的人越少。预言家一定上警，靠竞选发言报查验、拿警徽带队。" +
-			"狼队为了赢面也一定要有狼上警：悍跳的狼必须上警，和预言家正面对跳；其他打法也要派狼上警抢警徽、站边或搅局。第1夜的计划会派一只狼上警，悍跳的狼也一定上警，其他狼按局势和性格决定。上警的人不能投票选警长。",
+			"悍跳的狼一定上警，在竞选发言里和预言家正面对跳。其他狼按局势和性格决定：警上多一只狼可以帮着站边或搅局，但警下也要留狼的票。上警的人不能投票选警长。",
 		Campaign: "你上警了，这是你的竞选发言：说清楚为什么大家该把警徽给你，比如报出你的身份和查验，或者你会怎么带队找狼。不超过80字。",
 		Withdraw: "竞选发言都结束了，正式投票前你可以退水：选你自己的名字表示继续竞选，选\"放弃\"表示退水。所有还在竞选的人同时决定。" +
 			"退水的人不能当警长，也不能投票选警长。看清楚其他人的竞选发言：如果你信任的人更适合拿警徽，或者你的发言被打穿了，可以退水；还想要警徽就留下。" +
@@ -224,10 +228,11 @@ var chineseText = text{
 	badRole:        "claim.role 只能是预言家、女巫、猎人、村民之一，你给的是 %q",
 	badClaimTarget: "claim.target %q 不是桌上的其他玩家",
 	badResult:      "预言家的 claim.result 只能是好人或狼人，你给的是 %q",
-	badFaker:       "本局要悍跳，faker 只能是：%s，你给的是 %q",
-	badHook:        "本局要倒钩，hook 只能是：%s，你给的是 %q",
+	badFaker:       "第1夜必须派一只狼悍跳，faker 只能是：%s，你给的是 %q",
+	badHook:        "本局要倒钩，hook 只能是悍跳以外的：%s，你给的是 %q",
 	badFocus:       "focus 必须是这些好人阵营的候选之一：%s，你给的是 %q",
-	badRunner:      "第1夜要派一只狼上警，runner 只能是：%s，你给的是 %q",
+	leftSeer:       "你之前已经跳了预言家，不能改口成%s：预言家的身份要坚持到底",
+	changedCheck:   "你之前报过%s是%s，现在不能改成%s：前后矛盾一眼就假",
 	focusIsVictim:  "%s今晚就会被杀，明天不可能再投票放逐他：focus 要换一个人",
 	mustFake:       "狼队计划要你今天悍跳预言家：claim.role 必须是预言家，并报一个查验结果",
 	quoted:         "%s还没有公开发过言，你不能说\"%s%s\"",
@@ -265,11 +270,11 @@ var chineseText = text{
 	planLine:     "狼队今天的计划：%s，票投%s。\n",
 	noFaker:      "没人悍跳",
 	faker:        "%s悍跳预言家",
-	hook:         "%s倒钩",
+	hook:         "，%s倒钩",
 	hookLine:     "你就是倒钩的狼：今天要像最坚定的好人一样发言和投票，站边你认为是真的预言家，必要时可以怀疑、投票给狼同伴。\n",
 	habitNow:     "你的习惯倾向是：%s。但这一轮先看局势：证据和票型明确时，就照局势来。\n",
 	badgeNow:     "你对上警的态度：%s。这是你性格的倾向，身份和狼队计划可以改变它。\n",
-	mustFakeLine: "你就是要悍跳的人：这次发言必须跳预言家，claim.role 写预言家，并报一个查验结果。\n",
+	mustFakeLine: "你就是要悍跳的人：这次发言必须跳预言家，claim.role 写预言家，并报一个查验结果。要犀利、有攻击性，也要和你之前报过的查验、警徽流对得上。\n",
 	known:        "你确定知道的事，和任何人的说法冲突时以这些为准：\n",
 	nobodySpoke: "到现在为止还没有任何人公开发过言，也没有任何公开信息，谁是什么身份完全不知道。" +
 		"不能评价任何人的发言或观点，也不要编\"他像预言家\"这类没有依据的理由；需要选人时只能靠猜，就直说是猜的。\n",
@@ -310,7 +315,6 @@ var chineseText = text{
 		faker:        `"faker": "明天悍跳预言家的狼"`,
 		hook:         `"hook": "倒钩的狼"`,
 		focus:        `"focus": "明天把票引向的人"`,
-		runner:       `"runner": "明天上警的狼"`,
 		plan:         `"speech": "白天的具体打法"`,
 		target:       `"target": "名字"`,
 		speech:       `"speech": "你要说出口的话"`,
@@ -324,9 +328,8 @@ var chineseText = text{
 	line:             "[%s] %s：%s\n",
 	targetOnly:       "target 只能是这些名字之一：%s。\n",
 	fakerOnly:        "faker 只能是：%s。\n",
-	hookOnly:         "hook 只能是：%s。之前定过的倒钩还在场的话，不要换人。\n",
+	hookOnly:         "hook 只能是：%s，不能和 faker 是同一只。之前定过的倒钩还在场的话，不要换人。\n",
 	focusOnly:        "focus 只能是：%s，而且不能和 target 是同一个人。\n",
-	runnerOnly:       "runner 只能是：%s。\n",
 	declareOnly:      "suspect 只能是这些之一：%s。claim 是你这次公开声明的身份；不声明身份就写 null，不要写成字符串。suspect 和 claim 会由主持人公开记录，必须和你的 speech 一致。\n",
 	preparedLine:     "你的笔记刚刚整理到了最新一段发言之前。这次 observations 只写那之后的新事，想清楚怎么回应它们。\n",
 	changedNotesLine: "notes 只写这次判断有变化的人，没写的人保持原来的笔记；什么都没变就不写 notes。名字只能是桌上的人，不要写你自己。JSON 里每一项之间都要有逗号，最后一项后面不要有逗号。",
@@ -436,15 +439,20 @@ Write everything in English.`,
 			"A villager can be aggressive too: once you are sure of someone, go after them hard and lead the vote, without waiting for others to speak first.",
 	},
 	tactics: map[game.Tactic]string{
-		game.Counterclaim: "This game the pack plays the counter-claim: the plan names one werewolf who claims seer in their sheriff campaign (or, on a day with no election, their first speech) and reports a fake check to fight the real seer for the table's trust. " +
-			"A counter-claim goes all in: be the real seer in your own head, desperate to lead the good side to victory, and so certain the other seer is a werewolf. Report them, or whoever they trust most, as a werewolf, and stay on them every round: use the holes in their speeches and where their checks do not fit the deaths and votes to build a full case that you are the real one. The surer you sound, the more people believe you and vote with you; never hesitate, never back down. " +
-			"The faker never reports a teammate as good: vouching for a werewolf who then votes with you gives them away. Report good players as good, and the real seer or the most dangerous good player as a werewolf. " +
-			"At most one of the others sides with the faker; another plays neutral or even backs the real seer, and you split your votes. If the faker is seen through and cannot be saved, the rest of you may cut them loose and pile on, as a hook would.",
-		game.DeepCover: "This game the pack plays deep cover: as a rule none of you claims a power role; you all pass as plain villagers. " +
-			"Deep cover is not keeping quiet: play a villager who badly wants to win, drive the table, go after good players' holes and push someone out. By day, never pile onto the same person together and never defend each other, or you will be read as a team. " +
-			"The plan's focus is someone each of you nudges along, not someone you charge together. You are playing strangers, so when a teammate is exposed and done for, voting them out with the table fits your cover.",
-		game.Hook: "This game the pack plays the hook: the plan names one werewolf as the hook, who plays the staunchest good player at the table, backs the real seer, and when a teammate is exposed piles on and even votes them out, trading a teammate for the good side's trust to steer a vote later when it counts. " +
-			"The others usually do not claim seer, and do not defend the hook. The hook is the one the plan has trade a teammate for trust; the rest of you may turn on a teammate too, but only when the game calls for it.",
+		game.Counterclaim: "This game the pack always counter-claims: the first night's plan names one werewolf who runs for sheriff on Day 1 and claims seer in the campaign, taking the real seer on head to head for the badge. This cannot be skipped: with nobody challenging them, the real seer leads the good side check by check, and the pack loses. " +
+			"The faker must look more like a seer than the real one, and be sharper. Claim with everything at once: a check, why you checked them, and a badge flow (who you check the next two nights, and who gets the badge if you fall). Vague, hesitant, or no badge flow, and you are plainly fake. " +
+			"Who you report as a werewolf depends on the table: if the real seer has claimed, call them the werewolf come to steal the badge; if not, report the most dangerous good speaker, or whoever the real seer would likely clear. Clear only good players, never a teammate: vouching for a werewolf who then votes with you gives them away. " +
+			"Attack is your line: take every hole in the other seer apart, whether their reason for a check holds up, whether their badge flow makes sense, whether their checks fit the deaths and the votes, and build one complete chain of reasoning with one conclusion: they are the werewolf. Sound certain, name names, call the vote, never back down. " +
+			"Stay flexible: every day, update your story with the new deaths, votes and speeches, fitting what happened into your reasoning instead of ignoring it; when the game moves, move your attack. " +
+			"But stay consistent: report a new check every day, following your own badge flow; a check, a role or a reason you have given never changes, and the host sends back any speech that goes back on them. Before you make something up, check it fits what you said before and what has happened. " +
+			"The rest of you charge: back the faker openly, going after the real seer and whoever they cleared with reasons of your own, never repeating the faker's. But never pile onto the same person with the same vote together: at most one of you backs the faker from the start, another comes round later, as if persuaded. If the faker is seen through and cannot be saved, you may cut them loose.",
+		game.Hook: "This game the pack always counter-claims: the first night's plan names one werewolf who runs for sheriff on Day 1 and claims seer in the campaign, taking the real seer on head to head for the badge. This cannot be skipped: with nobody challenging them, the real seer leads the good side check by check, and the pack loses. " +
+			"The faker must look more like a seer than the real one, and be sharper. Claim with everything at once: a check, why you checked them, and a badge flow (who you check the next two nights, and who gets the badge if you fall). Vague, hesitant, or no badge flow, and you are plainly fake. " +
+			"Who you report as a werewolf depends on the table: if the real seer has claimed, call them the werewolf come to steal the badge; if not, report the most dangerous good speaker, or whoever the real seer would likely clear. Clear only good players, never a teammate: vouching for a werewolf who then votes with you gives them away. " +
+			"Attack is your line: take every hole in the other seer apart, whether their reason for a check holds up, whether their badge flow makes sense, whether their checks fit the deaths and the votes, and build one complete chain of reasoning with one conclusion: they are the werewolf. Sound certain, name names, call the vote, never back down. " +
+			"Stay flexible: every day, update your story with the new deaths, votes and speeches, fitting what happened into your reasoning instead of ignoring it; when the game moves, move your attack. " +
+			"But stay consistent: report a new check every day, following your own badge flow; a check, a role or a reason you have given never changes, and the host sends back any speech that goes back on them. Before you make something up, check it fits what you said before and what has happened. " +
+			"One of the others plays the hook: the staunchest good player at the table, backing the real seer, even turning on the faker and voting them out, buying trust to steer a vote later when it counts. The hook shows no understanding with the faker; the remaining wolf may back the faker, with reasons of their own too.",
 	},
 	goodVoting: "The point of a vote is not to vote out the person you personally suspect most, but for the good side to actually get a werewolf out. Before you vote, ask whether your vote can realistically help vote out someone suspicious. " +
 		"If several players look like werewolves and the good side's votes are split across them, rather join the one most likely to go, unless you have strong evidence that one is good. But do not drop your own reasoning just to follow the majority. " +
@@ -454,15 +462,15 @@ Write everything in English.`,
 		"But joining a vote is not following the crowd. When the whole table swings one way fast, think twice: does the suspicion rest on a single fact? Does the suspect's explanation hold up? Who started the push, and who keeps driving it? Werewolves love to slip into a ready-made consensus and let good players vote out one of their own. Then look at who brought a new reason of their own and who only echoed: the ones who only echo and follow the vote are often where the werewolves are. " +
 		"Voting differently from everyone on Day 1 is not evidence on its own: werewolves vote for a teammate to look good, and good players misjudge on their own. If you agree with someone, give a new reason of your own; if you have none, you are only following the vote. " +
 		"How readily you go along with others is down to your character: some are easily persuaded, some dig in, some argue against whatever the table says.",
-	adapt: " This play is where the pack starts, not a rule for the whole game. The first night's plan must play it. After that, when things change, say the faker is out or has been seen through, or the hook is no longer of use, you may name nobody and play something else: a good player's real slip, something they said they would do and did not, works better than anything made up.",
+	adapt: " The first night's plan must name a faker, and a hook when the pack plays the hook. After that, when things change, say the faker is out or the hook is no longer of use, you may name nobody and play something else: a good player's real slip, something they said they would do and did not, works better than anything made up. A wolf who has claimed seer sticks to it to the end, even once seen through.",
 	instructions: map[TurnKind]string{
 		Prepare:  "It is not your turn to speak yet; someone else is speaking. Bring your notes up to date with everything new so far: write observations, beliefs and strategy as usual, and say nothing this time. When your turn comes, you will only need to read what was said after this.",
 		Speech:   "It is the day's speeches and your turn to speak.",
-		WolfChat: "It is night, and only your fellow werewolves can hear you. Agree on who to kill tonight and how to play the day the way this game's play calls for, and who to push the vote onto; on the first night, also agree who runs for sheriff tomorrow.",
+		WolfChat: "It is night, and only your fellow werewolves can hear you. Agree on who to kill tonight and how to play the day the way this game's play calls for, and who to push the vote onto; on the first night, also agree who fakes the seer, who they report as a werewolf, and their badge flow.",
 		WolfPlan: "The night chat is over. Set the pack's final plan; your teammates will follow it by day, and the host will check it against the game. " +
 			"target is who to kill tonight: ideally someone who may hold a power role, or whose speeches are most dangerous to you; you may also self-kill, picking yourself or a teammate. " +
 			"focus is who the pack steers the vote onto tomorrow: they must still be alive then, so not tonight's target. You steer with good players' votes, not by all voting together: say in speech who votes for focus and who votes elsewhere. " +
-			"On the first night, also set runner: the werewolf who runs for sheriff tomorrow. The badge is the pack's chance to take the lead; a faker always runs, and runner may be the faker or one more wolf. " +
+			"faker is the werewolf who runs and claims seer; the first night's plan must name one, and after that, while the faker is alive, it is usually them again. " +
 			"speech is how you play the day this game's way, at most 40 words.",
 		LastWords: "You have been voted out. Give your last words, at most 40 words.",
 		Aftermath: "The game is over, and everyone's role was revealed at the end of the [Public record]. This is the chat after the game, as real players have before they leave: check [Your notes] against the truth, say what you read right and wrong, who fooled you and whether you saw it coming, which move decided it; answer those who spoke before you, tease them or own up. In character, about real people and moments, at most 50 words.",
@@ -473,7 +481,7 @@ Write everything in English.`,
 		Shoot:     "You are out. As the hunter you may shoot one person and take them with you: pick a name to shoot, or \"pass\" not to.",
 		Run: "Sheriff election: pick your own name to run for sheriff, or \"pass\" not to. Everyone decides at once, without seeing anyone else's choice. " +
 			"The sheriff's one and a half votes and the right to call the vote are worth a lot. Running is not just for power roles: a good player who wants to lead, to be heard, or to watch the liars up close may run too. But the more who run, the fewer are left to vote. The seer always runs, reporting their checks in the campaign to take the badge and lead. " +
-			"To keep their chances, the pack always has a wolf running too: a wolf set to fake the seer must run and take the seer on head to head, and under any other play a wolf runs to grab the badge, pick a side or stir things up. The first night's plan sends one wolf to run, and a faker always runs too; the other wolves decide by the game and their character. Those who run do not vote for sheriff.",
+			"The wolf faking the seer always runs, taking the seer on head to head in the campaign. The other wolves decide by the game and their character: one more wolf in the race can back the faker or stir things up, but the pack needs votes from the floor too. Those who run do not vote for sheriff.",
 		Campaign: "You are running for sheriff. This is your campaign speech: say why the table should give you the badge, such as your role and your checks, or how you will lead the hunt. At most 40 words.",
 		Withdraw: "The campaign speeches are over. Before the vote you may withdraw: pick your own name to stay in the race, or \"pass\" to withdraw. Everyone still running decides at once. " +
 			"Whoever withdraws cannot be sheriff and cannot vote for sheriff either. Weigh the other campaigns: if someone you trust is better placed to take the badge, or your own campaign was taken apart, you may withdraw; if you still want the badge, stay. " +
@@ -489,10 +497,11 @@ Write everything in English.`,
 	badRole:        "claim.role must be one of seer, witch, hunter, villager; you gave %q",
 	badClaimTarget: "claim.target %q is not another player at the table",
 	badResult:      "a seer's claim.result must be good or werewolf; you gave %q",
-	badFaker:       "this game the pack counter-claims, so faker must be one of: %s; you gave %q",
-	badHook:        "this game the pack plays the hook, so hook must be one of: %s; you gave %q",
+	badFaker:       "the first night's plan must name a werewolf to fake the seer, so faker must be one of: %s; you gave %q",
+	badHook:        "this game the pack plays the hook, so hook must be one of these, besides the faker: %s; you gave %q",
 	badFocus:       "focus must be one of these players on the good side: %s; you gave %q",
-	badRunner:      "the first night's plan sends a werewolf to run for sheriff, so runner must be one of: %s; you gave %q",
+	leftSeer:       "you have already claimed seer, so you cannot now claim %s: a seer claim stands to the end",
+	changedCheck:   "you already reported %s as %s, so you cannot now say %s: going back on a check gives you away",
 	focusIsVictim:  "%s will be killed tonight and cannot be voted out tomorrow: pick someone else as focus",
 	mustFake:       "the pack's plan has you claim seer today: claim.role must be seer, with a check result",
 	quoted:         "%s has not said anything in public yet; you cannot write \"%s%s\"",
@@ -530,11 +539,11 @@ Write everything in English.`,
 	planLine:     "The pack's plan for today: %s, and vote out %s.\n",
 	noFaker:      "nobody claims seer",
 	faker:        "%s claims seer",
-	hook:         "%s plays the hook",
+	hook:         ", %s plays the hook",
 	hookLine:     "You are the hook: speak and vote today like the staunchest good player, back whoever you judge the real seer, and suspect or vote for a teammate if you must.\n",
 	habitNow:     "Your lean is: %s. But read the situation first this round: when the evidence and the votes are clear, go with them.\n",
 	badgeNow:     "How you feel about running: %s. That is your character's lean; your role and the pack's plan can override it.\n",
-	mustFakeLine: "You are the one claiming seer: this speech must claim seer, with claim.role seer and a check result.\n",
+	mustFakeLine: "You are the one claiming seer: this speech must claim seer, with claim.role seer and a check result. Be sharp and on the attack, and fit what you already reported and your badge flow.\n",
 	known:        "What you know for certain; where anyone's word contradicts it, this wins:\n",
 	nobodySpoke: "Nobody has said anything in public yet and there is no public information at all; nobody knows anyone's role. " +
 		"Do not comment on anyone's speech or views, and do not invent reasons like \"he seems like the seer\"; if you have to pick someone, it is a guess, so say so.\n",
@@ -575,7 +584,6 @@ Write everything in English.`,
 		faker:        `"faker": "the werewolf who claims seer tomorrow"`,
 		hook:         `"hook": "the werewolf who plays the hook"`,
 		focus:        `"focus": "who you steer the vote onto tomorrow"`,
-		runner:       `"runner": "the werewolf who runs for sheriff tomorrow"`,
 		plan:         `"speech": "the plan for the day"`,
 		target:       `"target": "a name"`,
 		speech:       `"speech": "what you say out loud"`,
@@ -589,9 +597,8 @@ Write everything in English.`,
 	line:             "[%s] %s: %s\n",
 	targetOnly:       "target must be one of: %s.\n",
 	fakerOnly:        "faker must be one of: %s.\n",
-	hookOnly:         "hook must be one of: %s. If a hook was named before and is still in the game, keep them.\n",
+	hookOnly:         "hook must be one of: %s, and not the faker. If a hook was named before and is still in the game, keep them.\n",
 	focusOnly:        "focus must be one of: %s, and not the same person as target.\n",
-	runnerOnly:       "runner must be one of: %s.\n",
 	declareOnly:      "suspect must be one of: %s. claim is the role you publicly claim in this speech; if you claim none, write null, not a string. The host puts suspect and claim on the record, so they must match your speech.\n",
 	preparedLine:     "Your notes were just brought up to date, up to before the latest speech. This time, observations covers only what came after that; think about how to answer it.\n",
 	changedNotesLine: "In notes, write only the players whose belief changes this time; anyone left out keeps their old notes. If nothing changes, leave notes out. Only names at the table, never yourself. Put a comma between JSON items and none after the last one.",
