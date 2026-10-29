@@ -80,8 +80,48 @@
   .event.death { border-color:var(--wolf); background:rgba(217,83,79,.12); font-weight:600; }
   .event.vote { border-color:#6f8cff; background:rgba(111,140,255,.10); font-size:14px; }
   .event.result { border-color:var(--accent); background:rgba(224,168,74,.10); font-weight:600; }
-  #votes .line { padding:6px 0; border-bottom:1px solid var(--line); }
-  #votes .who { font-weight:600; margin-right:6px; }
+  /* Votes: the side panel keeps every result; a new one is revealed over the
+     page, vote by vote, then its outcome. */
+  #votes .vr-title { font-weight:700; margin-bottom:6px; }
+  #votes details { border-top:1px solid var(--line); padding:8px 0; }
+  #votes details:first-of-type { border-top:none; }
+  #votes summary { cursor:pointer; font-size:13.5px; font-weight:600; list-style-position:outside; }
+  #votes summary .dim { font-weight:400; }
+  #votes .replay { margin:8px 0 0; padding:4px 12px; font-size:12.5px; }
+  .vr-head { font-weight:700; font-size:16px; margin-bottom:6px; }
+  .vr-note { font-size:12.5px; color:var(--dim); margin:2px 0 6px; }
+  .vr-row { display:grid; grid-template-columns: minmax(0, 11em) 1fr 3.2em; gap:4px 10px; align-items:center; padding:7px 0; border-bottom:1px solid var(--line); }
+  .vr-name { display:flex; gap:6px; align-items:center; font-weight:600; min-width:0; }
+  .vr-name span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .vr-bar { height:10px; border-radius:5px; background:#262a36; overflow:hidden; }
+  .vr-bar i { display:block; height:100%; background:#6f8cff; border-radius:5px; transition: width .35s ease-out, background .4s; }
+  .vr-count { text-align:right; font-variant-numeric: tabular-nums; font-weight:700; }
+  .vr-voters { grid-column: 1 / -1; display:flex; flex-wrap:wrap; gap:4px; }
+  .vr-voters:empty { display:none; }
+  .vr-chip { font-size:12px; line-height:18px; padding:0 8px; border-radius:999px; background:#2a2e3a; color:#d6d9e2; white-space:nowrap; }
+  .vr-chip.wait { display:none; }
+  .vr-chip.pop { animation: pop .3s ease-out; }
+  .vr-chip.sheriff { box-shadow: inset 0 0 0 1px #d4a017; color:#f3d27a; }
+  .vr-chip.changed { background:#3b2c1a; }
+  .vr-chip .chg { color:#ffb86b; margin-left:5px; }
+  .vr-row.abstain .vr-name { color:var(--dim); font-weight:500; }
+  .vr-row.win .vr-bar i { background:var(--wolf); }
+  .vr-row.win.elected .vr-bar i { background:#d4a017; }
+  .vr-row.tied .vr-bar i { background:var(--accent); }
+  .vr-outcome { margin-top:12px; padding:10px 12px; border-radius:8px; border-left:3px solid var(--accent); background:rgba(224,168,74,.10); font-weight:700; }
+  .vr-outcome.exiled { border-color:var(--wolf); background:rgba(217,83,79,.14); }
+  .vr-outcome.wait { visibility:hidden; }
+  .vr-outcome.landed { animation: stamp .45s ease-out; }
+  #reveal { position:fixed; inset:0; z-index:30; display:grid; place-items:center; padding:16px; background:rgba(5,6,10,.7); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); animation: fade .25s; }
+  #reveal .card { width:min(560px, 100%); max-height:88vh; overflow-y:auto; margin:0; box-shadow:0 12px 40px rgba(0,0,0,.6); }
+  #reveal .actions { display:flex; justify-content:flex-end; gap:8px; }
+  #reveal .actions button { margin:12px 0 0; }
+  @keyframes pop { from { opacity:0; transform:translateY(-6px) scale(.85); } to { opacity:1; transform:none; } }
+  @keyframes stamp { from { opacity:0; transform:scale(1.12); } to { opacity:1; transform:none; } }
+  @keyframes fade { from { opacity:0; } to { opacity:1; } }
+  @media (prefers-reduced-motion: reduce) {
+    .vr-bar i, .vr-chip.pop, .vr-outcome.landed, #reveal { transition:none !important; animation:none !important; }
+  }
   #newPill { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); margin:0; padding:6px 14px; border-radius:999px;
     box-shadow:0 4px 14px rgba(0,0,0,.5); z-index:2; }
   .role { font-size:18px; font-weight:700; color:var(--accent); }
@@ -188,6 +228,9 @@
     </div>
   </section>
 </main>
+<div id="reveal" hidden role="dialog" aria-modal="true" aria-labelledby="revealTitle">
+  <div class="card"><div id="revealBody"></div><div class="actions"><button id="revealSkip" class="secondary" type="button"></button><button id="revealClose" class="secondary" type="button"></button></div></div>
+</div>
 <button id="rulesBtn" class="secondary" type="button"></button>
 <section id="rules" class="card" hidden><button id="rulesClose" type="button" aria-label="close">×</button><div id="rulesBody"></div></section>
 <script>
@@ -201,10 +244,18 @@ const UI = {
     kinds: { speech: "轮到你发言", wolf_chat: "狼队夜聊", wolf_plan: "你来定今晚的计划",
       last_words: "留下遗言", vote: "投票放逐", inspect: "今晚查验谁", save: "要用解药救他吗", poison: "要用毒药吗", shoot: "开枪带走谁",
       run: "竞选警长：要上警吗", campaign: "警长竞选发言", withdraw: "竞选结束：要退水吗", sheriff_vote: "投票选警长", badge: "移交警徽" },
-    run: "上警", noRun: "不上警", stay: "继续竞选", withdraw: "退水", tearBadge: "撕掉警徽", sheriff: "警长", sheriffBallot: "（警长，1.5票）",
+    run: "上警", noRun: "不上警", stay: "继续竞选", withdraw: "退水", tearBadge: "撕掉警徽", sheriff: "警长",
     target: "选择", speech: "发言", planSpeech: "给队友的计划说明", suspect: "你怀疑谁（会记录在案）",
     claim: "声称身份（可选）", noClaim: "不声称", claimChecked: "查验了谁", claimResult: "查验结果", claimPotion: "救了/毒了谁",
-    votes: w => `${w}票型`, abstain: "弃票", ballots: n => `${n}票`,
+    abstain: "弃票",
+    vote: { locale: "zh", record: "投票记录", title: (w, k) => `${w} · ${{ election: "警长投票", race: "警长竞选", exile: "放逐投票" }[k]}`,
+      count: n => `${n}票`, candidates: xs => `候选人：${xs}`, noVote: "上警的人不投票", withdrew: xs => `退水：${xs}`,
+      switched: x => `改票 · 上轮投${x}`, nowAbstains: x => `改为弃票 · 上轮投${x}`, wasAbstaining: "上轮弃票",
+      skip: "跳过动画", close: "关闭", replay: "▶ 回放",
+      exiled: n => `${n} 被放逐出局`, elected: n => `${n} 当选警长 🎖️`, tie: n => `${n} 平票，今天无人出局`,
+      electionTie: n => `${n} 平票，警徽流失，本局没有警长`, abstained: "所有人都弃票，今天无人出局", electionAbstained: "所有人都弃票，警徽流失，本局没有警长",
+      unopposed: n => `警上只剩 ${n} 一人，不用投票，直接当选 🎖️`, no_runners: "没有人上警，本局没有警长",
+      all_ran: "所有人都上警了，没有人投票，本局没有警长", all_withdrew: "上警的人都退水了，本局没有警长" },
     faker: "谁来悍跳预言家", faker2: "第二只悍跳（可选，双狼悍跳）", hook: "谁来倒钩（白天踩队友）", focus: "白天集中投谁（可选）", none: "（不选）",
     voiceOn: "🔊 语音朗读：开", voiceOff: "🔇 语音朗读：关", mic: "🎤 语音输入", micStop: "⏹ 停止录音", micErr: "语音输入出错：",
     micErrors: { "no-speech": "没听到声音。确认系统设置里选的输入设备是你在用的麦克风、没有静音，点 🎤 之后马上开始说。",
@@ -254,10 +305,19 @@ const UI = {
     kinds: { speech: "Your turn to speak", wolf_chat: "Wolf chat", wolf_plan: "Set tonight's plan",
       last_words: "Your last words", vote: "Vote someone out", inspect: "Who to check tonight", save: "Use the antidote on them?", poison: "Use the poison?", shoot: "Who to shoot",
       run: "Sheriff election: will you run?", campaign: "Your campaign speech", withdraw: "Campaign over: withdraw?", sheriff_vote: "Vote for sheriff", badge: "Pass on the badge" },
-    run: "Run for sheriff", noRun: "Stay out", stay: "Stay in the race", withdraw: "Withdraw", tearBadge: "Tear up the badge", sheriff: "Sheriff", sheriffBallot: " (sheriff, 1.5 votes)",
+    run: "Run for sheriff", noRun: "Stay out", stay: "Stay in the race", withdraw: "Withdraw", tearBadge: "Tear up the badge", sheriff: "Sheriff",
     target: "Pick", speech: "What you say", planSpeech: "The plan, for your pack", suspect: "Who you suspect (goes on the record)",
     claim: "Claim a role (optional)", noClaim: "No claim", claimChecked: "Who you checked", claimResult: "What you saw", claimPotion: "Who you saved or poisoned",
-    votes: w => `${w} votes`, abstain: "Abstained", ballots: n => `${n} vote${n === 1 ? "" : "s"}`,
+    abstain: "Abstained",
+    vote: { locale: "en", record: "Votes", title: (w, k) => `${w} · ${{ election: "Sheriff vote", race: "Sheriff election", exile: "Vote" }[k]}`,
+      count: n => `${n} vote${n === 1 ? "" : "s"}`, candidates: xs => `Candidates: ${xs}`, noVote: "Candidates do not vote", withdrew: xs => `Withdrew: ${xs}`,
+      switched: x => `switched · voted ${x} last time`, nowAbstains: x => `now abstains · voted ${x} last time`, wasAbstaining: "abstained last time",
+      skip: "Skip animation", close: "Close", replay: "▶ Replay",
+      exiled: n => `${n} is voted out`, elected: n => `${n} is elected sheriff 🎖️`, tie: n => `A tie between ${n}: nobody is voted out today`,
+      electionTie: n => `A tie between ${n}: the badge is lost and there is no sheriff this game`, abstained: "Everyone abstained: nobody is voted out today",
+      electionAbstained: "Everyone abstained: the badge is lost and there is no sheriff this game",
+      unopposed: n => `${n} is the only candidate left, so is sheriff without a vote 🎖️`, no_runners: "Nobody ran, so there is no sheriff this game",
+      all_ran: "Everyone ran, so nobody was left to vote and there is no sheriff this game", all_withdrew: "Every candidate withdrew, so there is no sheriff this game" },
     faker: "Who fakes the seer", faker2: "A second faker (optional, a double claim)", hook: "Who plays the hook (turns on a packmate by day)", focus: "Who the pack votes tomorrow (optional)", none: "(none)",
     voiceOn: "🔊 Read aloud: on", voiceOff: "🔇 Read aloud: off", mic: "🎤 Speak", micStop: "⏹ Stop", micErr: "Voice input failed: ",
     micErrors: { "no-speech": "Heard nothing. Check that your system's input device is the microphone you are using and is not muted, and start talking right after clicking 🎤.",
@@ -408,7 +468,7 @@ function render(v) {
   }
   document.body.classList.toggle("night", v.phase === "night");
   renderSeats(v, t);
-  renderVotes(v.lastVote, t);
+  renderVotes(v, t);
   renderLog(v, t);
   renderStage(v, t);
   $("waiting").hidden = !!v.pending && (!v.now || v.now.name === v.you);
@@ -532,24 +592,136 @@ function renderStage(v, t) {
   tick(); if (since) stageTimer = setInterval(tick, 1000);
 }
 
-// renderVotes shows a day's votes grouped by who they went to, most votes first.
-function renderVotes(b, t) {
-  const c = $("votes");
-  c.hidden = !b;
-  if (!b) return;
-  const by = new Map();
-  for (const x of b.votes) {
-    const k = x.target || "";
-    if (!by.has(k)) by.set(k, []);
-    by.get(k).push(x.voter);
+// ---- votes ----
+// Every result comes finished from the game master, outcome and all, and only
+// once every vote is in; the page shows it and never works one out. A result
+// that arrives while the page is open is revealed vote by vote; the ones
+// there when it loads, after a refresh or a reconnect, are only listed, so
+// nothing is replayed as if it had just happened. The panel holds a result
+// back while it is being revealed, so it does not give the outcome away.
+let seenVotes = null, votesShown = "";
+function renderVotes(v, t) {
+  const all = v.votes || [];
+  if (seenVotes === null) seenVotes = new Set(all.map(r => r.key));
+  const fresh = all.filter(r => !seenVotes.has(r.key));
+  for (const r of fresh) seenVotes.add(r.key);
+  const last = fresh.filter(r => r.votes).pop();
+  if (last) revealVote(last, t, true);
+  const held = revealing && revealing.fresh && !revealing.landed ? revealing.r.key : null;
+  const rs = all.filter(r => r.key !== held);
+  const shown = v.lang + "|" + rs.map(r => r.key).join();
+  if (shown !== votesShown) { // results never change once out, so redraw only for a new one and keep what is opened
+    votesShown = shown;
+    const c = $("votes");
+    c.hidden = !rs.length;
+    c.innerHTML = `<div class="vr-title">${esc(t.vote.record)}</div>` + rs.map((r, i) => [r, i]).reverse().map(([r, i], n) =>
+      `<details${n === 0 ? " open" : ""}><summary>${esc(voteTitle(r, t))} <span class="dim">· ${esc(outcomeText(r, t))}</span></summary>` +
+      voteHTML(r, t, false) + (r.votes ? `<button type="button" class="secondary replay" data-i="${i}">${esc(t.vote.replay)}</button>` : "") + `</details>`).join("");
+    for (const b of c.querySelectorAll("button.replay")) b.onclick = () => revealVote(rs[+b.dataset.i], t);
   }
-  const weight = voters => voters.reduce((n, v) => n + (v === b.sheriff ? 1.5 : 1), 0);
-  const rows = [...by].sort(([p, x], [q, y]) => (p === "") - (q === "") || weight(y) - weight(x));
-  c.innerHTML = `<div style="font-weight:600">${esc(t.votes(b.when))}</div>` + rows.map(([target, voters]) =>
-    `<div class="line"><span class="who">${esc(target || t.abstain)}</span>` +
-    (target ? `<span class="dim">${t.ballots(weight(voters))}</span>` : "") +
-    `<div class="dim">← ${voters.map(v => esc(v) + (v === b.sheriff ? t.sheriffBallot : "")).join(", ")}</div></div>`).join("");
 }
+
+function voteTitle(r, t) { return t.vote.title(r.when, !r.election ? "exile" : r.votes ? "election" : "race"); }
+function nameList(xs, t) { return new Intl.ListFormat(t.vote.locale, { type: "conjunction" }).format(xs); }
+function voteCount(n) { return Number.isInteger(n) ? String(n) : n.toFixed(1); }
+
+function outcomeText(r, t) {
+  const o = t.vote;
+  switch (r.outcome) {
+    case "tie": return (r.election ? o.electionTie : o.tie)(nameList(r.tied || [], t));
+    case "abstained": return r.election ? o.electionAbstained : o.abstained;
+    default: { const say = o[r.outcome]; return typeof say === "function" ? say(r.winner) : say || r.outcome; }
+  }
+}
+
+// voteHTML draws a result: one row for each candidate, or for each player
+// voted for, with its bar and count and who voted for them, then abstentions,
+// then the outcome. Rows keep the order of the candidates, or of the first
+// vote for each, so before the end their order gives nothing away; bars are
+// out of every vote cast, for the same reason. Hidden, every vote and the
+// outcome start out of sight for revealVote to bring in.
+function voteHTML(r, t, hidden) {
+  const votes = r.votes || [];
+  const targets = r.election ? [...(r.candidates || [])] : [];
+  for (const v of votes) if (v.target && !targets.includes(v.target)) targets.push(v.target);
+  const totals = Object.fromEntries((r.totals || []).map(x => [x.target, x.votes]));
+  const cast = votes.reduce((n, v) => n + v.weight, 0) || 1;
+  const won = new Set(r.winner && r.votes ? [r.winner] : r.tied || []);
+  const chip = (v, i) => {
+    let chg = "";
+    if (v.before !== undefined && v.before !== (v.target || "")) {
+      chg = v.before === "" ? t.vote.wasAbstaining : v.target ? t.vote.switched(v.before) : t.vote.nowAbstains(v.before);
+    }
+    const cls = ["vr-chip", v.weight > 1 && "sheriff", chg && "changed", hidden && "wait"].filter(Boolean).join(" ");
+    return `<span class="${cls}" data-i="${i}">${v.weight > 1 ? "🎖️ " : ""}${esc(v.voter)}${v.weight > 1 && v.target ? " ×1.5" : ""}` +
+      (chg ? `<span class="chg">${esc(chg)}</span>` : "") + `</span>`;
+  };
+  const row = (target, cls) => {
+    const mine = votes.map((v, i) => [v, i]).filter(([v]) => (v.target || "") === target);
+    const n = hidden ? 0 : totals[target] || 0;
+    const rowCls = ["vr-row", cls, !hidden && won.has(target) && (r.winner ? "win" : "tied"), r.election && "elected"].filter(Boolean).join(" ");
+    return `<div class="${rowCls}" data-k="${esc(target)}"><div class="vr-name">${target ? avatar(target, true) : ""}<span>${esc(target || t.abstain)}</span></div>` +
+      (target ? `<div class="vr-bar"><i style="width:${(100 * n / cast).toFixed(1)}%"></i></div><div class="vr-count">${voteCount(n)}</div>` : `<div></div><div></div>`) +
+      `<div class="vr-voters">${mine.map(([v, i]) => chip(v, i)).join("")}</div></div>`;
+  };
+  const notes = [];
+  if (r.election && r.candidates && r.candidates.length) notes.push(t.vote.candidates(nameList(r.candidates, t)) + (r.votes ? " · " + t.vote.noVote : ""));
+  if (r.withdrew && r.withdrew.length) notes.push(t.vote.withdrew(nameList(r.withdrew, t)));
+  const abstained = votes.some(v => !v.target);
+  return notes.map(n => `<div class="vr-note">${esc(n)}</div>`).join("") +
+    (votes.length ? targets.map(x => row(x)).join("") + (abstained ? row("", "abstain") : "") : "") +
+    `<div class="vr-outcome${r.outcome === "exiled" ? " exiled" : ""}${hidden ? " wait" : ""}" aria-live="polite">📣 ${esc(outcomeText(r, t))}</div>`;
+}
+
+// revealVote shows a result over the page: each vote lands in turn, its row's
+// bar and count growing, then the outcome. Skipping, or a reader who prefers
+// less motion, goes straight to the end. It closes itself a while after.
+let revealing = null;
+const STEP = 420;
+function revealVote(r, t, fresh) {
+  stopReveal();
+  const body = $("revealBody"), timers = [];
+  revealing = { r, t, timers, fresh };
+  $("reveal").hidden = false;
+  $("revealSkip").textContent = t.vote.skip; $("revealClose").textContent = t.vote.close;
+  $("revealSkip").hidden = false;
+  body.innerHTML = revealHead(r, t) + voteHTML(r, t, true);
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { landReveal(); return; }
+  const cast = r.votes.reduce((n, v) => n + v.weight, 0) || 1, counts = {};
+  r.votes.forEach((v, i) => timers.push(setTimeout(() => {
+    const chip = body.querySelector(`.vr-chip[data-i="${i}"]`);
+    chip.classList.replace("wait", "pop");
+    if (!v.target) return;
+    counts[v.target] = (counts[v.target] || 0) + v.weight;
+    const row = [...body.querySelectorAll(".vr-row")].find(x => x.dataset.k === v.target);
+    row.querySelector(".vr-count").textContent = voteCount(counts[v.target]);
+    row.querySelector(".vr-bar i").style.width = `${(100 * counts[v.target] / cast).toFixed(1)}%`;
+  }, 500 + i * STEP)));
+  timers.push(setTimeout(landReveal, 500 + r.votes.length * STEP + 500));
+}
+
+function landReveal() {
+  if (!revealing) return;
+  const { r, t, timers } = revealing;
+  timers.forEach(clearTimeout); timers.length = 0;
+  revealing.landed = true;
+  if (revealing.fresh && view) renderVotes(view, t);
+  $("revealBody").innerHTML = revealHead(r, t) + voteHTML(r, t, false);
+  $("revealBody").querySelector(".vr-outcome").classList.add("landed");
+  $("revealSkip").hidden = true;
+  timers.push(setTimeout(closeReveal, 6000));
+}
+
+function revealHead(r, t) { return `<div class="vr-head" id="revealTitle">🗳️ ${esc(voteTitle(r, t))}</div>`; }
+function stopReveal() { if (revealing) revealing.timers.forEach(clearTimeout); revealing = null; }
+function closeReveal() { if (revealing && !revealing.landed) landReveal(); stopReveal(); $("reveal").hidden = true; }
+$("revealSkip").onclick = landReveal;
+$("revealClose").onclick = closeReveal;
+$("reveal").onclick = e => { if (e.target === $("reveal")) closeReveal(); };
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape" || $("reveal").hidden) return;
+  if (!$("revealSkip").hidden) landReveal(); else closeReveal();
+});
 
 function showTurn(p, t, w) {
   shownEvent = p.event;

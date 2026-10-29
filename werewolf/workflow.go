@@ -495,11 +495,17 @@ func (t *table) election() error {
 		}
 	}
 	voters := game.Without(alive, runners...)
+	// The election goes on the record, and so on the page, only once it is
+	// over, in the same step as the announcement of how it ended.
+	e := &game.Election{Round: s.Round, Runners: runners}
+	end := func(o game.Outcome) { e.Outcome, s.Election = o, e }
 	switch {
 	case len(runners) == 0:
+		end(game.NoRunners)
 		t.announce(game.KindResult, t.h.noRunners)
 		return nil
 	case len(voters) == 0:
+		end(game.AllRan)
 		t.announce(game.KindResult, t.h.allRun)
 		return nil
 	}
@@ -508,23 +514,27 @@ func (t *table) election() error {
 	if _, err := t.goRound(brain.Campaign, runners, nil); err != nil {
 		return err
 	}
-	runners, err = t.withdraw(runners)
+	standing, err := t.withdraw(runners)
 	if err != nil {
 		return err
 	}
-	if len(runners) == 0 {
+	e.Withdrew = game.Without(runners, standing...)
+	if len(standing) == 0 {
+		end(game.AllWithdrew)
 		t.announce(game.KindResult, t.h.allWithdrew)
 		return t.pause()
 	}
-	sheriff := runners[0]
-	if len(runners) == 1 {
+	sheriff := standing[0]
+	if len(standing) == 1 {
+		end(game.Unopposed)
 		t.announce(game.KindResult, fmt.Sprintf(t.h.unopposed, sheriff))
 	} else {
-		votes, err := t.chooseAll(brain.SheriffVote, voters, func(string) []string { return append(slices.Clone(runners), game.Pass) })
+		votes, err := t.chooseAll(brain.SheriffVote, voters, func(string) []string { return append(slices.Clone(standing), game.Pass) })
 		if err != nil {
 			return err
 		}
 		s.Ballots = append(s.Ballots, game.Ballot{Round: s.Round, Votes: votes, Election: true})
+		end(game.Voted)
 		t.announce(game.KindVote, fmt.Sprintf(t.h.sheriffVotes, t.tallyLine(votes)))
 		won, ok := game.Tally(votes, "")
 		if !ok {
@@ -537,7 +547,7 @@ func (t *table) election() error {
 		}
 		sheriff = won
 	}
-	s.Sheriff = sheriff
+	s.Sheriff, e.Sheriff = sheriff, sheriff
 	t.announce(game.KindResult, fmt.Sprintf(t.h.elected, sheriff))
 	return t.pause()
 }

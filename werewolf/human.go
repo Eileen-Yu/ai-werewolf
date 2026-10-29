@@ -47,9 +47,9 @@ type View struct {
 	// people invited each other.
 	People []string `json:"people,omitempty"`
 	Log    []Line   `json:"log"`
-	// LastVote is how everyone voted on the latest day.
-	LastVote *LastVote `json:"lastVote,omitempty"`
-	Pending  *Pending  `json:"pending,omitempty"`
+	// Votes is every vote held so far, and the sheriff election.
+	Votes   []VoteResult `json:"votes,omitempty"`
+	Pending *Pending     `json:"pending,omitempty"`
 	// Now is what the table is waiting on, as anyone at a real table could
 	// tell: whose speech, a vote, the wolves at night. Never a role's move.
 	Now *Activity `json:"now,omitempty"`
@@ -86,14 +86,6 @@ func line(e game.Event, l game.Lang) Line {
 		out.Kind = "host"
 	}
 	return out
-}
-
-// LastVote is a day's votes. An empty Target is an abstention.
-type LastVote struct {
-	When  string      `json:"when"`
-	Votes []game.Vote `json:"votes"`
-	// Sheriff is whose vote counted one and a half that day, if anyone's.
-	Sheriff string `json:"sheriff,omitempty"`
 }
 
 // Activity is something the table is waiting on. Kind is the public part of
@@ -310,9 +302,7 @@ func (t *table) publish() {
 		}
 		b.Humans = append(b.Humans, me)
 	}
-	if x := t.s.LastExile(); x != nil {
-		b.LastVote = &LastVote{When: l.When(x.Round, game.Day), Votes: x.Votes, Sheriff: x.Sheriff}
-	}
+	b.Votes = voteResults(t.s)
 	for _, p := range t.s.Players {
 		b.Seats = append(b.Seats, brain.Seat{Name: p.Name, Death: p.Death, Sheriff: p.Name == t.s.Sheriff})
 	}

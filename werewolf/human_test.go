@@ -95,18 +95,33 @@ func TestAnAIPlaysForAPersonWhoRunsOutOfTime(t *testing.T) {
 	if !slices.ContainsFunc(v.Log, func(l Line) bool { return l.When == "Day 1" }) {
 		return // the game ended on the first night, before any vote
 	}
-	require.NotNil(t, v.LastVote, "the page is shown the latest day's votes")
-	assert.Regexp(t, `^Day \d+$`, v.LastVote.When)
-	require.NotEmpty(t, v.LastVote.Votes)
+	require.NotEmpty(t, v.Votes, "the page is shown the votes")
+	assert.True(t, v.Votes[0].Election, "the sheriff election comes first")
 	seated := func(name string) bool {
 		return slices.ContainsFunc(res.Players, func(p game.Player) bool { return p.Name == name })
 	}
-	voters := map[string]bool{}
-	for _, x := range v.LastVote.Votes {
-		assert.True(t, seated(x.Voter), "%s voted but is not at the table", x.Voter)
-		assert.False(t, voters[x.Voter], "%s voted twice", x.Voter)
-		voters[x.Voter] = true
-		assert.True(t, x.Target == "" || seated(x.Target), "a vote went to %s, who is not at the table", x.Target)
+	for _, r := range v.Votes {
+		assert.Regexp(t, `^Day \d+$`, r.When)
+		voters := map[string]bool{}
+		total := 0.0
+		for _, x := range r.Votes {
+			assert.True(t, seated(x.Voter), "%s voted but is not at the table", x.Voter)
+			assert.False(t, voters[x.Voter], "%s voted twice", x.Voter)
+			voters[x.Voter] = true
+			assert.True(t, x.Target == "" || seated(x.Target), "a vote went to %s, who is not at the table", x.Target)
+			if x.Target != "" {
+				total += x.Weight
+			}
+		}
+		counted := 0.0
+		for _, c := range r.Totals {
+			counted += c.Votes
+		}
+		assert.Equal(t, total, counted, "%s: the totals add up to the votes cast", r.Key)
+		if r.Outcome == "exiled" {
+			i := slices.IndexFunc(v.Seats, func(s brain.Seat) bool { return s.Name == r.Winner })
+			assert.Contains(t, v.Seats[i].Death, "voted out", "%s is shown exiled and is out", r.Winner)
+		}
 	}
 }
 

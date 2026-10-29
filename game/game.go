@@ -4,6 +4,7 @@
 package game
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"math/rand/v2"
@@ -559,6 +560,8 @@ type State struct {
 	Plan *Plan `json:"plan,omitempty"`
 	// Ballots is every vote so far, the sheriff election included, in order.
 	Ballots []Ballot `json:"ballots,omitempty"`
+	// Election is how the sheriff election went, once it is over.
+	Election *Election `json:"election,omitempty"`
 	// Sheriff holds the badge: elected on the first day, passed on or torn
 	// up when they go. "" when nobody holds it.
 	Sheriff string `json:"sheriff,omitempty"`
@@ -679,44 +682,83 @@ type Ballot struct {
 	Election bool `json:"election,omitempty"`
 }
 
-// LastExile is the latest day's vote to send someone out, or nil before the
-// first one.
-func (s *State) LastExile() *Ballot {
-	for i := len(s.Ballots) - 1; i >= 0; i-- {
-		if !s.Ballots[i].Election {
-			return &s.Ballots[i]
+// Election is how the sheriff election ended. Its ballot, when it came to a
+// vote, is among the State's Ballots.
+type Election struct {
+	Round int `json:"round"`
+	// Runners is everyone who ran, Withdrew those of them who withdrew.
+	Runners  []string `json:"runners,omitempty"`
+	Withdrew []string `json:"withdrew,omitempty"`
+	Outcome  Outcome  `json:"outcome"`
+	// Sheriff is who won, "" for nobody.
+	Sheriff string `json:"sheriff,omitempty"`
+}
+
+// Outcome is how a sheriff election ended.
+type Outcome string
+
+const (
+	NoRunners   Outcome = "no_runners"   // nobody ran
+	AllRan      Outcome = "all_ran"      // nobody was left to vote
+	AllWithdrew Outcome = "all_withdrew" // every candidate withdrew
+	Unopposed   Outcome = "unopposed"    // one candidate was left, so no vote
+	Voted       Outcome = "voted"        // the voters chose, or tied
+)
+
+// Total is the votes one target got, the sheriff's counting one and a half.
+type Total struct {
+	Target string  `json:"target"`
+	Votes  float64 `json:"votes"`
+}
+
+// Totals counts the votes for each target, the sheriff's vote counting one
+// and a half, most first and equal totals in the order they were first voted
+// for. Abstentions (an empty Target) are not counted.
+func Totals(votes []Vote, sheriff string) []Total {
+	var totals []Total
+	for _, v := range votes {
+		if v.Target == "" {
+			continue
 		}
+		i := slices.IndexFunc(totals, func(t Total) bool { return t.Target == v.Target })
+		if i < 0 {
+			i = len(totals)
+			totals = append(totals, Total{Target: v.Target})
+		}
+		totals[i].Votes += VoteWeight(v.Voter, sheriff)
 	}
-	return nil
+	slices.SortStableFunc(totals, func(a, b Total) int { return cmp.Compare(b.Votes, a.Votes) })
+	return totals
+}
+
+// VoteWeight is what one voter's vote counts: one and a half for the sheriff.
+func VoteWeight(voter, sheriff string) float64 {
+	if sheriff != "" && voter == sheriff {
+		return 1.5
+	}
+	return 1
 }
 
 // Tally returns the target with strictly the most votes, the sheriff's vote
-// counting one and a half. Abstentions (an empty Target) are not counted; a
-// tie or no votes at all reports false.
+// counting one and a half. Abstentions are not counted; a tie or no votes at
+// all reports false.
 func Tally(votes []Vote, sheriff string) (string, bool) {
-	counts := map[string]int{} // in half votes
-	for _, v := range votes {
-		switch {
-		case v.Target == "":
-		case v.Voter == sheriff:
-			counts[v.Target] += 3
-		default:
-			counts[v.Target] += 2
-		}
-	}
-	best, bestN, tied := "", 0, false
-	for target, n := range counts {
-		switch {
-		case n > bestN:
-			best, bestN, tied = target, n, false
-		case n == bestN:
-			tied = true
-		}
-	}
-	if bestN == 0 || tied {
+	totals := Totals(votes, sheriff)
+	if len(totals) == 0 || len(totals) > 1 && totals[1].Votes == totals[0].Votes {
 		return "", false
 	}
-	return best, true
+	return totals[0].Target, true
+}
+
+// Leaders is everyone tied for the most votes, or the one winner.
+func Leaders(totals []Total) []string {
+	var out []string
+	for _, t := range totals {
+		if t.Votes == totals[0].Votes {
+			out = append(out, t.Target)
+		}
+	}
+	return out
 }
 
 // Rotate returns names starting from index n, wrapping around, so the

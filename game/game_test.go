@@ -208,6 +208,36 @@ func TestTally(t *testing.T) {
 	}
 }
 
+func TestTotals(t *testing.T) {
+	tests := []struct {
+		name    string
+		votes   []Vote
+		sheriff string
+		want    []Total
+		leaders []string
+	}{
+		{"most first", []Vote{{"a", "y"}, {"b", "x"}, {"c", "x"}}, "", []Total{{"x", 2}, {"y", 1}}, []string{"x"}},
+		{"the sheriff counts one and a half", []Vote{{"a", "x"}, {"b", "y"}, {"c", "y"}}, "a", []Total{{"y", 2}, {"x", 1.5}}, []string{"y"}},
+		{"the sheriff tips a tie", []Vote{{"a", "x"}, {"b", "y"}}, "b", []Total{{"y", 1.5}, {"x", 1}}, []string{"y"}},
+		{"a tie keeps the order first voted for", []Vote{{"a", "y"}, {"b", "x"}, {"c", "x"}, {"d", "y"}}, "", []Total{{"y", 2}, {"x", 2}}, []string{"y", "x"}},
+		{"abstentions are not counted", []Vote{{"a", ""}, {"b", "x"}, {"c", ""}}, "a", []Total{{"x", 1}}, []string{"x"}},
+		{"everyone abstained", []Vote{{"a", ""}, {"b", ""}}, "a", nil, nil},
+		{"one and a half against two halves", []Vote{{"a", "x"}, {"b", "y"}, {"c", "z"}}, "a", []Total{{"x", 1.5}, {"y", 1}, {"z", 1}}, []string{"x"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Totals(tt.votes, tt.sheriff)
+			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.leaders, Leaders(got))
+			winner, ok := Tally(tt.votes, tt.sheriff)
+			assert.Equal(t, len(tt.leaders) == 1, ok, "Tally agrees with the totals")
+			if ok {
+				assert.Equal(t, tt.leaders[0], winner)
+			}
+		})
+	}
+}
+
 func TestEnglish(t *testing.T) {
 	l := English
 	assert.Equal(t, "3 werewolves, 1 seer, 1 witch, 1 hunter, 3 villagers", l.LineupSummary())

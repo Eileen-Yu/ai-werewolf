@@ -740,6 +740,7 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 				left = game.Without(runners, b.withdrew...)
 				withdrawn = withdrawn || len(b.withdrew) > 0
 			case brain.SheriffVote:
+				assert.False(t, slices.ContainsFunc(turn.Ballots, func(b game.Ballot) bool { return b.Election }), "the sheriff votes are not on the record while they are cast")
 				assert.NotContains(t, runners, turn.Me.Name, "a candidate, even one who withdrew, does not vote for sheriff")
 				assert.Equal(t, append(slices.Clone(left), game.Pass), turn.Candidates, "only those still running stand, and a voter may abstain")
 			case brain.Speech:
@@ -816,6 +817,8 @@ func TestTheVoteFollowsTheDaysOneRoundOfSpeeches(t *testing.T) {
 			speeches[turn.Round]++
 		case brain.Vote:
 			votes[turn.Round]++
+			assert.False(t, slices.ContainsFunc(turn.Ballots, func(b game.Ballot) bool { return !b.Election && b.Round == turn.Round }),
+				"day %d's votes are not on the record while they are cast", turn.Round)
 			if last != brain.Vote {
 				assert.Equal(t, brain.Speech, last, "something came between the day's speeches and the vote on day %d", turn.Round)
 			}
