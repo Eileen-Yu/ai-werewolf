@@ -22,10 +22,10 @@ The fake seer wins the badge, the real seer gets voted out on the sheriff's one 
 
 Post-game analysis:
 
-- Real seer: dead.
-- Werewolves: thriving.
-- Village: confidently incorrect.
-- LinkedIn Influencer: already drafting a post about it.
+- Real seer: dead ☠️
+- Werewolves: thriving 😄
+- Village: confidently incorrect 🤡 
+- LinkedIn Influencer: already drafting a post about it 📝
 
 The game master's terminal is a god's-eye feed of the chaos: every public accusation, every private thought, and every read that shifts over the game.
 
