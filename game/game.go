@@ -155,17 +155,29 @@ func Names(ps []Player) []string {
 
 // Characters is everyone a game in l may seat, for a person to pick whose
 // seat to take.
-func Characters(l Lang) []string {
-	var pool []Player
-	if l == English {
-		pool = englishCast
-	} else {
-		for _, pair := range chineseRivals {
-			pool = append(pool, pair[:]...)
-		}
-		pool = append(pool, chineseLoners...)
+func Characters(l Lang) []string { return Names(everyone(l)) }
+
+// Character is the character a game in l seats as name, if there is one.
+func Character(l Lang, name string) (Player, bool) {
+	pool := everyone(l)
+	i := slices.IndexFunc(pool, func(p Player) bool { return p.Name == name })
+	if i < 0 {
+		return Player{}, false
 	}
-	return Names(pool)
+	return pool[i], true
+}
+
+// everyone is every character a game in l may seat: the rivals pair by pair,
+// then the loners.
+func everyone(l Lang) []Player {
+	if l == English {
+		return slices.Clone(englishCast)
+	}
+	var pool []Player
+	for _, pair := range chineseRivals {
+		pool = append(pool, pair[:]...)
+	}
+	return append(pool, chineseLoners...)
 }
 
 // CheckPeople reports what would stop people from taking these seats in a
@@ -178,14 +190,7 @@ func CheckPeople(l Lang, people []Person) error {
 	if _, err := Cast(l, rand.New(rand.NewPCG(1, 1)), with); err != nil {
 		return err
 	}
-	pool := slices.Clone(englishCast)
-	if l != English {
-		pool = slices.Clone(chineseLoners)
-		for _, pair := range chineseRivals {
-			pool = append(pool, pair[:]...)
-		}
-	}
-	_, err := SeatHumans(pool, people, l)
+	_, err := SeatHumans(everyone(l), people, l)
 	return err
 }
 

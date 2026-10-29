@@ -265,6 +265,10 @@ diagrid workflow start GameWorkflow --project werewolf --id werewolf --instance-
 | | `-id <name>` | Game instance ID. Default is generated from the time |
 | `werewolf engine` | `-addr <address>` | Address the local engine listens on. Default `localhost:4001` |
 | | `-db <file>` | SQLite file for the state. Default `werewolf.db` |
+| `werewolf bench` | `-llm-component <name>` | Ask the LLM players to make fixed decisions from a real game again. Default `llm` |
+| | `-n <count>` | Times to ask each decision. Default `3` |
+| | `-only <names>` | Comma-separated decisions to ask: `sheriff-vote`, `day2-speech`, `day2-vote`. Default: all |
+| | `-out <file>` | Also write every answer as JSON |
 
 ### The model
 

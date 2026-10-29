@@ -4,6 +4,9 @@
 //	werewolf gm       the game master worker, and with -web the page a person
 //	                  plays from
 //	werewolf start    deal a new game and wait for the result
+//	werewolf bench    ask the LLM brain to make fixed decisions from a real
+//	                  game again, for comparing one version of the prompts
+//	                  with another
 //
 // gm and start talk to Dapr (local daprd or Catalyst, via the usual
 // DAPR_GRPC_ENDPOINT / DAPR_API_TOKEN variables) unless -engine points them
@@ -12,6 +15,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -19,6 +23,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/dapr/durabletask-go/backend"
@@ -35,7 +42,7 @@ import (
 	"github.com/Eileen-Yu/ai-werewolf/werewolf"
 )
 
-const usage = "usage: werewolf engine|gm|start [flags]"
+const usage = "usage: werewolf engine|gm|start|bench [flags]"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -52,6 +59,8 @@ func main() {
 		err = runGM(ctx, args)
 	case "start":
 		err = runStart(ctx, args)
+	case "bench":
+		err = runBench(ctx, args)
 	default:
 		err = errors.New(usage)
 	}
@@ -191,4 +200,82 @@ func connect(ctx context.Context, engineAddr string) (grpc.ClientConnInterface, 
 		return nil, nil, nil, fmt.Errorf("dapr metadata: %w", err)
 	}
 	return c.GrpcClientConn(), c, c.Close, nil
+}
+
+// benchRun is one answer to one bench, as -out writes it.
+type benchRun struct {
+	Bench    string            `json:"bench"`
+	Run      int               `json:"run"`
+	Action   brain.Action      `json:"action"`
+	Measures werewolf.Measures `json:"measures"`
+	Error    string            `json:"error,omitempty"`
+}
+
+func runBench(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("bench", flag.ExitOnError)
+	component := fs.String("llm-component", "llm", "Dapr conversation component to ask")
+	runs := fs.Int("n", 3, "times to ask each bench")
+	only := fs.String("only", "", "comma-separated bench names to run; empty runs all")
+	out := fs.String("out", "", "file to write every answer to as JSON")
+	_ = fs.Parse(args)
+
+	c, err := dapr.NewClient()
+	if err != nil {
+		return fmt.Errorf("connect to dapr: %w", err)
+	}
+	defer c.Close()
+	llm := &brain.LLM{Client: c, Component: *component}
+
+	var benches []werewolf.Bench
+	for _, b := range werewolf.Benches() {
+		if *only == "" || slices.Contains(strings.Split(*only, ","), b.Name) {
+			benches = append(benches, b)
+		}
+	}
+	results := make([]benchRun, len(benches)**runs)
+	var wg sync.WaitGroup
+	limit := make(chan struct{}, 3)
+	for i := range results {
+		b, run := benches[i / *runs], i%*runs+1
+		wg.Go(func() {
+			limit <- struct{}{}
+			defer func() { <-limit }()
+			r := benchRun{Bench: b.Name, Run: run}
+			if a, err := llm.Act(ctx, b.Turn); err != nil {
+				r.Error = err.Error()
+			} else {
+				r.Action, r.Measures = a, werewolf.Measure(b, a)
+			}
+			results[i] = r
+		})
+	}
+	wg.Wait()
+
+	for _, r := range results {
+		fmt.Printf("\n=== %s #%d\n", r.Bench, r.Run)
+		if r.Error != "" {
+			fmt.Printf("error: %s\n", r.Error)
+			continue
+		}
+		a, m := r.Action, r.Measures
+		fmt.Printf("thinking: %s\n", a.Thinking)
+		if a.Notes != nil {
+			notes, _ := json.Marshal(a.Notes)
+			fmt.Printf("notes: %s\n", notes)
+		}
+		if a.Speech != "" {
+			fmt.Printf("speech: %s\n", a.Speech)
+		}
+		fmt.Printf("target: %s  suspect: %s\n", a.Target, a.Suspect)
+		fmt.Printf("length %d, named %d, votes %d, claims %d, questions %d, future %d, on a wolf %t\n",
+			m.Length, m.Named, m.Votes, m.Claims, m.Questions, m.Future, m.OnWolf)
+	}
+	if *out == "" {
+		return nil
+	}
+	data, err := json.MarshalIndent(results, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(*out, data, 0o644)
 }
