@@ -170,15 +170,23 @@ diagrid component create llm --project werewolf --type conversation.openai \
   --metadata key=<your OpenAI key> --metadata model=gpt-6.1-sol
 ```
 
-### 4. Start the game master
+### 4. Create the agent
+
+The game master runs as the agent `werewolf` in the project. It needs no endpoint, since it connects out to Catalyst:
+
+```bash
+diagrid agent create werewolf --project werewolf --wait
+```
+
+### 5. Start the game master
 
 ```bash
 diagrid dev run --project werewolf --id werewolf --approve -- ./bin/werewolf gm -brain llm
 ```
 
-`dev run` creates the app ID `werewolf` on Catalyst and starts the game master on your machine. Once you see `game master ready (brain: llm)`, you can start a game. This terminal is the live feed.
+`dev run` connects the game master on your machine to the agent `werewolf` on Catalyst. Once you see `game master ready (brain: llm)`, you can start a game. This terminal is the live feed.
 
-### 5. Start a game
+### 6. Start a game
 
 In another terminal:
 
@@ -204,9 +212,9 @@ Open <http://localhost:8080>, pick a language and how many people play, from non
 
 The page can also talk. Click **🔊 Read aloud** and every new line is spoken, each character in a voice, pitch and pace of their own. On your speaking turns, **🎤 Speak** types what you say into the speech box, where you can fix it before you submit. Both use the browser's own speech support, so nothing goes through the game master; voice input needs Chrome or Edge and microphone access, and Chrome sends the audio to Google to transcribe it.
 
-### 6. Try killing the game master
+### 7. Try killing the game master
 
-While a game is running, press Ctrl+C in the game master's terminal, wait a moment, and run the command from step 4 again. The game carries on from where it stopped, and nothing earlier is repeated.
+While a game is running, press Ctrl+C in the game master's terminal, wait a moment, and run the command from step 5 again. The game carries on from where it stopped, and nothing earlier is repeated.
 
 ## Play locally (no account needed)
 
