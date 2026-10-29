@@ -172,8 +172,11 @@ var chineseText = text{
 			"刀口没死说明女巫救了他，女巫知道他是你们的刀口，随时可能公开：不要给他报查杀，也不要带头踩他，否则她一句话就能拆穿你。" +
 			"真预言家是你们最大的威胁。女巫的解药可能救下你们的刀，猎人出局会开枪，所以要尽早找出神职并优先杀掉。" +
 			"被放逐时的遗言也要继续伪装、搅浑水，绝不能承认自己是狼人。" +
-			"自刀是一招险棋：刀自己或同伴，赌女巫用解药救下，既骗掉解药，被救的狼第二天还能以\"银水\"（被女巫救过的人）的身份获得信任。" +
-			"但女巫不救，你们就真的少了一只狼，所以一般只在第1夜、女巫还有解药时考虑，而且要在计划里说清楚谁自刀。" +
+			"自刀是一手正经的牌，不是禁招：今晚刀自己或同伴。常见两种打法。" +
+			"一是第1夜自刀，赌女巫用解药救：骗掉解药，被救的狼第二天以\"银水\"（被女巫救过的人）的身份拿信任；他要是还要悍跳，就能说\"狼人第一晚就刀我\"来做实预言家身份。" +
+			"二是悍跳之后自刀：已经跳了预言家的狼在之后某一晚刀自己。女巫救了，他更像狼人急着除掉的真预言家；女巫不救，他就死得像真预言家，他报过的查杀和警徽流更有分量，真预言家反倒像假的，好人可能把真预言家投出去。" +
+			"代价要算清：女巫不救、或者解药已经用掉，被刀的狼就真的死了；女巫知道刀口是谁，她本来就怀疑这个人的话，可能不救，还会公开刀口来拆你们。" +
+			"所以自刀要算账：狼还多、两个预言家僵持不下、悍跳的狼反正快被投出去时，用一只狼换局面往往划算；狼只剩一两只时别轻易送。要自刀，就在计划里说清楚刀谁、想换来什么。" +
 			"狼要有狼性：隐藏身份不等于说话保守。好人会很强势地带队、穷追不舍，你们只有更强势才赢得了。每次发言都要有明确的立场和攻击目标，主动带节奏，抓住好人发言和投票里真实的漏洞往死里打，不要和稀泥，不要\"再观察一下\"。" +
 			"分开投票是为了不被看出是一伙的，不是让你们说话变软。" +
 			"顺推也不是隐身：只复述别人的理由、跟着风向推人，看起来就是一个不想赢、不在思考的人，有经验的好人专门抓这种人。真想赢的好人有自己视角里的理由，也敢逆着风向：替被推的人说句公道话，或者追问带节奏的人。每次站队都要给出一条别人没说过的、你自己的理由。" +
@@ -217,9 +220,9 @@ var chineseText = text{
 	instructions: map[TurnKind]string{
 		Prepare:  "现在还没轮到你发言，别人正在发言。先把到目前为止新发生的事整理进你的笔记：observations、beliefs、strategy 照常写，这一步不说话。轮到你的时候，只需要再看这之后的新发言。",
 		Speech:   "白天发言环节，轮到你了。",
-		WolfChat: "现在是夜里，只有狼同伴能听到你说话。先回应前面同伴说过的提议：同意、补充还是反对，说清楚理由，不要各说各的。和同伴商量：今晚杀谁；白天怎么按本局的打法来打，票往谁身上引；第1夜还要说好谁悍跳、查杀报给谁、警徽流怎么报。",
+		WolfChat: "现在是夜里，只有狼同伴能听到你说话。先回应前面同伴说过的提议：同意、补充还是反对，说清楚理由，不要各说各的。和同伴商量：今晚杀谁，要不要自刀；白天怎么按本局的打法来打，票往谁身上引；第1夜还要说好谁悍跳、查杀报给谁、警徽流怎么报。",
 		WolfPlan: "夜聊结束，你代表狼队定下最终计划，同伴白天会照着执行，主持人也会检查你的计划和局势是否一致。" +
-			"target 是今晚要杀的人，优先杀可能是神职、或者发言最有威胁的人；也可以自刀，选自己或同伴。" +
+			"target 是今晚要杀的人：可能是神职、或者发言最有威胁的人，也可以自刀，选自己或同伴。按局势算哪个对狼队更划算，别想都不想就刀神职。" +
 			"focus 是明天要把票引向的人：他明天必须还活着，所以不能是今晚要杀的人。引票靠好人的票，不靠狼队一起投：speech 里说清楚谁投 focus、谁投别人。" +
 			"fakers 是上警悍跳预言家的狼：一般一只，也可以两只（双狼悍跳）。第1夜至少一只；之后悍跳的狼还在，一般就是他接着跳。" +
 			"定计划前先看夜聊：同伴提出的具体打法，比如谁悍跳、要不要两只一起跳、刀谁、票投谁，能采纳就采纳；不采纳，就在 speech 里点他的名说清楚为什么，他会看到你的计划。" +
@@ -453,8 +456,11 @@ Write everything in English.`,
 			"If your victim did not die, the witch saved them and knows they were your kill, and may say so at any time: never report them as a werewolf or lead the charge against them, or one sentence from her exposes you. " +
 			"The real seer is your biggest threat. The witch's antidote can undo your kill and the hunter shoots when he goes, so find the power roles early and kill them first. " +
 			"In your last words, keep up the act and muddy the water; never admit to being a werewolf. " +
-			"A self-kill is a gamble: kill yourself or a teammate and bet the witch saves them, which wastes her antidote and makes the saved werewolf look trusted the next day. " +
-			"If she does not save, you really lose a werewolf, so only consider it on Night 1 while she still has the antidote, and say in the plan who it is. " +
+			"A self-kill is a real play, not a forbidden one: kill yourself or a teammate tonight. Two common ways to use it. " +
+			"One, self-kill on Night 1 and bet the witch saves: it wastes her antidote and the saved werewolf looks trusted the next day; if they are about to fake the seer, they can say \"the werewolves went for me on the first night\" to make the claim stick. " +
+			"Two, self-kill after faking the seer: a werewolf who has already claimed seer kills himself on a later night. If the witch saves him, he looks like the real seer the werewolves were desperate to remove; if she does not, he dies looking like the real seer, his reported checks and badge flow carry more weight, the real seer looks fake, and the good players may vote the real one out. " +
+			"Count the cost: if the witch does not save, or has used her antidote, that werewolf really dies; and she knows who your victim was, so if she already doubts them she may not save and may name them to expose you. " +
+			"So weigh it: with werewolves to spare, two seers deadlocked, or a faker about to be voted out anyway, trading a werewolf for the position often pays; with only one or two werewolves left, do not throw one away. If you self-kill, say in the plan who and what it is meant to buy. " +
 			"Play like a wolf: hiding who you are does not mean talking timidly. Good players will lead hard and keep pressing, and you only beat them by pressing harder. Every speech takes a clear side and a clear target; drive the table, and hit the real holes in good players' speeches and votes as hard as you can. Never sit on the fence, never \"wait and see\". " +
 			"Splitting your votes keeps you from being read as a team; it is no reason to go soft in what you say. " +
 			"Following the crowd is no cover either: repeating others' reasons and riding the table's push makes you look like someone who is not trying to win and not thinking, and experienced good players hunt exactly that. A good player who wants to win has reasons from their own seat and will go against the room: stand up for someone pushed unfairly, or press whoever is driving the push. Every time you take a side, give a reason of your own that nobody has said yet. " +
@@ -498,9 +504,9 @@ Write everything in English.`,
 	instructions: map[TurnKind]string{
 		Prepare:  "It is not your turn to speak yet; someone else is speaking. Bring your notes up to date with everything new so far: write observations, beliefs and strategy as usual, and say nothing this time. When your turn comes, you will only need to read what was said after this.",
 		Speech:   "It is the day's speeches and your turn to speak.",
-		WolfChat: "It is night, and only your fellow werewolves can hear you. First answer what the teammates before you proposed: agree, add to it or argue against it, and say why, rather than talking past them. Agree on who to kill tonight and how to play the day the way this game's play calls for, and who to push the vote onto; on the first night, also agree who fakes the seer, who they report as a werewolf, and their badge flow.",
+		WolfChat: "It is night, and only your fellow werewolves can hear you. First answer what the teammates before you proposed: agree, add to it or argue against it, and say why, rather than talking past them. Agree on who to kill tonight, a self-kill included, and how to play the day the way this game's play calls for, and who to push the vote onto; on the first night, also agree who fakes the seer, who they report as a werewolf, and their badge flow.",
 		WolfPlan: "The night chat is over. Set the pack's final plan; your teammates will follow it by day, and the host will check it against the game. " +
-			"target is who to kill tonight: ideally someone who may hold a power role, or whose speeches are most dangerous to you; you may also self-kill, picking yourself or a teammate. " +
+			"target is who to kill tonight: someone who may hold a power role, someone whose speeches are most dangerous to you, or a self-kill, picking yourself or a teammate. Weigh which buys the pack more right now rather than killing a power role by reflex. " +
 			"focus is who the pack steers the vote onto tomorrow: they must still be alive then, so not tonight's target. You steer with good players' votes, not by all voting together: say in speech who votes for focus and who votes elsewhere. " +
 			"fakers are the werewolves who run and claim seer: usually one, sometimes two (a double claim). The first night's plan names at least one, and after that, while a faker is alive, it is usually them again. " +
 			"Before you set the plan, read the night chat: when a teammate proposed something concrete, such as who fakes the seer, whether two of you claim together, who to kill or who to vote, take it up if you can; if you do not, name them in speech and say why, since they will see your plan. " +

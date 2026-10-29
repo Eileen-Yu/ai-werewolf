@@ -246,6 +246,8 @@ func TestTheWolfPlanAsksForWhatThisGamesTacticNeeds(t *testing.T) {
 		assert.Contains(t, user, "能采纳就采纳", "the plan answers what teammates proposed")
 		assert.Contains(t, system, chineseText.tactics[tactic], "a wolf is told this game's play")
 		assert.Contains(t, system, "警徽流", "the faker is told to give a badge flow")
+		assert.Contains(t, system, "悍跳之后自刀", "the pack is shown the faker's self-kill as a play")
+		assert.Contains(t, user, "也可以自刀")
 	}
 	turn.Pack = []string{"阿杰"}
 	_, user := prompt(turn)
@@ -477,6 +479,7 @@ func TestCheckHoldsTheWolfPlanToTheGame(t *testing.T) {
 	plan.Round, plan.Tactic = 1, game.Counterclaim
 	assert.NoError(t, plan.Check(Action{Target: "阿芳", Fakers: []string{"小宇"}, Focus: "老王", Speech: "小宇跳"}))
 	assert.NoError(t, plan.Check(Action{Target: "阿杰", Fakers: []string{"小宇"}, Focus: "老王", Speech: "自刀"}))
+	assert.NoError(t, plan.Check(Action{Target: "小宇", Fakers: []string{"小宇"}, Focus: "老王", Speech: "悍跳的小宇自刀骗银水"}))
 	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Fakers: []string{"小宇"}, Focus: "阿芳", Speech: "集中投阿芳"}), "阿芳今晚就会被杀")
 	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Fakers: []string{"小宇"}, Focus: "小宇", Speech: "投小宇"}), "focus")
 	assert.ErrorContains(t, plan.Check(Action{Target: "阿芳", Fakers: []string{"老王"}, Focus: "老王", Speech: "老王跳"}), "faker")
