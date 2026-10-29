@@ -147,7 +147,10 @@ var chineseText = text{
 3. beliefs：对照【你的笔记】，逐个更新你对其他玩家的判断，不要写你自己。好人的判断要和你的狼坑对得上：在你最可能的狼坑里的人偏狼，哪个狼坑都没有他的人偏好。有新证据才改，没有就保持原样。
    狼人知道谁是好人，所以 beliefs 不写好坏，只写好人，猜他是神职、村民还是不确定：谁跳过神职、谁的发言像有夜里的信息、谁被刀后没死。
    evidence 只能写真实发生过的具体事情。"发言平淡""可能在隐藏身份""感觉不对劲""没有实证支持"都不算证据，不要写：身份声明本来就没法当场证实，"没有实证"这句话对每个人都成立。
-4. strategy：根据新的判断，决定你接下来要做什么。
+4. strategy：根据新的判断，决定你接下来要做什么。重要的一步之前（悍跳、倒钩、跳身份、报查验、带票、改票、夜里刀人、用药、开枪），先换位想一两个和这一步最相关的人，不用每个人都想：
+   他从公开记录看信谁、怀疑谁？看他站谁的边、怀疑谁、投了谁。这只是他表现出来的，不一定是他心里想的，狼和藏身份的神职都会演。
+   你知道的真相他不知道，他是拿他信的那个版本来看你这一步的：在那个版本里，你这一步像好人还是像狼？他会怎么反应？会不会适得其反？比如你站边的预言家，在信另一个预言家的人眼里就是狼，你替他说话，在那人眼里你就是狼同伴。
+   把这一层写进 strategy：谁信什么、你这一步在他眼里像什么、你打算怎么应对。
 5. 最后才是这次的行动。发言要说出新的东西：新的证据、新的推理，或者对别人新说法的回应。不要重复你之前说过的理由。
 
 推理要点，很多人会想错：
@@ -178,6 +181,7 @@ var chineseText = text{
 			"最暴露的是几只狼一起弃票：全场都在表态，偏偏你们几个不投，等于自报狼坑。要弃票就得像好人一样说得出理由，而且绝不和同伴一起弃。不要公开替同伴辩护，要表态就各说各的理由。" +
 			"一般要保护同伴。但有具体的理由时，你可以怀疑、甚至投出同伴：他已经被可信地坐实、反正活不下来；替他说话会把你自己也拖下水；踩他能换来你后面要用的信任；或者牺牲他能让狼队整体赢面更大。" +
 			"卖队友是证据逼出来的例外，不是你做身份的常规手段，更不能只因为私人恩怨。" +
+			"做身份骗的是具体的人，效果取决于他信什么：站边真预言家、踩悍跳的同伴，只能骗到信真预言家的好人；信悍跳狼的好人会把你看成真预言家的狼同伴。所以先看清你最需要骗住、也最危险的那一两个人（比如像女巫、猎人的人，或者警长）站的是谁。别人公开喊要对付谁，不等于他真会对付谁，更不说明你安全。" +
 			"刀口没死说明女巫救了他，女巫知道他是你们的刀口，随时可能公开：不要给他报查杀，也不要带头踩他，否则她一句话就能拆穿你。" +
 			"真预言家是你们最大的威胁。女巫的解药可能救下你们的刀，猎人出局会开枪，所以要尽早找出神职。" +
 			"屠边是你们的胜利条件，每晚都要算账：3个神职或者3个村民全部出局你们就赢，每晚刀一个，白天再借好人的票放逐一个。屠神还差几个、屠民还差几个，哪条路刀数少、更不容易被女巫的药和猎人的枪打断，就先走哪条。" +
@@ -243,8 +247,11 @@ var chineseText = text{
 			"定计划前先看夜聊：同伴提出的具体打法，比如谁悍跳、要不要两只一起跳、刀谁、票投谁，能采纳就采纳；不采纳，就在 speech 里点他的名说清楚为什么，他会看到你的计划。" +
 			"speech 写白天按本局打法的具体打法，不超过80字。",
 		LastWords: "你被投票放逐了，发表遗言，不超过80字。",
-		Aftermath: "游戏结束了，所有人的身份都在【公开记录】的最后公开了。这是赛后复盘，像真人玩家散场前那样自然地聊：拿【你的笔记】对照真相，你哪里看对了、哪里看错了，被谁骗了、服不服，哪一手是关键，也可以接前面的人的话吐槽或者认错。按你的性格说，要具体到人和事，不超过100字。",
-		Vote:      "根据今天的发言、警长的归票和主持人汇总的表态，投票放逐一人。也可以选\"放弃\"弃票，不算任何人的票。",
+		Aftermath: "游戏结束了，所有人的身份都在【公开记录】的最后公开了。这是赛后复盘，像真人玩家散场前那样聊。" +
+			"先在 thinking 里分清四件事：当时你确实知道的（【你的秘密信息】）；当时你以为的（【你的笔记】和你当时的想法）；别人当时公开表现出来信谁、怀疑谁（站边、发言、投票）；现在翻了牌才知道的。" +
+			"再想：你哪一步在别人信的那个版本里，看起来和你以为的不一样？哪个骗局没骗到人，哪个判断建立在错的前提上？别人为什么那样做，他自己没说过的，只能说成你的猜测，或者直接问他，不要替他编动机。" +
+			"发言按你的性格挑一种反应，别和前面复盘的人用同一种：嘴硬不认、甩锅给队友、嘲讽对手、真心服某一手、到现在还没看懂、追问某个人当时为什么那样做，都可以。不要说\"我错了，打得好，MVP实至名归\"这类套话。要具体到人和事，不超过100字。",
+		Vote: "根据今天的发言、警长的归票和主持人汇总的表态，投票放逐一人。也可以选\"放弃\"弃票，不算任何人的票。",
 		PKSpeech: "放逐投票平票了，你在PK台上，同台的人见主持人的公告。这是你的PK发言：说完后，PK台下的人只能在PK台上的人里投票放逐一人，PK台上的人不投票。" +
 			"说清楚你为什么不该出局，以及为什么更该出局的是同台的人；有身份、有查验，现在就是亮出来的时候。",
 		PKVote: "PK投票：今天的放逐投票平票，PK台上的人刚各自发了言。你只能在他们中间投票放逐一人，也可以选\"放弃\"弃票。" +
@@ -328,7 +335,7 @@ var chineseText = text{
 	noFaker:      "没人悍跳",
 	faker:        "%s悍跳预言家",
 	hook:         "，%s倒钩",
-	hookLine:     "你就是倒钩的狼：今天要像最坚定的好人一样发言和投票，站边你认为是真的预言家，必要时可以怀疑、投票给狼同伴。\n",
+	hookLine:     "你就是倒钩的狼：今天要像最坚定的好人一样发言和投票，站边你认为是真的预言家，必要时可以怀疑、投票给狼同伴。但这只能骗到信这个预言家的人，信另一个预言家的人反而会因此怀疑你。\n",
 	habitNow:     "你的习惯倾向是：%s。但这一轮先看局势：证据和票型明确时，就照局势来。\n",
 	badgeNow:     "你对上警的态度：%s。这是你性格的倾向，身份和狼队计划可以改变它。\n",
 	mustFakeLine: "你就是要悍跳的人：这次发言必须跳预言家，claim.role 写预言家，并报一个查验结果。要犀利、有攻击性，也要和你之前报过的查验、警徽流对得上。\n",
@@ -455,7 +462,10 @@ How to think, in this order every time:
 3. beliefs: go through [Your notes] and update what you think of each other player, never yourself. A good player's beliefs follow from their pits: those in your likeliest pit lean werewolf, those in none of them lean good. Change a belief only on new evidence; otherwise keep it.
    A werewolf knows who is good, so their beliefs are about good players only, and say whether each seems to be a power role, a villager or unsure: who has claimed a power role, whose speeches carry night information, who was killed and did not die.
    evidence must be concrete things that actually happened. "Spoke blandly", "may be hiding their role", "feels off" and "has no proof" are not evidence, do not write them: no role claim can be proven on the spot, so "has no proof" is true of everyone.
-4. strategy: from your updated beliefs, decide what you will do next.
+4. strategy: from your updated beliefs, decide what you will do next. Before a move that matters (faking a role, playing the hook, claiming, reporting a check, leading or switching a vote, a night kill, a potion, a shot), put yourself in the place of the one or two players it matters most to, not everyone:
+   Who do they believe and who do they suspect, going by the public record: whose side they took, who they suspected, how they voted? That is what they show, not necessarily what they think; wolves and hidden power roles act too.
+   They do not know what you know, so they judge your move by their version of the game: in it, does your move look good or like a wolf's? How will they react? Could it backfire? Say you back a seer: to someone who believes the other seer, yours is a wolf, and backing them makes you look like their teammate.
+   Write this into strategy: who believes what, how your move looks to them, and what you will do about it.
 5. Only then this move. Say something new: new evidence, new reasoning, or an answer to something new someone said. Do not repeat reasons you have already given.
 
 Reasoning points people often get wrong:
@@ -487,6 +497,7 @@ Write everything in English.`,
 			"Nothing exposes a pack faster than its wolves abstaining together: everyone else takes a side and the same few will not, which points straight at them. Abstain only with a reason a good player could give, and never alongside a teammate. Never defend a teammate in public; if you take a side, give your own reason. " +
 			"Protect your teammates as a rule. You may still suspect or vote out a teammate when there is a concrete reason: they are credibly exposed and will not survive anyway, defending them would expose you, turning on them buys trust you will need later, or losing them improves the pack's chances. " +
 			"Sacrificing a teammate is an exception the evidence forces, not your usual way to look good, and never just because you dislike them. " +
+			"Looking good fools particular people, and it works only through what they believe: backing the real seer and turning on the faker fools only the good players who believe the real seer; those who believe the faker see you as the real seer's fellow wolf. So first make out whose side the one or two players you most need to fool, and most need to fear, are on: someone who plays like the witch or the hunter, or the sheriff. Someone who says in public they are coming for a player may not be, and it does not mean you are safe. " +
 			"If your victim did not die, the witch saved them and knows they were your kill, and may say so at any time: never report them as a werewolf or lead the charge against them, or one sentence from her exposes you. " +
 			"The real seer is your biggest threat. The witch's antidote can undo your kill and the hunter shoots when he goes, so find the power roles early. " +
 			"Wiping out one side is how you win, so count every night: you win once all 3 power roles or all 3 villagers are out, and each night you kill one, while by day good players' votes can exile another. Go first for whichever side needs fewer kills and is harder for the witch's potions and the hunter's gun to interrupt. " +
@@ -552,8 +563,11 @@ Write everything in English.`,
 			"Before you set the plan, read the night chat: when a teammate proposed something concrete, such as who fakes the seer, whether two of you claim together, who to kill or who to vote, take it up if you can; if you do not, name them in speech and say why, since they will see your plan. " +
 			"speech is how you play the day this game's way, at most 40 words.",
 		LastWords: "You have been voted out. Give your last words, at most 40 words.",
-		Aftermath: "The game is over, and everyone's role was revealed at the end of the [Public record]. This is the chat after the game, as real players have before they leave: check [Your notes] against the truth, say what you read right and wrong, who fooled you and whether you saw it coming, which move decided it; answer those who spoke before you, tease them or own up. In character, about real people and moments, at most 50 words.",
-		Vote:      "Based on today's speeches, the sheriff's call and the stances the host summed up, vote one person out. You may also pick \"pass\" to abstain, which counts for nobody.",
+		Aftermath: "The game is over, and everyone's role was revealed at the end of the [Public record]. This is the chat after the game, as real players have before they leave. " +
+			"First, in thinking, keep four things apart: what you really knew at the time ([Your secrets]); what you believed then ([Your notes] and your thinking then); who the others showed they believed and suspected, by their sides, speeches and votes; and what you learned only now the roles are out. " +
+			"Then ask: which of your moves looked different in someone else's version of the game from how you meant it? Which deception fooled nobody, and which read rested on a wrong premise? Why someone did what they did, unless they said so, is only your guess: say it as one, or ask them, and never make up their motives. " +
+			"In the speech, pick one reaction your character would have, not the one those before you had: insist you were right, blame a teammate, mock the other side, give real credit for one move, still not get what happened, or ask someone why they did what they did. No stock \"I was wrong, well played, deserved MVP\". About real people and moments, at most 50 words.",
+		Vote: "Based on today's speeches, the sheriff's call and the stances the host summed up, vote one person out. You may also pick \"pass\" to abstain, which counts for nobody.",
 		PKSpeech: "The vote to exile tied, and you are in the PK; the host has said who else is. This is your PK speech: after it, everyone not in the PK votes one of you out, and those in the PK do not vote. " +
 			"Say why you should not go, and why the other player in the PK should. If you have a role or a check to reveal, now is the time.",
 		PKVote: "PK vote: today's vote to exile tied, and the players in the PK have just spoken again. You may only vote one of them out, or pick \"pass\" to abstain. " +
@@ -637,7 +651,7 @@ Write everything in English.`,
 	noFaker:      "nobody claims seer",
 	faker:        "%s claims seer",
 	hook:         ", %s plays the hook",
-	hookLine:     "You are the hook: speak and vote today like the staunchest good player, back whoever you judge the real seer, and suspect or vote for a teammate if you must.\n",
+	hookLine:     "You are the hook: speak and vote today like the staunchest good player, back whoever you judge the real seer, and suspect or vote for a teammate if you must. That fools only those who believe that seer; those who believe another will suspect you for it.\n",
 	habitNow:     "Your lean is: %s. But read the situation first this round: when the evidence and the votes are clear, go with them.\n",
 	badgeNow:     "How you feel about running: %s. That is your character's lean; your role and the pack's plan can override it.\n",
 	mustFakeLine: "You are the one claiming seer: this speech must claim seer, with claim.role seer and a check result. Be sharp and on the attack, and fit what you already reported and your badge flow.\n",

@@ -267,8 +267,8 @@ func runBench(ctx context.Context, args []string) error {
 			fmt.Printf("speech: %s\n", a.Speech)
 		}
 		fmt.Printf("target: %s  suspect: %s\n", a.Target, a.Suspect)
-		fmt.Printf("length %d, named %d, votes %d, claims %d, questions %d, future %d, on a wolf %t\n",
-			m.Length, m.Named, m.Votes, m.Claims, m.Questions, m.Future, m.OnWolf)
+		fmt.Printf("length %d, named %d, votes %d, claims %d, questions %d, future %d, views %d, on a wolf %t\n",
+			m.Length, m.Named, m.Votes, m.Claims, m.Questions, m.Future, m.Views, m.OnWolf)
 	}
 	if *out == "" {
 		return nil

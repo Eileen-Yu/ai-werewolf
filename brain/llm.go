@@ -279,7 +279,7 @@ func prompt(t Turn) (system, user string) {
 	if t.Kind == Speech && t.IsSheriff() {
 		b.WriteString(tx.sheriffLine)
 	}
-	if p := t.Plan; p != nil && t.Phase == game.Day {
+	if p := t.Plan; p != nil && t.Phase == game.Day && t.Kind != Aftermath {
 		day := tx.noFaker
 		if len(p.Fakers) > 0 {
 			day = fmt.Sprintf(tx.faker, l.List(p.Fakers))

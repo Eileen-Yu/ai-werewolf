@@ -1,6 +1,7 @@
 package werewolf
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -10,22 +11,55 @@ import (
 
 func TestBenchesSeeOnlyTheirOwnSecrets(t *testing.T) {
 	for _, b := range Benches() {
-		if b.Turn.Me.Role != game.Villager {
-			t.Fatalf("%s: the benches are villagers' decisions, got %s", b.Name, b.Turn.Me.Role)
-		}
+		me := b.Turn.Me
+		wolf := me.Role == game.Werewolf
 		for _, e := range b.Turn.Transcript {
-			if len(e.Audience) > 0 && (len(e.Audience) != 1 || e.Audience[0] != b.Turn.Me.Name) {
+			if len(e.Audience) > 0 && !slices.Contains(e.Audience, me.Name) {
 				t.Errorf("%s sees a line meant for %v: %q", b.Name, e.Audience, e.Text)
 			}
-			for _, secret := range []string{"狼人同伴", "查验了", "打法是"} {
+			secrets := []string{"你用解药", "你用毒药", "今晚被狼人杀的是", "查验了"}
+			if !wolf {
+				secrets = append(secrets, "狼人同伴", "打法是")
+			}
+			for _, secret := range secrets {
 				if strings.Contains(e.Text, secret) {
 					t.Errorf("%s sees a secret: %q", b.Name, e.Text)
 				}
 			}
+			if e.Thought && e.Speaker != me.Name {
+				t.Errorf("%s sees %s's thinking", b.Name, e.Speaker)
+			}
 		}
-		if len(b.Turn.Pack) > 0 || b.Turn.Plan != nil || b.Turn.Tactic != "" {
+		if !wolf && (len(b.Turn.Pack) > 0 || b.Turn.Plan != nil || b.Turn.Tactic != "") {
 			t.Errorf("%s is told the pack's business", b.Name)
 		}
+		if wolf && len(b.Turn.Wolves) != 3 {
+			t.Errorf("%s: a wolf knows the whole pack, got %v", b.Name, b.Turn.Wolves)
+		}
+	}
+}
+
+func TestTheHookLooksBackOnWhatHeCouldSee(t *testing.T) {
+	var turn brain.Turn
+	for _, b := range Benches() {
+		if b.Name == "hook-aftermath" {
+			turn = b.Turn
+		}
+	}
+	var thoughts, roles int
+	for _, e := range turn.Transcript {
+		if e.Thought {
+			thoughts++
+		}
+		if strings.Contains(e.Text, "身份公开") {
+			roles++
+		}
+	}
+	if turn.Me.Alive || thoughts != 1 || roles != 1 {
+		t.Errorf("the poisoned hook looks back dead, with his own thinking and the roles: alive %t, %d thoughts, %d reveals", turn.Me.Alive, thoughts, roles)
+	}
+	if turn.Notes.Strategy == "" {
+		t.Error("the hook looks back with the strategy he played")
 	}
 }
 
@@ -45,6 +79,9 @@ func TestBenchesStopAtTheirDecision(t *testing.T) {
 		{"sheriff-vote", brain.SheriffVote, "懒羊羊", 9, 0, "退水"},
 		{"day2-speech", brain.Speech, "华妃", 6, 2, "今天投他"},
 		{"day2-vote", brain.Vote, "懒羊羊", 6, 2, "最新表态"},
+		{"hook-speech", brain.Speech, "光头强", 7, 2, "今晚小心"},
+		{"hook-aftermath", brain.Aftermath, "光头强", 3, 4, "还在吵"},
+		{"plan-kill", brain.WolfPlan, "安陵容", 8, 2, "太危险"},
 	}
 	for _, c := range cases {
 		b, ok := benches[c.name]

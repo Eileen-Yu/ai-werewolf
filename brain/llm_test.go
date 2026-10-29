@@ -791,3 +791,47 @@ func TestPowerRolesHideAndVillagersMaySmokeScreen(t *testing.T) {
 		}
 	}
 }
+
+func TestPlayersWeighAMoveThroughWhatOthersBelieve(t *testing.T) {
+	seats := []Seat{{Name: "阿杰"}, {Name: "小宇"}, {Name: "阿芳"}}
+	wolf := Turn{
+		Kind: Speech, Round: 2, Phase: game.Day, Me: game.Player{Name: "阿杰", Role: game.Werewolf},
+		Seats: seats, Suspects: []string{"小宇", "阿芳"}, Pack: []string{"阿杰"}, Wolves: []string{"阿杰"},
+		Plan: &game.Plan{Round: 2, Hook: "阿杰"},
+	}
+	system, user := prompt(wolf)
+	assert.Contains(t, system, "先换位想一两个和这一步最相关的人，不用每个人都想")
+	assert.Contains(t, system, "这只是他表现出来的，不一定是他心里想的")
+	assert.Contains(t, system, "只能骗到信真预言家的好人；信悍跳狼的好人会把你看成真预言家的狼同伴")
+	assert.Contains(t, user, "但这只能骗到信这个预言家的人", "the hook is told who his play fools")
+
+	good := wolf
+	good.Me.Role, good.Pack, good.Wolves, good.Plan = game.Witch, nil, nil, nil
+	system, _ = prompt(good)
+	assert.Contains(t, system, "先换位想一两个和这一步最相关的人", "every role weighs how its move looks")
+	assert.NotContains(t, system, "只能骗到信真预言家的好人", "fooling the table is the wolves' business")
+
+	good.Lang = game.English
+	system, _ = prompt(good)
+	assert.Contains(t, system, "put yourself in the place of the one or two players it matters most to, not everyone")
+}
+
+func TestTheAftermathTellsWhatWasKnownFromWhatWasLearned(t *testing.T) {
+	turn := Turn{
+		Kind: Aftermath, Round: 3, Phase: game.Day, Me: game.Player{Name: "阿杰", Role: game.Werewolf},
+		Seats: []Seat{{Name: "阿杰", Death: "第3夜死亡"}, {Name: "小宇"}}, Pack: []string{}, Wolves: []string{"阿杰"},
+		Plan: &game.Plan{Round: 3, Victim: "小宇", Focus: "小宇", Edge: game.God},
+	}
+	_, user := prompt(turn)
+	assert.Contains(t, user, "先在 thinking 里分清四件事")
+	assert.Contains(t, user, "现在翻了牌才知道的")
+	assert.Contains(t, user, "只能说成你的猜测，或者直接问他，不要替他编动机")
+	assert.Contains(t, user, "别和前面复盘的人用同一种")
+	assert.NotContains(t, user, "狼队今天的计划", "a plan has nothing left to play once the game is over")
+	assert.Contains(t, user, `"thinking"`)
+
+	turn.Lang = game.English
+	_, user = prompt(turn)
+	assert.Contains(t, user, "keep four things apart")
+	assert.Contains(t, user, "never make up their motives")
+}

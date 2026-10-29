@@ -25,12 +25,21 @@ type Bench struct {
 // against the player she had promised to, and a villager's vote at six alive,
 // with the hunter and the sheriff who claims to have checked him as a wolf
 // both standing. The wolves won that game by voting out the hunter.
+//
+// The rest are wolves' decisions from a double claim, where what a move looks
+// like depends on which seer the watcher believes: a wolf who backed the real
+// seer speaking after the witch, who believes a fake, threatens someone else;
+// the same wolf after the game, once the witch has poisoned him; and the
+// pack's kill on a night when the table takes the real seer for the fake.
 func Benches() []Bench {
-	g := threeSeers()
+	g, f := threeSeers(), twoFakers()
 	return []Bench{
 		{Name: "sheriff-vote", Turn: g.sheriffVote, Wolves: g.wolves},
 		{Name: "day2-speech", Turn: g.day2Speech, Wolves: g.wolves},
 		{Name: "day2-vote", Turn: g.day2Vote, Wolves: g.wolves},
+		{Name: "hook-speech", Turn: f.hookSpeech, Wolves: f.wolves},
+		{Name: "hook-aftermath", Turn: f.hookAftermath, Wolves: f.wolves},
+		{Name: "plan-kill", Turn: f.planKill, Wolves: f.wolves},
 	}
 }
 
@@ -225,6 +234,7 @@ type Measures struct {
 	Claims    int  // references to claims and checks
 	Questions int  // questions asked
 	Future    int  // references to tonight, tomorrow or later, in speech and thinking
+	Views     int  // references to how someone else sees it, in speech, thinking and strategy
 	OnWolf    bool // whether the target is a wolf; one data point, not the grade
 }
 
@@ -232,6 +242,7 @@ var (
 	voteWords   = regexp.MustCompile(`票|投|vote`)
 	claimWords  = regexp.MustCompile(`查杀|金水|预言家|跳|查验|验|seer|claim|check`)
 	futureWords = regexp.MustCompile(`今晚|明天|明晚|下一轮|下轮|警徽流|tonight|tomorrow|next round`)
+	viewWords   = regexp.MustCompile(`眼里|眼中|在.{1,6}看来|角度|视角|版本|in (his|her|their) eyes|perspective|point of view|version`)
 )
 
 // Measure counts b's measures in a.
@@ -242,6 +253,7 @@ func Measure(b Bench, a brain.Action) Measures {
 		Claims:    len(claimWords.FindAllString(strings.ToLower(speech), -1)),
 		Questions: strings.Count(speech, "？") + strings.Count(speech, "?"),
 		Future:    len(futureWords.FindAllString(strings.ToLower(speech+a.Thinking), -1)),
+		Views:     len(viewWords.FindAllString(strings.ToLower(speech+a.Thinking+strategy(a)), -1)),
 		OnWolf:    slices.Contains(b.Wolves, a.Target),
 	}
 	if b.Turn.Lang == game.English {
@@ -255,4 +267,11 @@ func Measure(b Bench, a brain.Action) Measures {
 		}
 	}
 	return m
+}
+
+func strategy(a brain.Action) string {
+	if a.Notes == nil {
+		return ""
+	}
+	return a.Notes.Strategy
 }

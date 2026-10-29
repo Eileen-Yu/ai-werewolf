@@ -86,7 +86,7 @@ var chineseHost = host{
 	silence:      "（沉默）",
 	mvp:          "本局MVP：%s！%s",
 	takeover:     "你超时了，这一手由AI代打。",
-	aftermath:    "赛后复盘：身份都公开了，大家说说自己哪里看对了、哪里被骗了。",
+	aftermath:    "赛后复盘：身份都公开了，大家聊聊这一局。",
 
 	election:         "天亮了。先竞选警长，竞选结束后再公布昨晚的死讯。想当警长的上警。警长的放逐票算1.5票，每天最后发言、可以归票，出局时可以移交警徽。",
 	noRunners:        "没有人上警，本局没有警长。",
@@ -168,7 +168,7 @@ var englishHost = host{
 	silence:      "(silence)",
 	mvp:          "MVP of the game: %s! %s",
 	takeover:     "You ran out of time, so an AI played this move for you.",
-	aftermath:    "After the game: the roles are out, so everyone says what they read right and where they were fooled.",
+	aftermath:    "After the game: the roles are out, so everyone has their say.",
 
 	election:         "Day breaks. First the sheriff election; last night's deaths are announced once it is over. Whoever wants the badge, run now. The sheriff's vote to exile counts one and a half; the sheriff speaks last each day, may call the vote, and may pass the badge on when they go.",
 	noRunners:        "Nobody runs, so there is no sheriff this game.",
