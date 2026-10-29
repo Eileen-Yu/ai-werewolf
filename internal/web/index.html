@@ -86,8 +86,14 @@
   .pill.suspect { background:#2f2230; color:#f0b5c8; }
   .pill.suspect.none { background:#262a36; color:var(--dim); font-weight:500; }
   .pill .avatar.sm { width:20px; height:20px; font-size:10px; }
-  .sum { margin-top:6px; font-size:13.5px; color:#c9ccd6; background:rgba(127,209,255,.06); border-left:2px solid #4f7da0; border-radius:0 6px 6px 0; padding:4px 10px; }
-  .sum summary { cursor:pointer; font-size:11.5px; color:#8fb3cc; list-style-position:inside; }
+  /* A long speech's summary is the game master's, not the speaker's: folded
+     under the words, opened on demand. */
+  .sum { margin-top:4px; font-size:13.5px; color:#c9ccd6; }
+  .sum summary { display:inline-block; cursor:pointer; font-size:11.5px; color:#8fb3cc; padding:0 8px; border-radius:999px; list-style:none; opacity:.75; }
+  .sum summary::-webkit-details-marker { display:none; }
+  .sum summary:hover, .sum[open] summary { opacity:1; background:rgba(127,209,255,.08); }
+  .sum[open] { background:rgba(127,209,255,.06); border-left:2px solid #4f7da0; border-radius:0 6px 6px 0; padding:4px 10px 6px; }
+  .sum[open] summary { padding:0; background:none; margin-bottom:2px; }
   .at { font-weight:700; color:#e6e6ea; background:rgba(255,255,255,.07); border-radius:3px; padding:0 2px; }
   .at.hit { color:#ffb3c6; background:rgba(240,120,150,.16); }
   .msg.reading .bubble .text { box-shadow: inset 3px 0 0 #7fd1ff; }
@@ -165,8 +171,29 @@
   #votes .prev { color:var(--accent); font-weight:700; }
   #newPill { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); margin:0; padding:6px 14px; border-radius:999px;
     box-shadow:0 4px 14px rgba(0,0,0,.5); z-index:2; }
-  .role { font-size:18px; font-weight:700; color:var(--accent); }
-  .role.wolf { color:var(--wolf); }
+  /* Who you are: a badge for your role and, for a werewolf, the pack. The
+     wolves' side gets a quiet red edge and their seats a red ring, not a red
+     page. Day is warm, night is blue, and at night the pack's edge glows. */
+  .me { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  .rolebadge { display:inline-flex; align-items:center; gap:6px; font-size:16px; font-weight:700; padding:3px 12px 3px 8px; border-radius:999px;
+    color:var(--accent); background:rgba(224,168,74,.12); border:1px solid rgba(224,168,74,.35); }
+  .rolebadge .ico { font-size:18px; line-height:1; }
+  .rolebadge.seer { color:#c9b6ff; background:rgba(150,120,255,.12); border-color:rgba(150,120,255,.35); }
+  .rolebadge.witch { color:#9fe0b8; background:rgba(90,200,140,.10); border-color:rgba(90,200,140,.32); }
+  .rolebadge.hunter { color:#f6b47c; background:rgba(240,150,80,.10); border-color:rgba(240,150,80,.32); }
+  .rolebadge.villager { color:#d6d9e2; background:rgba(255,255,255,.05); border-color:var(--line); }
+  .rolebadge.werewolf { color:#ffb3b0; background:rgba(217,83,79,.14); border-color:rgba(217,83,79,.45); }
+  .packmark { display:inline-flex; align-items:center; gap:4px; font-size:12.5px; color:#ffb3b0; padding:2px 8px 2px 6px; border-radius:999px; background:rgba(217,83,79,.08); }
+  .packmark .avatar.sm { width:22px; height:22px; font-size:11px; box-shadow:0 0 0 1.5px rgba(217,83,79,.7); }
+  .packmark .avatar.gone { filter:grayscale(1); opacity:.5; }
+  #board.wolfside { border-color:rgba(217,83,79,.35); box-shadow: inset 3px 0 0 rgba(217,83,79,.8);
+    background: linear-gradient(90deg, rgba(217,83,79,.08), transparent 45%), var(--card); }
+  body.night #board.wolfside { box-shadow: inset 3px 0 0 rgba(217,83,79,.9), 0 0 26px rgba(217,83,79,.16);
+    background: linear-gradient(90deg, rgba(217,83,79,.10), transparent 45%), rgba(22,26,44,.88); }
+  .wolfside .seat.me { border-color:var(--wolf); background:rgba(217,83,79,.08); }
+  .wolfside .seat.me .tag.you { background:var(--wolf); color:#fff; }
+  .seat.mate { border-color:rgba(217,83,79,.45); }
+  body.day { background: radial-gradient(ellipse at top, #2a2416 0%, var(--bg) 55%) fixed var(--bg); }
   .dim { color:var(--dim); font-size:13px; }
   .err { color:var(--wolf); margin-top:8px; white-space: pre-wrap; }
   .row { display:flex; gap:8px; } .row > * { flex:1; }
@@ -252,7 +279,7 @@
     <div class="card" id="board">
       <div class="boardHead">
         <div class="phase" id="when"></div>
-        <div class="me"><span id="youAre"></span> <span id="role" class="role"></span> <span class="dim" id="pack"></span></div>
+        <div class="me"><span id="youAre"></span><span id="role" hidden></span><span id="pack" hidden></span></div>
         <span id="sync" class="sync"></span>
         <button id="voiceBtn" class="secondary" type="button"></button>
       </div>
@@ -286,7 +313,7 @@ const UI = {
     title: "AI 狼人杀", count: "真人玩家人数（其余座位由AI坐）", player: i => `玩家${i}`, name: "名字", start: "开始游戏",
     linksTitle: "游戏开始了：每人一条链接", copy: "复制", copied: "已复制", open: "打开",
     linksHint: "把链接分别发给每位玩家，在同一个 Wi-Fi 下用各自的手机或电脑打开。每条链接只能看到自己的座位，别点开别人的。",
-    youAre: "你是", pack: "狼队：", waiting: "等待其他玩家……", dead: "你已出局，继续观战。", submit: "提交",
+    youAre: "你是", pack: "狼队", waiting: "等待其他玩家……", dead: "你已出局，继续观战。", submit: "提交",
     timeLeft: s => `剩余 ${s}，超时由AI代打`,
     bar: { yours: k => `⏰ 轮到你了 · ${k}`, go: "去操作", notYet: s => `⏳ 还没轮到你 · ${s}`, out: "👻 你已出局，正在观战", title: "⏰ 轮到你了" },
     sync: { ok: a => `● 已同步 · ${a}`, retry: (at, a) => `⚠️ 连接中断，正在重连… 上次同步 ${at}（${a}）`,
@@ -294,7 +321,7 @@ const UI = {
       gone: "⛔ 找不到这局游戏：主持人（gm）可能重启过或换了引擎，这局已经丢失", connecting: "连接中…", over: "● 游戏已结束",
       paused: "连接中断，计时暂停", now: "刚刚", secs: n => `${n}秒前`, mins: n => `${n}分钟前` },
     seatState: { thinking: "💭 思考中", speaking: "🔊 发言中" },
-    line: { summary: "✨ AI 摘要 · 不是角色原话", claims: r => `声称${r}`, checked: (x, r) => `查验 ${x}：${r}`, potion: x => `用药：${x}`,
+    line: { summary: "🔍 分析", summaryTip: "AI 主持人写的摘要，不是角色原话", claims: r => `声称${r}`, checked: (x, r) => `查验 ${x}：${r}`, potion: x => `用药：${x}`,
       suspects: "怀疑", nobody: "暂不怀疑谁" },
     kinds: { speech: "轮到你发言", wolf_chat: "狼队夜聊", wolf_plan: "你来定今晚的计划",
       last_words: "留下遗言", vote: "投票放逐", inspect: "今晚查验谁", save: "要用解药救他吗", poison: "要用毒药吗", shoot: "开枪带走谁",
@@ -362,7 +389,7 @@ const UI = {
     title: "AI Werewolf", count: "How many people play (AI takes the other seats)", player: i => `Player ${i}`, name: "Name", start: "Start game",
     linksTitle: "The game is on: one link each", copy: "Copy", copied: "Copied", open: "Open",
     linksHint: "Send each player their own link, to open on their own phone or computer on the same Wi-Fi. A link only shows its own seat, so don't open anyone else's.",
-    youAre: "You are", pack: "Your pack: ", waiting: "Waiting for the others…", dead: "You are out. Keep watching.", submit: "Submit",
+    youAre: "You are", pack: "Pack", waiting: "Waiting for the others…", dead: "You are out. Keep watching.", submit: "Submit",
     timeLeft: s => `${s} left before an AI plays this for you`,
     bar: { yours: k => `⏰ Your move · ${k}`, go: "Go to it", notYet: s => `⏳ Not your turn yet · ${s}`, out: "👻 You are out, watching", title: "⏰ Your move" },
     sync: { ok: a => `● Synced · ${a}`, retry: (at, a) => `⚠️ Connection lost, reconnecting… last synced ${at} (${a})`,
@@ -370,7 +397,7 @@ const UI = {
       gone: "⛔ Game not found: the game master (gm) may have restarted or changed engine, and this game is lost", connecting: "Connecting…", over: "● Game over",
       paused: "Connection lost, timer paused", now: "just now", secs: n => `${n}s ago`, mins: n => `${n} min ago` },
     seatState: { thinking: "💭 Thinking", speaking: "🔊 Speaking" },
-    line: { summary: "✨ AI summary · not the character's words", claims: r => `Claims ${r}`, checked: (x, r) => `checked ${x}: ${r}`, potion: x => `potion on ${x}`,
+    line: { summary: "🔍 Analysis", summaryTip: "The AI game master's summary, not the character's words", claims: r => `Claims ${r}`, checked: (x, r) => `checked ${x}: ${r}`, potion: x => `potion on ${x}`,
       suspects: "Suspects", nobody: "Suspects nobody yet" },
     kinds: { speech: "Your turn to speak", wolf_chat: "Wolf chat", wolf_plan: "Set tonight's plan",
       last_words: "Your last words", vote: "Vote someone out", inspect: "Who to check tonight", save: "Use the antidote on them?", poison: "Use the poison?", shoot: "Who to shoot",
@@ -563,14 +590,15 @@ function render(v) {
   $("voiceBtn").textContent = voice.on ? t.voiceOn : t.voiceOff;
   $("when").textContent = stageLabel(t, v.round, v.stage, v.phase);
   if (v.you) {
-    $("youAre").textContent = `${v.you}，${t.youAre}`;
-    $("role").textContent = v.role;
-    $("role").className = "role" + (v.pack ? " wolf" : "");
-    $("pack").textContent = v.pack ? t.pack + v.pack.join(", ") : "";
+    $("youAre").textContent = v.lang === "en" ? `${v.you}, ${t.youAre}` : `${v.you}，${t.youAre}`;
+    renderIdentity(v, t);
   } else {
     $("youAre").textContent = t.watching;
+    $("role").hidden = $("pack").hidden = true;
   }
+  $("board").classList.toggle("wolfside", !!v.pack);
   document.body.classList.toggle("night", v.phase === "night");
+  document.body.classList.toggle("day", v.phase !== "night");
   renderSeats(v, t);
   renderVotes(v, t);
   renderLog(v, t);
@@ -578,6 +606,25 @@ function render(v) {
   $("waiting").hidden = !!v.pending && (!v.now || v.now.name === v.you);
   if (!v.pending) { $("turnCard").hidden = true; shownEvent = null; clearInterval(timer); renderBar(v, t); return; }
   if (v.pending.event !== shownEvent) showTurn(v.pending, t, w);
+}
+
+// renderIdentity is the seat's role as a badge and, for a werewolf, the pack
+// with a portrait each, a fallen packmate greyed out. The role comes in the
+// game's words, so its key is found by its word.
+const ROLE_ICON = { werewolf: "🐺", seer: "🔮", witch: "🧪", hunter: "🏹", villager: "🌾" };
+function renderIdentity(v, t) {
+  const key = Object.keys(ROLE_ICON).find(k => v.words[k] === v.role) || "";
+  const role = $("role");
+  role.hidden = false;
+  role.className = "rolebadge " + key;
+  role.innerHTML = `<span class="ico">${ROLE_ICON[key] || "🎭"}</span>${esc(v.role)}`;
+  const pack = $("pack");
+  pack.hidden = !v.pack;
+  if (!v.pack) return;
+  const dead = new Set(v.seats.filter(s => s.death).map(s => s.name));
+  pack.className = "packmark";
+  pack.innerHTML = `🐺 ${esc(t.pack)} ` + v.pack.filter(n => n !== v.you)
+    .map(n => avatar(n, true).replace('class="avatar sm"', `class="avatar sm${dead.has(n) ? " gone" : ""}" title="${esc(n)}"`)).join("");
 }
 
 // renderBar is the bar along the bottom for a seat at the table: on its turn
@@ -637,7 +684,8 @@ function renderSeats(v, t, roles = revealed) {
     else if (!me && pack.includes(s.name)) tags.push(`<span class="tag wolf">${esc(t.packmate)}</span>`);
     if (s.death) tags.push(`<span class="tag out">${esc(t.out)}</span>`);
     const state = s.name === speaking ? "speaking" : !roles && s.name === thinking ? "thinking" : "";
-    const cls = ["seat", s.death && "dead", me && "me", s.sheriff && "sheriff", state].filter(Boolean).join(" ");
+    const mate = !me && !roles && pack.includes(s.name);
+    const cls = ["seat", s.death && "dead", me && "me", mate && "mate", s.sheriff && "sheriff", state].filter(Boolean).join(" ");
     return `<div class="${cls}" title="${esc([s.name, s.death || (s.sheriff ? t.sheriff : "")].filter(Boolean).join(" · "))}">` +
       avatar(s.name, false, s.sheriff ? `<span class="badge">🎖️</span>` : "") +
       `<div class="name">${esc(s.name)}</div><div class="status">${state ? esc(t.seatState[state]) : ""}</div><div class="tags">${tags.join("")}</div></div>`;
@@ -678,17 +726,17 @@ $("log").onscroll = () => {
 $("newPill").onclick = () => { const log = $("log"); log.scrollTo({ top: log.scrollHeight, behavior: "smooth" }); };
 
 // A speech shows, before its words, what it put on the record: the role it
-// claims and who it suspects. A long one has a summary over it, which the game
-// master wrote and the speaker did not say. In the words, every player named
+// claims and who it suspects. A long one has a summary folded under it, which
+// the game master wrote and the speaker did not say. In the words, every player named
 // stands out, the one suspected most.
 function lineHTML(l, v, t) {
   const text = esc(l.text);
   if (l.kind === "speech") {
     const cls = ["msg", l.speaker === v.you && "mine", l.private && "private"].filter(Boolean).join(" ");
     const tag = l.private ? `<span class="tag wolf">${esc(v.pack ? t.packTag : t.secret)}</span>` : "";
-    const sum = l.summary ? `<details class="sum" open><summary>${esc(t.line.summary)}</summary>${esc(l.summary)}</details>` : "";
+    const sum = l.summary ? `<details class="sum"><summary title="${esc(t.line.summaryTip)}">${esc(t.line.summary)}</summary>${esc(l.summary)}</details>` : "";
     return `<div class="${cls}" data-n="${l.n}">${avatar(l.speaker, true)}<div class="bubble"><div class="meta"><b>${esc(l.speaker)}</b>${tag}</div>` +
-      stanceHTML(l, v, t) + sum + `<div class="text">${mentions(text, l, v)}</div></div></div>`;
+      stanceHTML(l, v, t) + `<div class="text">${mentions(text, l, v)}</div>` + sum + `</div></div>`;
   }
   if (l.kind === "death") return `<div class="event death">💀 ${text}</div>`;
   if (l.kind === "vote") return `<div class="event vote">🗳️ ${text}</div>`;
