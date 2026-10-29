@@ -123,9 +123,9 @@ func playFromPage(t *testing.T, url string) bool {
 	}
 }
 
-// Every English character has a portrait, and every portrait belongs to a
-// character, so renaming one cannot quietly lose its picture.
-func TestEveryEnglishCharacterHasAPortrait(t *testing.T) {
+// Every character has a portrait, and every portrait belongs to a character,
+// so renaming one cannot quietly lose its picture.
+func TestEveryCharacterHasAPortrait(t *testing.T) {
 	srv := httptest.NewServer(Handler(nil))
 	t.Cleanup(srv.Close)
 
@@ -133,7 +133,7 @@ func TestEveryEnglishCharacterHasAPortrait(t *testing.T) {
 	files, err := fs.Glob(pictures, "avatars/*")
 	require.NoError(t, err)
 	assert.Len(t, got, len(files))
-	for _, c := range game.Characters(game.English) {
+	for _, c := range append(game.Characters(game.Chinese), game.Characters(game.English)...) {
 		url, ok := got[c]
 		if !assert.True(t, ok, "no portrait for %s", c) {
 			continue
