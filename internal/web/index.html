@@ -737,7 +737,8 @@ function renderStage(v, t) {
     sub = s.ai;
   } else {
     icon = `<span class="ballot">🗳️</span>`;
-    text = `<span class="dots">${esc(s[now.kind] || t.waiting)}</span>`;
+    const say = s[now.kind]; // a line for one player, with nobody named, would print as source
+    text = `<span class="dots">${esc(typeof say === "string" ? say : t.waiting.replace(/[.…]+$/, ""))}</span>`;
     if (now.waiting > 1) sub = s.left(now.waiting);
   }
   $("stageIcon").innerHTML = icon;

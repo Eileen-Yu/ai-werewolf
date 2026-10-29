@@ -115,7 +115,7 @@ func publicActivity(turn brain.Turn) (kind, name string) {
 		return "night", ""
 	case brain.Shoot:
 		return "wait", ""
-	case brain.Speech, brain.Campaign, brain.LastWords, brain.Badge:
+	case brain.Speech, brain.Campaign, brain.LastWords, brain.Badge, brain.Aftermath:
 		return string(turn.Kind), turn.Me.Name
 	}
 	return string(turn.Kind), ""

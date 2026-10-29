@@ -265,9 +265,11 @@ func TestThePageIsToldOnlyWhatTheTableCanSee(t *testing.T) {
 		assert.Equal(t, want, got, kind)
 		assert.Empty(t, name, "%s does not name who is moving", kind)
 	}
-	kind, name := publicActivity(brain.Turn{Kind: brain.Speech, Me: game.Player{Name: "小红"}})
-	assert.Equal(t, "speech", kind)
-	assert.Equal(t, "小红", name, "everyone sees whose turn it is to speak")
+	for _, k := range []brain.TurnKind{brain.Speech, brain.Campaign, brain.LastWords, brain.Badge, brain.Aftermath} {
+		kind, name := publicActivity(brain.Turn{Kind: k, Me: game.Player{Name: "小红"}})
+		assert.Equal(t, string(k), kind)
+		assert.Equal(t, "小红", name, "everyone sees whose turn it is to %s", k)
+	}
 
 	tb := &table{now: []*Activity{{Kind: "night"}, {Kind: "wolves"}, {Kind: "wolves"}}}
 	assert.Equal(t, &Activity{Kind: "wolves", Waiting: 2}, tb.doing(), "the wolves hide the seer's check")
