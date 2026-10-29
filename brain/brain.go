@@ -111,7 +111,8 @@ type Turn struct {
 // Claim are a declaring speech's stance, put on the record so others can hold
 // the player to it; a wolf's Claim may be a lie. Fakers, Hook and Focus are a
 // wolf plan's seer claimants, the wolf who sides with the good players, and
-// vote target.
+// vote target. Summary is a line on a long public speech for the page,
+// written apart from the player (see LLM.summarize); a player never sets it.
 type Action struct {
 	Observations []string    `json:"observations,omitempty"`
 	Thinking     string      `json:"thinking"`
@@ -123,6 +124,7 @@ type Action struct {
 	Fakers       []string    `json:"fakers,omitempty"`
 	Hook         string      `json:"hook,omitempty"`
 	Focus        string      `json:"focus,omitempty"`
+	Summary      string      `json:"summary,omitempty"`
 }
 
 // Claimable is what a player may claim to be. A wolf claims one of these too.

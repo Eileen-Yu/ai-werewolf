@@ -65,6 +65,11 @@ type text struct {
 	// preparedLine and changedNotesLine are for a turn after a Prepare turn.
 	preparedLine, changedNotesLine string
 
+	// summarize asks for a line on a public speech of at least summaryFrom
+	// characters, for the page; summaryOf is the speaker and the speech.
+	summarize, summaryOf string
+	summaryFrom          int
+
 	// Random's lines.
 	speechLines, wolfLines []string
 	lastWords, randomPlan  string
@@ -294,6 +299,10 @@ var chineseText = text{
 	badgeNow:     "你对上警的态度：%s。这是你性格的倾向，身份和狼队计划可以改变它。\n",
 	mustFakeLine: "你就是要悍跳的人：这次发言必须跳预言家，claim.role 写预言家，并报一个查验结果。要犀利、有攻击性，也要和你之前报过的查验、警徽流对得上。\n",
 	known:        "你确定知道的事，和任何人的说法冲突时以这些为准：\n",
+	summarize: "你是狼人杀的场记，只负责把一段公开发言压缩成一句话给观众看。用第三人称、不超过30个字，说清楚他声称了什么身份或查验、怀疑或攻击谁、主要理由。" +
+		"只能用发言里出现的内容，不要加任何发言里没有的信息，不要判断真假，也不要评价。只输出这一句话，不要引号。",
+	summaryOf:   "%s的发言：%s",
+	summaryFrom: 60,
 	nobodySpoke: "到现在为止还没有任何人公开发过言，也没有任何公开信息，谁是什么身份完全不知道。" +
 		"不能评价任何人的发言或观点，也不要编\"他像预言家\"这类没有依据的理由；需要选人时只能靠猜，就直说是猜的。\n",
 	silent:         "还没有公开发过言的人：%s。你不能评价他们说过什么。\n",
@@ -565,6 +574,10 @@ Write everything in English.`,
 	badgeNow:     "How you feel about running: %s. That is your character's lean; your role and the pack's plan can override it.\n",
 	mustFakeLine: "You are the one claiming seer: this speech must claim seer, with claim.role seer and a check result. Be sharp and on the attack, and fit what you already reported and your badge flow.\n",
 	known:        "What you know for certain; where anyone's word contradicts it, this wins:\n",
+	summarize: "You keep the record at a game of Werewolf: squeeze one public speech into a single line for the audience. In the third person and at most 20 words, say what role or check they claimed, who they suspect or attack, and their main reason. " +
+		"Use only what is in the speech, add nothing it does not say, and neither judge whether it is true nor comment on it. Reply with that one line only, without quotes. Write in English.",
+	summaryOf:   "%s's speech: %s",
+	summaryFrom: 180,
 	nobodySpoke: "Nobody has said anything in public yet and there is no public information at all; nobody knows anyone's role. " +
 		"Do not comment on anyone's speech or views, and do not invent reasons like \"he seems like the seer\"; if you have to pick someone, it is a guess, so say so.\n",
 	silent:         "Players who have not said anything in public yet: %s. You cannot comment on what they said.\n",

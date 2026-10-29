@@ -634,3 +634,43 @@ func TestPreparingWritesOnlyNotesAndTheTurnAfterOnlyWhatChanged(t *testing.T) {
 	_, user = prompt(speech)
 	assert.Contains(t, user, chineseText.notesLine)
 }
+
+func TestASummaryIsAskedFromTheSpeechAlone(t *testing.T) {
+	long := strings.Repeat("我是预言家，昨晚查验阿杰是狼，警徽流先美玲后小红。", 3)
+	turn := Turn{
+		Kind: Speech, Round: 1, Phase: game.Day,
+		Me:         game.Player{Name: "老王", Role: game.Werewolf, Persona: "推理小说迷"},
+		Transcript: []game.Event{{Round: 1, Phase: game.Night, Text: "你们是狼人同伴：老王、阿杰。", Audience: []string{"老王", "阿杰"}}},
+		Notes:      game.Notes{Strategy: "悍跳预言家"},
+	}
+	system, user, ok := summaryPrompt(turn, long)
+	require.True(t, ok)
+	assert.Equal(t, chineseText.summarize, system)
+	assert.Equal(t, "老王的发言："+long, user)
+	for _, secret := range []string{"狼人同伴", "悍跳", "推理小说迷", string(game.Werewolf)} {
+		assert.NotContains(t, system+user, secret)
+	}
+
+	_, _, ok = summaryPrompt(turn, "我是好人。")
+	assert.False(t, ok, "a short speech needs no summary")
+	for _, k := range []TurnKind{WolfChat, WolfPlan, Aftermath, Vote} {
+		turn.Kind = k
+		_, _, ok = summaryPrompt(turn, long)
+		assert.False(t, ok, "%s gets no summary", k)
+	}
+	turn.Kind, turn.Lang = LastWords, game.English
+	system, _, ok = summaryPrompt(turn, strings.Repeat("I am the seer and Ruby is a werewolf. ", 6))
+	require.True(t, ok)
+	assert.Equal(t, englishText.summarize, system)
+}
+
+// A summary is for the page; no player ever reads one.
+func TestNoPromptShowsASummary(t *testing.T) {
+	turn := Turn{
+		Kind: Speech, Round: 1, Phase: game.Day, Me: game.Player{Name: "老王", Role: game.Villager},
+		Seats:      []Seat{{Name: "老王"}, {Name: "美玲"}},
+		Transcript: []game.Event{{Round: 1, Phase: game.Day, Speaker: "美玲", Text: "我是预言家。", Summary: "SUMMARY-ONLY-FOR-THE-PAGE"}},
+	}
+	system, user := prompt(turn)
+	assert.NotContains(t, system+user, "SUMMARY-ONLY-FOR-THE-PAGE")
+}

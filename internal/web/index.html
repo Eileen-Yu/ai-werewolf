@@ -36,7 +36,9 @@
   @media (max-width: 520px) { .seats { grid-template-columns: repeat(3, 1fr); } }
   .seat { position:relative; display:flex; flex-direction:column; align-items:center; gap:3px; padding:10px 4px 8px;
     border:1px solid var(--line); border-radius:10px; background:rgba(255,255,255,.02); text-align:center; min-width:0; transition: opacity .4s; }
-  .seat .name { font-size:13px; font-weight:600; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .seat .name { font-size:13px; font-weight:600; line-height:1.25; min-height:2.5em; max-width:100%; overflow:hidden; overflow-wrap:anywhere;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .seats .avatar { width:60px; height:60px; font-size:24px; }
   .seat .tags { display:flex; flex-wrap:wrap; justify-content:center; gap:3px; min-height:18px; }
   .tag { font-size:11px; line-height:16px; padding:0 6px; border-radius:999px; background:#2a2e3a; color:#c9ccd6; white-space:nowrap; }
   .tag.you { background:var(--accent); color:#14161c; font-weight:700; }
@@ -50,6 +52,7 @@
   .avatar.sm { width:30px; height:30px; font-size:13px; }
   .avatar img { position:absolute; inset:0; width:100%; height:100%; border-radius:50%; object-fit:cover; }
   .avatar .badge { position:absolute; right:-6px; bottom:-4px; font-size:16px; }
+  .avatar .state { position:absolute; left:-7px; top:-7px; font-size:15px; line-height:1; padding:3px; border-radius:50%; background:var(--card); }
   .seat.me { border-color:var(--accent); background:rgba(224,168,74,.08); }
   .seat.sheriff .avatar { box-shadow: 0 0 0 2px #d4a017; }
   .seat.dead .avatar, .seat.dead .name { opacity:.45; }
@@ -75,6 +78,19 @@
   .msg.private .bubble .text { background:#3a2023; border:1px dashed #7a3a3d; }
   .chip { font-size:11.5px; padding:1px 7px; border-radius:999px; border:1px solid #4a5068; color:#c3c8dc; }
   .chip.claim { border-color:var(--accent); color:var(--accent); }
+  /* What a speech put on the record comes before its words. */
+  .stance { display:flex; flex-wrap:wrap; gap:6px; margin-top:5px; }
+  .pill { display:inline-flex; align-items:center; gap:5px; font-size:13px; font-weight:600; padding:2px 10px 2px 8px; border-radius:999px; }
+  .pill.claim { background:#3a3320; color:var(--accent); }
+  .pill.claim.wolfish { background:#4a2224; color:#ffb3b0; }
+  .pill.suspect { background:#2f2230; color:#f0b5c8; }
+  .pill.suspect.none { background:#262a36; color:var(--dim); font-weight:500; }
+  .pill .avatar.sm { width:20px; height:20px; font-size:10px; }
+  .sum { margin-top:6px; font-size:13.5px; color:#c9ccd6; background:rgba(127,209,255,.06); border-left:2px solid #4f7da0; border-radius:0 6px 6px 0; padding:4px 10px; }
+  .sum summary { cursor:pointer; font-size:11.5px; color:#8fb3cc; list-style-position:inside; }
+  .at { font-weight:700; color:#e6e6ea; background:rgba(255,255,255,.07); border-radius:3px; padding:0 2px; }
+  .at.hit { color:#ffb3c6; background:rgba(240,120,150,.16); }
+  .msg.reading .bubble .text { box-shadow: inset 3px 0 0 #7fd1ff; }
   .host { margin:8px 0; color:var(--dim); font-size:13.5px; white-space:pre-wrap; }
   .host.private { color:#e9cf9b; padding:6px 10px; border-radius:8px; background:rgba(224,168,74,.08); }
   .event { margin:10px 0; padding:8px 12px; border-radius:8px; border-left:3px solid; white-space:pre-wrap; }
@@ -123,6 +139,30 @@
   @media (prefers-reduced-motion: reduce) {
     .vr-bar i, .vr-chip.pop, .vr-outcome.landed, #reveal { transition:none !important; animation:none !important; }
   }
+  .sync { font-size:12px; padding:2px 10px; border-radius:999px; color:var(--dim); white-space:nowrap; }
+  .sync.retry { background:#3a3320; color:var(--accent); }
+  .sync.down { background:#4a2224; color:#ffb3b0; }
+  #turnCard { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  /* The action bar: on your turn, what is asked and the time left; otherwise
+     that it is not your turn yet. */
+  #actionBar { position:fixed; z-index:25; left:50%; bottom:16px; transform:translateX(-50%); width:min(720px, calc(100vw - 190px));
+    display:flex; align-items:center; gap:12px; padding:10px 14px; border-radius:12px; background:#232733; border:1px solid var(--line);
+    box-shadow:0 8px 28px rgba(0,0,0,.55); }
+  #actionBar .what { flex:1; min-width:0; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #actionBar .clock { font-variant-numeric:tabular-nums; font-weight:700; font-size:18px; }
+  #actionBar button { margin:0; }
+  #actionBar .bar { position:absolute; left:0; right:0; bottom:0; height:3px; border-radius:0 0 12px 12px; overflow:hidden; }
+  #actionBar .bar i { display:block; height:100%; background:var(--accent); transition: width 1s linear; }
+  #actionBar.mine { background:#3a3320; border-color:var(--accent); }
+  #actionBar.urgent { background:#4a2224; border-color:var(--wolf); }
+  #actionBar.urgent .bar i { background:var(--wolf); }
+  #actionBar.idle { color:var(--dim); font-size:13.5px; padding:8px 14px; }
+  #actionBar.idle .what { font-weight:500; }
+  @media (max-width: 860px) { #actionBar { width:calc(100vw - 24px); bottom:66px; } }
+  main { padding-bottom:90px; }
+  #votesNow { margin-bottom:8px; padding:8px 10px; border-radius:8px; background:rgba(111,140,255,.10); border-left:3px solid #6f8cff; font-size:13.5px; }
+  #votesNow:empty { display:none; }
+  #votes .prev { color:var(--accent); font-weight:700; }
   #newPill { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); margin:0; padding:6px 14px; border-radius:999px;
     box-shadow:0 4px 14px rgba(0,0,0,.5); z-index:2; }
   .role { font-size:18px; font-weight:700; color:var(--accent); }
@@ -141,8 +181,12 @@
   body { transition: background 1.2s; }
   body.night { background: radial-gradient(ellipse at top, #1a2148 0%, #0b0e1c 60%, #07080f 100%) fixed #07080f; }
   body.night .card { background: rgba(22,26,44,.88); border-color:#2a3157; }
-  .seat.speaking { border-color:#7fd1ff; }
+  /* thinking: an AI is writing its move; speaking: its speech is being read aloud. */
+  .seat.thinking { border-style:dashed; border-color:#5f8fb0; }
+  .seat.speaking { border-color:#7fd1ff; background:rgba(127,209,255,.10); box-shadow:0 0 0 1px #7fd1ff, 0 0 18px rgba(127,209,255,.25); }
   .seat.speaking .avatar { animation: ring 1.4s ease-out infinite; }
+  .seat .status { font-size:11px; line-height:16px; color:#7fd1ff; min-height:16px; }
+  .seat.thinking .status { color:#8fb3cc; }
   @keyframes ring { 0% { box-shadow:0 0 0 0 rgba(127,209,255,.7); } 100% { box-shadow:0 0 0 11px rgba(127,209,255,0); } }
   .stage { position:relative; overflow:hidden; min-height:140px; display:flex; align-items:center; gap:16px; padding:22px 18px; }
   body.night .stage.night { background: linear-gradient(180deg, #070b22 0%, #141a40 100%); border-color:#2f3870; }
@@ -209,6 +253,7 @@
       <div class="boardHead">
         <div class="phase" id="when"></div>
         <div class="me"><span id="youAre"></span> <span id="role" class="role"></span> <span class="dim" id="pack"></span></div>
+        <span id="sync" class="sync"></span>
         <button id="voiceBtn" class="secondary" type="button"></button>
       </div>
       <div class="seats" id="seats"></div>
@@ -216,15 +261,15 @@
     <div class="grid">
       <div class="card timeline"><div id="log"></div><button id="newPill" type="button" hidden></button></div>
       <div class="side">
-        <div class="card" id="votes" hidden></div>
+        <div class="card" id="result" hidden></div>
         <div class="card" id="turnCard" hidden>
           <div id="turnTitle" style="font-weight:600"></div>
           <div class="dim" id="countdown"></div>
           <form id="turnForm"></form>
           <div id="turnErr" class="err"></div>
         </div>
-        <div class="card stage" id="waiting"><div class="sky"></div><div class="moon"></div><div class="icon" id="stageIcon"></div><div class="body"><div class="big" id="stageText"></div><div class="sub" id="stageSub"></div></div></div>
-        <div class="card" id="result" hidden></div>
+        <div class="card stage" id="waiting"><div class="sky"></div><div class="moon"></div><div class="icon" id="stageIcon"></div><div class="body"><div class="big" id="stageText"></div><div class="sub" id="stageSub"></div><div class="sub" id="stageReading"></div></div></div>
+        <div class="card" id="votes" hidden><div id="votesNow"></div><div id="votesList"></div></div>
       </div>
     </div>
   </section>
@@ -232,6 +277,7 @@
 <div id="reveal" hidden role="dialog" aria-modal="true" aria-labelledby="revealTitle">
   <div class="card"><div id="revealBody"></div><div class="actions"><button id="revealSkip" class="secondary" type="button"></button><button id="revealClose" class="secondary" type="button"></button></div></div>
 </div>
+<div id="actionBar" hidden><span class="what" id="barWhat"></span><span class="clock" id="barClock"></span><button id="barGo" type="button"></button><div class="bar"><i id="barFill"></i></div></div>
 <button id="rulesBtn" class="secondary" type="button"></button>
 <section id="rules" class="card" hidden><button id="rulesClose" type="button" aria-label="close">×</button><div id="rulesBody"></div></section>
 <script>
@@ -241,7 +287,15 @@ const UI = {
     linksTitle: "游戏开始了：每人一条链接", copy: "复制", copied: "已复制", open: "打开",
     linksHint: "把链接分别发给每位玩家，在同一个 Wi-Fi 下用各自的手机或电脑打开。每条链接只能看到自己的座位，别点开别人的。",
     youAre: "你是", pack: "狼队：", waiting: "等待其他玩家……", dead: "你已出局，继续观战。", submit: "提交",
-    timeLeft: s => `剩余 ${s} 秒，超时由AI代打`,
+    timeLeft: s => `剩余 ${s}，超时由AI代打`,
+    bar: { yours: k => `⏰ 轮到你了 · ${k}`, go: "去操作", notYet: s => `⏳ 还没轮到你 · ${s}`, out: "👻 你已出局，正在观战", title: "⏰ 轮到你了" },
+    sync: { ok: a => `● 已同步 · ${a}`, retry: (at, a) => `⚠️ 连接中断，正在重连… 上次同步 ${at}（${a}）`,
+      down: (at, a) => `⛔ 游戏暂时不可用：连不上主持人（gm），仍在重试。上次同步 ${at}（${a}）`,
+      gone: "⛔ 找不到这局游戏：主持人（gm）可能重启过或换了引擎，这局已经丢失", connecting: "连接中…", over: "● 游戏已结束",
+      paused: "连接中断，计时暂停", now: "刚刚", secs: n => `${n}秒前`, mins: n => `${n}分钟前` },
+    seatState: { thinking: "💭 思考中", speaking: "🔊 发言中" },
+    line: { summary: "✨ AI 摘要 · 不是角色原话", claims: r => `声称${r}`, checked: (x, r) => `查验 ${x}：${r}`, potion: x => `用药：${x}`,
+      suspects: "怀疑", nobody: "暂不怀疑谁" },
     kinds: { speech: "轮到你发言", wolf_chat: "狼队夜聊", wolf_plan: "你来定今晚的计划",
       last_words: "留下遗言", vote: "投票放逐", inspect: "今晚查验谁", save: "要用解药救他吗", poison: "要用毒药吗", shoot: "开枪带走谁",
       run: "竞选警长：要上警吗", campaign: "警长竞选发言", withdraw: "竞选结束：要退水吗", sheriff_vote: "投票选警长", badge: "移交警徽" },
@@ -249,10 +303,12 @@ const UI = {
     target: "选择", speech: "发言", planSpeech: "给队友的计划说明", suspect: "你怀疑谁（会记录在案）",
     claim: "声称身份（可选）", noClaim: "不声称", claimChecked: "查验了谁", claimResult: "查验结果", claimPotion: "救了/毒了谁",
     abstain: "弃票",
-    vote: { locale: "zh", record: "投票记录", title: (w, k) => `${w} · ${{ election: "警长投票", race: "警长竞选", exile: "放逐投票" }[k]}`,
+    vote: { locale: "zh", record: "已结束的投票", previous: "上一次结果", replay: "▶ 回放已结束的投票",
+      live: { vote: "🗳️ 放逐投票进行中", sheriff_vote: "🗳️ 警长投票进行中", run: "🎖️ 警长竞选进行中：大家在决定要不要上警", withdraw: "🎖️ 警长竞选进行中：候选人在考虑退水",
+        campaign: "🎖️ 警长竞选进行中：竞选发言" }, liveNote: "所有人投完之后才公布结果", title: (w, k) => `${w} · ${{ election: "警长投票", race: "警长竞选", exile: "放逐投票" }[k]}`,
       count: n => `${n}票`, candidates: xs => `候选人：${xs}`, noVote: "上警的人不投票", withdrew: xs => `退水：${xs}`,
       switched: x => `改票 · 上轮投${x}`, nowAbstains: x => `改为弃票 · 上轮投${x}`, wasAbstaining: "上轮弃票",
-      skip: "跳过动画", close: "关闭", replay: "▶ 回放",
+      skip: "跳过动画", close: "关闭",
       exiled: n => `${n} 被放逐出局`, elected: n => `${n} 当选警长 🎖️`, tie: n => `${n} 平票，今天无人出局`,
       electionTie: n => `${n} 平票，警徽流失，本局没有警长`, abstained: "所有人都弃票，今天无人出局", electionAbstained: "所有人都弃票，警徽流失，本局没有警长",
       unopposed: n => `警上只剩 ${n} 一人，不用投票，直接当选 🎖️`, no_runners: "没有人上警，本局没有警长",
@@ -290,19 +346,28 @@ const UI = {
 <li>狼人：村民全部出局，或神职（预言家、女巫、猎人）全部出局，或活着的狼人不少于其他人。</li>
 <li>游戏结束、身份公开后，AI 玩家会挨个复盘：哪里看对了、被谁骗了。</li></ul>
 <h4>你怎么玩</h4><ul>
-<li>轮到你时，右边会出现操作框；3分钟没操作，AI 会替你走这一步。</li>
+<li>轮到你时，屏幕底部会出现行动栏和倒计时，右边是操作框；3分钟没操作，AI 会替你走这一步。</li>
 <li>发言时要选你怀疑谁（会公开记录），也可以声称一个身份。狼人也可以假装成任何身份。</li></ul>`,
     stage: { wolves: "狼人正在密谋", wolvesSub: "天黑请闭眼，狼人请睁眼", night: "夜色深沉，有人正悄悄行动", nightIdle: "夜深了",
-      wait: "主持人正在等待", speech: n => `${n} 正在发言`, aftermath: n => `${n} 正在复盘`, campaign: n => `${n} 正在竞选发言`,
-      last_words: n => `${n} 正在留遗言`, badge: n => `${n} 正在决定警徽交给谁`, vote: "大家正在投票", sheriff_vote: "大家正在投票选警长",
-      run: "大家正在决定要不要上警", withdraw: "候选人正在考虑要不要退水", left: n => `还有 ${n} 人在想`, elapsed: s => `已经 ${s} 秒` },
+      wait: "主持人正在等待", speech: n => `${n} 正在想怎么发言`, aftermath: n => `${n} 正在想怎么复盘`, campaign: n => `${n} 正在准备竞选发言`,
+      last_words: n => `${n} 正在准备遗言`, badge: n => `${n} 正在决定警徽交给谁`, ai: "AI 生成中", person: n => `等 ${n}（真人）行动`,
+      reading: n => `🔊 正在朗读 ${n} 的发言`, vote: "大家正在投票", sheriff_vote: "大家正在投票选警长",
+      run: "大家正在决定要不要上警", withdraw: "候选人正在考虑要不要退水", left: n => `还有 ${n} 人在想`, elapsed: s => `已经 ${s}` },
   },
   en: {
     title: "AI Werewolf", count: "How many people play (AI takes the other seats)", player: i => `Player ${i}`, name: "Name", start: "Start game",
     linksTitle: "The game is on: one link each", copy: "Copy", copied: "Copied", open: "Open",
     linksHint: "Send each player their own link, to open on their own phone or computer on the same Wi-Fi. A link only shows its own seat, so don't open anyone else's.",
     youAre: "You are", pack: "Your pack: ", waiting: "Waiting for the others…", dead: "You are out. Keep watching.", submit: "Submit",
-    timeLeft: s => `${s}s left before an AI plays this for you`,
+    timeLeft: s => `${s} left before an AI plays this for you`,
+    bar: { yours: k => `⏰ Your move · ${k}`, go: "Go to it", notYet: s => `⏳ Not your turn yet · ${s}`, out: "👻 You are out, watching", title: "⏰ Your move" },
+    sync: { ok: a => `● Synced · ${a}`, retry: (at, a) => `⚠️ Connection lost, reconnecting… last synced ${at} (${a})`,
+      down: (at, a) => `⛔ Game unavailable: cannot reach the game master (gm), still retrying. Last synced ${at} (${a})`,
+      gone: "⛔ Game not found: the game master (gm) may have restarted or changed engine, and this game is lost", connecting: "Connecting…", over: "● Game over",
+      paused: "Connection lost, timer paused", now: "just now", secs: n => `${n}s ago`, mins: n => `${n} min ago` },
+    seatState: { thinking: "💭 Thinking", speaking: "🔊 Speaking" },
+    line: { summary: "✨ AI summary · not the character's words", claims: r => `Claims ${r}`, checked: (x, r) => `checked ${x}: ${r}`, potion: x => `potion on ${x}`,
+      suspects: "Suspects", nobody: "Suspects nobody yet" },
     kinds: { speech: "Your turn to speak", wolf_chat: "Wolf chat", wolf_plan: "Set tonight's plan",
       last_words: "Your last words", vote: "Vote someone out", inspect: "Who to check tonight", save: "Use the antidote on them?", poison: "Use the poison?", shoot: "Who to shoot",
       run: "Sheriff election: will you run?", campaign: "Your campaign speech", withdraw: "Campaign over: withdraw?", sheriff_vote: "Vote for sheriff", badge: "Pass on the badge" },
@@ -310,10 +375,13 @@ const UI = {
     target: "Pick", speech: "What you say", planSpeech: "The plan, for your pack", suspect: "Who you suspect (goes on the record)",
     claim: "Claim a role (optional)", noClaim: "No claim", claimChecked: "Who you checked", claimResult: "What you saw", claimPotion: "Who you saved or poisoned",
     abstain: "Abstained",
-    vote: { locale: "en", record: "Votes", title: (w, k) => `${w} · ${{ election: "Sheriff vote", race: "Sheriff election", exile: "Vote" }[k]}`,
+    vote: { locale: "en", record: "Finished votes", previous: "Previous result", replay: "▶ Replay this finished vote",
+      live: { vote: "🗳️ Vote in progress", sheriff_vote: "🗳️ Sheriff vote in progress", run: "🎖️ Sheriff election: everyone is deciding whether to run",
+        withdraw: "🎖️ Sheriff election: the candidates are deciding whether to withdraw", campaign: "🎖️ Sheriff election: campaign speeches" },
+      liveNote: "The result is shown once every vote is in", title: (w, k) => `${w} · ${{ election: "Sheriff vote", race: "Sheriff election", exile: "Vote" }[k]}`,
       count: n => `${n} vote${n === 1 ? "" : "s"}`, candidates: xs => `Candidates: ${xs}`, noVote: "Candidates do not vote", withdrew: xs => `Withdrew: ${xs}`,
       switched: x => `switched · voted ${x} last time`, nowAbstains: x => `now abstains · voted ${x} last time`, wasAbstaining: "abstained last time",
-      skip: "Skip animation", close: "Close", replay: "▶ Replay",
+      skip: "Skip animation", close: "Close",
       exiled: n => `${n} is voted out`, elected: n => `${n} is elected sheriff 🎖️`, tie: n => `A tie between ${n}: nobody is voted out today`,
       electionTie: n => `A tie between ${n}: the badge is lost and there is no sheriff this game`, abstained: "Everyone abstained: nobody is voted out today",
       electionAbstained: "Everyone abstained: the badge is lost and there is no sheriff this game",
@@ -352,12 +420,13 @@ const UI = {
 <li>Werewolves: every villager is out, or every power role (seer, witch, hunter) is out, or the living werewolves are at least as many as everyone else.</li>
 <li>Once the game is over and the roles are out, each AI player looks back: what they read right and who fooled them.</li></ul>
 <h4>How you play</h4><ul>
-<li>On your turn a move box appears on the right; after three minutes, an AI plays the move for you.</li>
+<li>On your turn an action bar with a countdown appears at the bottom, and the move box on the right; after three minutes, an AI plays the move for you.</li>
 <li>When you speak, you pick who you suspect (it goes on the record) and may claim a role. Werewolves may claim anything.</li></ul>`,
     stage: { wolves: "The werewolves are plotting", wolvesSub: "Everyone close your eyes. Werewolves, open yours", night: "Deep in the night, someone is on the move", nightIdle: "Night falls",
-      wait: "The host is waiting", speech: n => `${n} is speaking`, aftermath: n => `${n} is looking back`, campaign: n => `${n} is campaigning`,
-      last_words: n => `${n} is saying last words`, badge: n => `${n} is passing on the badge`, vote: "Everyone is voting", sheriff_vote: "Everyone is voting for sheriff",
-      run: "Everyone is deciding whether to run", withdraw: "The candidates are deciding whether to withdraw", left: n => `${n} still deciding`, elapsed: s => `${s}s so far` },
+      wait: "The host is waiting", speech: n => `${n} is thinking what to say`, aftermath: n => `${n} is thinking back`, campaign: n => `${n} is preparing a campaign speech`,
+      last_words: n => `${n} is preparing last words`, badge: n => `${n} is passing on the badge`, ai: "AI writing", person: n => `Waiting for ${n} (a person)`,
+      reading: n => `🔊 Reading out ${n}'s speech`, vote: "Everyone is voting", sheriff_vote: "Everyone is voting for sheriff",
+      run: "Everyone is deciding whether to run", withdraw: "The candidates are deciding whether to withdraw", left: n => `${n} still deciding`, elapsed: s => `${s} so far` },
   },
 };
 const $ = id => document.getElementById(id);
@@ -382,8 +451,8 @@ let shownEvent = null, logCount = 0, view = null, timer = null;
 
 async function api(path, body) {
   const r = await fetch(path, body ? { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) } : {});
-  const j = await r.json();
-  if (!r.ok) throw new Error(j.error || r.statusText);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error || r.statusText), { status: r.status });
   return j;
 }
 
@@ -443,19 +512,45 @@ function showLinks(g, link) {
 }
 
 // ---- table ----
+// sync is how the page stands with the game master: in step, reconnecting
+// after a failed poll, unavailable after a minute of them, or gone when the
+// game master no longer knows the game. Failing, it polls less often.
+const sync = { state: "connecting", last: 0, fails: 0 };
 async function poll() {
   try {
     const g = await api(`/api/games/${encodeURIComponent(gameId)}${seatQuery}`);
+    Object.assign(sync, { state: "ok", last: Date.now(), fails: 0 });
     if (g.view) render(g.view);
-    if (g.result || g.error) { finish(g); return; }
-  } catch (e) { $("stageText").textContent = e.message; }
-  setTimeout(poll, 1500);
+    if (g.result || g.error) { sync.state = "over"; renderSync(); finish(g); return; }
+  } catch (e) {
+    sync.fails++;
+    sync.state = e.status === 404 ? "gone" : sync.last && Date.now() - sync.last > 60000 ? "down" : "retry";
+    clearInterval(stageTimer);
+    if (view) $("stageSub").textContent = (UI[view.lang] || UI.zh).sync.paused;
+  }
+  renderSync();
+  setTimeout(poll, sync.fails ? Math.min(10000, 1500 * sync.fails) : 1500);
 }
+
+function renderSync() {
+  const t = UI[(view && view.lang) || "zh"].sync, el = $("sync");
+  const secs = Math.round((Date.now() - sync.last) / 1000);
+  const ago = secs < 3 ? t.now : secs < 60 ? t.secs(secs) : t.mins(Math.floor(secs / 60));
+  const at = sync.last ? new Date(sync.last).toLocaleTimeString([], { hour12: false }) : "—";
+  el.className = "sync" + ({ retry: " retry", down: " down", gone: " down" }[sync.state] || "");
+  el.textContent = sync.state === "ok" ? t.ok(ago) : sync.state === "connecting" ? t.connecting : sync.state === "over" ? t.over
+    : sync.state === "gone" ? t.gone : t[sync.state](at, ago);
+}
+setInterval(() => { if (gameId) renderSync(); }, 1000);
+
+// clock is a number of seconds as m:ss.
+function clock(s) { return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
 
 function render(v) {
   view = v;
   const t = UI[v.lang] || UI.zh, w = k => v.words[k] || k;
-  document.title = $("title").textContent = t.title;
+  $("title").textContent = t.title;
+  document.title = v.pending ? `${t.bar.title} · ${t.title}` : t.title;
   renderRules(v.lang);
   $("voiceBtn").textContent = voice.on ? t.voiceOn : t.voiceOff;
   $("when").textContent = stageLabel(t, v.round, v.stage, v.phase);
@@ -473,9 +568,36 @@ function render(v) {
   renderLog(v, t);
   renderStage(v, t);
   $("waiting").hidden = !!v.pending && (!v.now || v.now.name === v.you);
-  if (!v.pending) { $("turnCard").hidden = true; shownEvent = null; return; }
+  if (!v.pending) { $("turnCard").hidden = true; shownEvent = null; clearInterval(timer); renderBar(v, t); return; }
   if (v.pending.event !== shownEvent) showTurn(v.pending, t, w);
 }
+
+// renderBar is the bar along the bottom for a seat at the table: on its turn
+// what is asked and the time left, otherwise what the table is doing. On a
+// person's turn showTurn keeps it ticking.
+let stagePlain = "";
+const MOVE_SECS = 180; // werewolf.HumanTimeout
+function renderBar(v, t) {
+  const bar = $("actionBar");
+  bar.hidden = !v.you;
+  if (!v.you) return;
+  const p = v.pending;
+  bar.classList.toggle("idle", !p);
+  bar.classList.toggle("mine", !!p);
+  $("barGo").hidden = !p; $("barClock").hidden = !p; $("barFill").parentElement.hidden = !p;
+  if (!p) { bar.classList.remove("urgent"); $("barWhat").textContent = v.alive ? t.bar.notYet(stagePlain) : t.bar.out; return; }
+  const k = p.turn.kind, left = Math.max(0, Math.round((new Date(p.deadline) - Date.now()) / 1000));
+  $("barWhat").textContent = t.bar.yours(t.kinds[k] || k);
+  $("barGo").textContent = t.bar.go;
+  $("barClock").textContent = clock(left);
+  $("barFill").style.width = `${Math.min(100, 100 * left / MOVE_SECS).toFixed(1)}%`;
+  bar.classList.toggle("urgent", left < 30);
+}
+$("barGo").onclick = () => {
+  $("turnCard").scrollIntoView({ behavior: "smooth", block: "center" });
+  const first = $("turnForm").querySelector("select, textarea");
+  if (first) first.focus({ preventScroll: true });
+};
 
 // stageLabel names a part of the game, e.g. "第2天 · 警长竞选". Events from
 // before stages were kept fall back to their phase.
@@ -495,8 +617,9 @@ function avatar(name, small, badge) {
 // renderSeats draws every seat: who is out, who has the badge, who is
 // speaking, which seats people play, and only the roles this seat knows:
 // its own and its pack's, or everyone's once the game is over.
-function renderSeats(v, t, roles) {
-  const speaking = v.now && v.now.name, people = v.people || [], pack = v.pack || [];
+let revealed = null; // every seat's role, once the game is over
+function renderSeats(v, t, roles = revealed) {
+  const thinking = v.now && v.now.name, speaking = reading && reading.speaker, people = v.people || [], pack = v.pack || [];
   const w = k => v.words[k] || k;
   $("seats").innerHTML = v.seats.map(s => {
     const me = s.name === v.you, tags = [];
@@ -505,10 +628,11 @@ function renderSeats(v, t, roles) {
     if (roles) tags.push(`<span class="tag revealed${roles[s.name] === "werewolf" ? " wolf" : ""}">${esc(w(roles[s.name]))}</span>`);
     else if (!me && pack.includes(s.name)) tags.push(`<span class="tag wolf">${esc(t.packmate)}</span>`);
     if (s.death) tags.push(`<span class="tag out">${esc(t.out)}</span>`);
-    const cls = ["seat", s.death && "dead", me && "me", s.sheriff && "sheriff", !roles && s.name === speaking && "speaking"].filter(Boolean).join(" ");
-    return `<div class="${cls}" title="${esc(s.death || (s.sheriff ? t.sheriff : ""))}">` +
+    const state = s.name === speaking ? "speaking" : !roles && s.name === thinking ? "thinking" : "";
+    const cls = ["seat", s.death && "dead", me && "me", s.sheriff && "sheriff", state].filter(Boolean).join(" ");
+    return `<div class="${cls}" title="${esc([s.name, s.death || (s.sheriff ? t.sheriff : "")].filter(Boolean).join(" · "))}">` +
       avatar(s.name, false, s.sheriff ? `<span class="badge">🎖️</span>` : "") +
-      `<div class="name">${esc(s.name)}</div><div class="tags">${tags.join("")}</div></div>`;
+      `<div class="name">${esc(s.name)}</div><div class="status">${state ? esc(t.seatState[state]) : ""}</div><div class="tags">${tags.join("")}</div></div>`;
   }).join("");
 }
 
@@ -521,6 +645,7 @@ function renderLog(v, t) {
   const log = $("log"), first = logCount === 0;
   const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
   const fresh = v.log.slice(logCount);
+  fresh.forEach((l, i) => { l.n = logCount + i; });
   for (const l of fresh) {
     const k = l.stage || (l.phase === "night" ? "night" : "day"), key = `${l.round}/${k}`;
     if (key !== groupKey) {
@@ -544,19 +669,45 @@ $("log").onscroll = () => {
 };
 $("newPill").onclick = () => { const log = $("log"); log.scrollTo({ top: log.scrollHeight, behavior: "smooth" }); };
 
+// A speech shows, before its words, what it put on the record: the role it
+// claims and who it suspects. A long one has a summary over it, which the game
+// master wrote and the speaker did not say. In the words, every player named
+// stands out, the one suspected most.
 function lineHTML(l, v, t) {
   const text = esc(l.text);
   if (l.kind === "speech") {
     const cls = ["msg", l.speaker === v.you && "mine", l.private && "private"].filter(Boolean).join(" ");
     const tag = l.private ? `<span class="tag wolf">${esc(v.pack ? t.packTag : t.secret)}</span>` : "";
-    const stance = l.stance ? `<span class="chip${/声称|claims/.test(l.stance) ? " claim" : ""}">${esc(l.stance)}</span>` : "";
-    return `<div class="${cls}">${avatar(l.speaker, true)}<div class="bubble"><div class="meta"><b>${esc(l.speaker)}</b>${tag}${stance}</div>` +
-      `<div class="text">${text}</div></div></div>`;
+    const sum = l.summary ? `<details class="sum" open><summary>${esc(t.line.summary)}</summary>${esc(l.summary)}</details>` : "";
+    return `<div class="${cls}" data-n="${l.n}">${avatar(l.speaker, true)}<div class="bubble"><div class="meta"><b>${esc(l.speaker)}</b>${tag}</div>` +
+      stanceHTML(l, v, t) + sum + `<div class="text">${mentions(text, l, v)}</div></div></div>`;
   }
   if (l.kind === "death") return `<div class="event death">💀 ${text}</div>`;
   if (l.kind === "vote") return `<div class="event vote">🗳️ ${text}</div>`;
   if (l.kind === "result") return `<div class="event result">📣 ${text}</div>`;
   return `<div class="host${l.private ? " private" : ""}">${l.private ? esc(t.secret) + " · " : ""}${text}</div>`;
+}
+
+function stanceHTML(l, v, t) {
+  if (!l.suspect) return l.stance ? `<div class="stance"><span class="chip">${esc(l.stance)}</span></div>` : "";
+  const w = k => v.words[k] || k, out = [], c = l.claim;
+  if (c && c.role) {
+    const detail = c.role === "seer" && c.target ? t.line.checked(c.target, w(c.result)) : c.role === "witch" && c.target ? t.line.potion(c.target) : "";
+    out.push(`<span class="pill claim${c.result === "werewolf" ? " wolfish" : ""}">🎭 ${esc(t.line.claims(w(c.role)))}${detail ? " · " + esc(detail) : ""}</span>`);
+  }
+  out.push(v.seats.some(s => s.name === l.suspect)
+    ? `<span class="pill suspect">🎯 ${esc(t.line.suspects)} ${avatar(l.suspect, true)} ${esc(l.suspect)}</span>`
+    : `<span class="pill suspect none">${esc(t.line.nobody)}</span>`);
+  return `<div class="stance">${out.join("")}</div>`;
+}
+
+// mentions marks the players a speech names; text is already escaped. A Latin
+// name only counts as a whole word, so "Ee" is not found inside "seer".
+function mentions(text, l, v) {
+  const names = v.seats.map(s => s.name).filter(n => n !== l.speaker).sort((a, b) => b.length - a.length);
+  if (!names.length) return text;
+  const re = new RegExp(names.map(n => `(?<![A-Za-z])${esc(n).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z])`).join("|"), "g");
+  return text.replace(re, m => `<span class="at${m === esc(l.suspect || "") ? " hit" : ""}">${m}</span>`);
 }
 
 // renderStage shows what the table is waiting on: only what anyone at a real
@@ -576,10 +727,14 @@ function renderStage(v, t) {
   } else if (now.kind === "night" || now.kind === "wait") {
     icon = night ? "🦉" : "⏳";
     text = `<span class="dots">${esc(s[now.kind])}</span>`;
+  } else if (now.name && (v.people || []).includes(now.name)) {
+    icon = "⏳";
+    text = `<span class="dots">${esc(s.person(now.name))}</span>`;
   } else if (now.name) {
-    icon = now.kind === "badge" ? "🎖️" : "🎙️";
+    icon = now.kind === "badge" ? "🎖️" : "💭";
     const say = s[now.kind];
-    text = esc(typeof say === "function" ? say(now.name) : now.name) + `<span class="wave"><i></i><i></i><i></i><i></i><i></i></span>`;
+    text = `<span class="dots">${esc(typeof say === "function" ? say(now.name) : now.name)}</span>`;
+    sub = s.ai;
   } else {
     icon = `<span class="ballot">🗳️</span>`;
     text = `<span class="dots">${esc(s[now.kind] || t.waiting)}</span>`;
@@ -587,10 +742,12 @@ function renderStage(v, t) {
   }
   $("stageIcon").innerHTML = icon;
   $("stageText").innerHTML = text;
+  stagePlain = $("stageText").textContent;
+  renderReading();
   const since = now ? new Date(now.since) : null;
   const tick = () => {
     const secs = since ? Math.max(0, Math.round((Date.now() - since) / 1000)) : 0;
-    $("stageSub").textContent = [sub, since ? s.elapsed(secs) : ""].filter(Boolean).join(" · ");
+    $("stageSub").textContent = [sub, since ? s.elapsed(clock(secs)) : ""].filter(Boolean).join(" · ");
   };
   clearInterval(stageTimer);
   tick(); if (since) stageTimer = setInterval(tick, 1000);
@@ -613,14 +770,18 @@ function renderVotes(v, t) {
   if (last) revealVote(last, t, true);
   const held = revealing && revealing.fresh && !revealing.landed ? revealing.r.key : null;
   const rs = all.filter(r => r.key !== held);
-  const shown = v.lang + "|" + rs.map(r => r.key).join();
+  // What is being decided now comes first; the finished votes follow, the
+  // latest labelled as the previous result, closed while another is under way.
+  const live = v.now && t.vote.live[v.now.kind];
+  $("votesNow").innerHTML = live ? `<b>${esc(live)}</b>${/vote/.test(v.now.kind) ? `<div class="dim">${esc(t.vote.liveNote)}</div>` : ""}` : "";
+  $("votes").hidden = !rs.length && !live;
+  const shown = v.lang + "|" + !!live + "|" + rs.map(r => r.key).join();
   if (shown !== votesShown) { // results never change once out, so redraw only for a new one and keep what is opened
     votesShown = shown;
-    const c = $("votes");
-    c.hidden = !rs.length;
-    c.innerHTML = `<div class="vr-title">${esc(t.vote.record)}</div>` + rs.map((r, i) => [r, i]).reverse().map(([r, i], n) =>
-      `<details${n === 0 ? " open" : ""}><summary>${esc(voteTitle(r, t))} <span class="dim">· ${esc(outcomeText(r, t))}</span></summary>` +
-      voteHTML(r, t, false) + (r.votes ? `<button type="button" class="secondary replay" data-i="${i}">${esc(t.vote.replay)}</button>` : "") + `</details>`).join("");
+    const c = $("votesList");
+    c.innerHTML = rs.length ? `<div class="vr-title">${esc(t.vote.record)}</div>` + rs.map((r, i) => [r, i]).reverse().map(([r, i], n) =>
+      `<details${n === 0 && !live ? " open" : ""}><summary>${n === 0 ? `<span class="prev">${esc(t.vote.previous)}</span> · ` : ""}${esc(voteTitle(r, t))} <span class="dim">· ${esc(outcomeText(r, t))}</span></summary>` +
+      voteHTML(r, t, false) + (r.votes ? `<button type="button" class="secondary replay" data-i="${i}">${esc(t.vote.replay)}</button>` : "") + `</details>`).join("") : "";
     for (const b of c.querySelectorAll("button.replay")) b.onclick = () => revealVote(rs[+b.dataset.i], t);
   }
 }
@@ -782,7 +943,8 @@ function showTurn(p, t, w) {
   clearInterval(timer);
   const tick = () => {
     const s = Math.max(0, Math.round((new Date(p.deadline) - Date.now()) / 1000));
-    $("countdown").textContent = t.timeLeft(s);
+    $("countdown").textContent = t.timeLeft(clock(s));
+    if (view && view.pending && view.pending.event === p.event) renderBar(view, t);
   };
   tick(); timer = setInterval(tick, 1000);
 }
@@ -791,12 +953,13 @@ function finish(g) {
   clearInterval(timer);
   stopMic();
   clearInterval(stageTimer);
-  $("turnCard").hidden = true; $("waiting").hidden = true;
+  $("turnCard").hidden = true; $("waiting").hidden = true; $("actionBar").hidden = true;
   const t = UI[(view && view.lang) || "zh"], r = $("result");
   r.hidden = false;
   if (g.error) { r.innerHTML = `<div class="err">${t.failed}${esc(g.error)}</div>`; return; }
   const res = g.result, w = k => (view && view.words[k]) || k;
-  if (view) renderSeats(view, t, Object.fromEntries(res.players.map(p => [p.name, p.role])));
+  revealed = Object.fromEntries(res.players.map(p => [p.name, p.role]));
+  if (view) renderSeats(view, t);
   r.innerHTML = `<div style="font-weight:700">${t.over} · ${esc(t.winner(w(res.winner)))}</div>` +
     (res.mvp && res.mvp.name ? `<p class="mvp">${t.mvp}: <b>${esc(res.mvp.name)}</b></p><p>${esc(res.mvp.reason)}</p>` : "") +
     `<a href="/"><button>${t.again}</button></a>`;
@@ -817,7 +980,7 @@ $("voiceBtn").onclick = () => {
   voice.on = !voice.on;
   const lang = (view && view.lang) || "zh", t = UI[lang];
   $("voiceBtn").textContent = voice.on ? t.voiceOn : t.voiceOff;
-  if (!voice.on) { speechSynthesis.cancel(); return; }
+  if (!voice.on) { speechSynthesis.cancel(); setReading(null); return; }
   // Said at once, so the person hears read-aloud works before the next line.
   speakLine({ text: t.voiceReady }, lang);
 };
@@ -903,7 +1066,27 @@ function speakLine(l, lang) {
   } else {
     u.voice = host;
   }
+  if (l.speaker) {
+    u.onstart = () => setReading(l);
+    u.onend = u.onerror = () => { if (reading === l) setReading(null); };
+  }
   speechSynthesis.speak(u);
+}
+
+// reading is the line being read aloud. Its speaker's seat shows them speaking
+// and the line stands out, apart from whoever the table is waiting on, which
+// is often the next player while the last one is still being read.
+let reading = null;
+function setReading(l) {
+  reading = l;
+  for (const x of $("log").querySelectorAll(".msg.reading")) x.classList.remove("reading");
+  if (l) { const m = $("log").querySelector(`.msg[data-n="${l.n}"]`); if (m) m.classList.add("reading"); }
+  if (view) renderSeats(view, UI[view.lang] || UI.zh);
+  renderReading();
+}
+function renderReading() {
+  const t = UI[(view && view.lang) || "zh"];
+  $("stageReading").textContent = reading ? t.stage.reading(reading.speaker) : "";
 }
 
 // addMic puts a voice-input button under the speech box: what the person says
@@ -930,6 +1113,7 @@ function addMic(f, lang, t) {
     };
     voice.recording = true;
     if (window.speechSynthesis) speechSynthesis.cancel();
+    setReading(null);
     $("turnErr").textContent = "";
     try { rec.start(); } catch (err) { $("turnErr").textContent = t.micErr + err.message; rec.onend(); return; }
     b.textContent = t.micStop;

@@ -47,6 +47,7 @@ func (l *LLM) Act(ctx context.Context, t Turn) (Action, error) {
 			err = t.Check(a)
 		}
 		if err == nil {
+			a.Summary = l.summarize(ctx, t, a.Speech)
 			return a, nil
 		}
 		last = a
@@ -395,6 +396,41 @@ func orNobody(l game.Lang, names []string) string {
 		return l.Say(game.Nobody)
 	}
 	return l.List(names)
+}
+
+// summarize is a line on a long public speech, for the page to show above it
+// as a summary rather than the player's words. A failed ask gets none.
+func (l *LLM) summarize(ctx context.Context, t Turn, speech string) string {
+	system, user, ok := summaryPrompt(t, speech)
+	if !ok {
+		return ""
+	}
+	reply, err := l.converse(ctx, []*dapr.ConversationMessageAlpha2{
+		{ConversationMessageOfSystem: &dapr.ConversationMessageOfSystemAlpha2{Content: content(system)}},
+		{ConversationMessageOfUser: &dapr.ConversationMessageOfUserAlpha2{Content: content(user)}},
+	})
+	if err != nil {
+		log.Printf("no summary of %s's speech: %v", t.Me.Name, err)
+		return ""
+	}
+	return strings.Trim(strings.TrimSpace(reply), "\"“”「」")
+}
+
+// summaryPrompt is what a summary is asked from: the speaker's name and the
+// speech, and nothing else, so it cannot give away the role, notes or
+// thinking the player's own answer was written from. Only long public
+// speeches get one.
+func summaryPrompt(t Turn, speech string) (system, user string, ok bool) {
+	switch t.Kind {
+	case Speech, Campaign, LastWords:
+	default:
+		return "", "", false
+	}
+	tx := t.text()
+	if len([]rune(speech)) < tx.summaryFrom {
+		return "", "", false
+	}
+	return tx.summarize, fmt.Sprintf(tx.summaryOf, t.Me.Name, speech), true
 }
 
 // temperature is the only one gpt-6.1-sol accepts. It is sent rather than

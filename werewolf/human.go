@@ -58,25 +58,31 @@ type View struct {
 }
 
 // Line is one event the person saw. Stance is what a speech put on the
-// record, apart from its words. Kind is "speech", "host", or the kind of a
-// host announcement; Stage is empty for events from before it was kept.
+// record, apart from its words, and Suspect and Claim the same stance for
+// the page to lay out. Summary is a line on a long speech that is not the
+// speaker's own words. Kind is "speech", "host", or the kind of a host
+// announcement; Stage is empty for events from before it was kept.
 type Line struct {
-	When    string     `json:"when"`
-	Round   int        `json:"round"`
-	Phase   game.Phase `json:"phase"`
-	Stage   game.Stage `json:"stage,omitempty"`
-	Kind    string     `json:"kind"`
-	Speaker string     `json:"speaker,omitempty"`
-	Text    string     `json:"text"`
-	Stance  string     `json:"stance,omitempty"`
-	Private bool       `json:"private,omitempty"`
+	When    string      `json:"when"`
+	Round   int         `json:"round"`
+	Phase   game.Phase  `json:"phase"`
+	Stage   game.Stage  `json:"stage,omitempty"`
+	Kind    string      `json:"kind"`
+	Speaker string      `json:"speaker,omitempty"`
+	Text    string      `json:"text"`
+	Stance  string      `json:"stance,omitempty"`
+	Suspect string      `json:"suspect,omitempty"`
+	Claim   *game.Claim `json:"claim,omitempty"`
+	Summary string      `json:"summary,omitempty"`
+	Private bool        `json:"private,omitempty"`
 }
 
 func line(e game.Event, l game.Lang) Line {
 	out := Line{When: e.When(l), Round: e.Round, Phase: e.Phase, Stage: e.Stage, Kind: string(e.Kind),
-		Speaker: e.Speaker, Text: e.Text, Private: len(e.Audience) > 0}
+		Speaker: e.Speaker, Text: e.Text, Summary: e.Summary, Private: len(e.Audience) > 0}
 	if e.Suspect != "" {
 		out.Stance = game.Stance(l, e.Suspect, e.Claim)
+		out.Suspect, out.Claim = e.Suspect, e.Claim
 	}
 	switch {
 	case out.Kind != "":
@@ -264,7 +270,7 @@ func (m *humanMove) Await(v any) error {
 	if err != nil {
 		return err
 	}
-	a.Observations, a.Thinking, a.Notes = nil, "", nil
+	a.Observations, a.Thinking, a.Notes, a.Summary = nil, "", nil, ""
 	out, ok := v.(*brain.Action)
 	if !ok {
 		return fmt.Errorf("a move is read into a *brain.Action, not %T", v)

@@ -179,6 +179,14 @@ The page cannot read the workflow's state, so the workflow publishes a board as 
 
 Each page polls its view. A move is posted to `gm` with the person's key, checked against that seat's pending turn (`web.Check`) so the person can be told and try again, and raised as the event. `web.Check` only asks what a form can get wrong; style rules the AI players are held to, like never saying your own name, are not a person's business. Moves asked of several people at once are taken by the workflow in seat order, so a vote cast early would still show as pending until the people before it answer; `gm` remembers the moves it has sent and stops asking for them.
 
+The page tells apart what it can know: the AI the table waits on is thinking, the line being read aloud is someone speaking, and the two are rarely the same player, since the next speech is written while the last is still being read. It also says how it stands with `gm`: in step, with the time of the last poll that worked; reconnecting; unavailable after a minute without an answer; or gone, when `gm` no longer knows the game.
+
+### Summaries of long speeches
+
+**Decision.** A long public speech by an AI (a day speech, a campaign speech or last words) gets a one-line summary, written by a second, separate LLM call that is given only the speaker's name and the speech (`brain.summaryPrompt`). It cannot give away a secret, because it is never told one. The summary rides on the `Action` and the event, the page shows it above the speech marked as a summary rather than the character's words, and no prompt ever shows it (`Event.Said` leaves it out), so players read each other's words, not a recap. A person's move carries none; a wolf chat line, private, keeps none.
+
+**Tradeoff.** One more small LLM call per long speech, made in the same activity, so the speech lands a little later. A failed call just leaves the speech without a summary.
+
 ### Revealing a vote
 
 **Decision.** A vote is revealed on the page, never staged in the workflow. The workflow takes every vote at once and puts the ballot on the record, with the count and the announcement of the outcome, in one step, so the page is never shown a vote half cast and nothing waits for an animation. `werewolf.voteResults` turns each ballot into a `VoteResult` for the view: every vote with its weight, the totals by `game.Totals` (the count `game.Tally` decides with, so the two cannot disagree), the outcome (exiled, elected, a tie with who tied, everyone abstaining), and, for a day's vote, what each voter did the day before. The sheriff election is recorded as it ends (`game.Election`): who stood, who withdrew, and how it ended, including the four ways that never come to a vote. The page only animates what it is given: each vote lands in turn, the bars grow out of every vote cast and the rows keep the order of the first vote, so neither gives the outcome away before it is shown.

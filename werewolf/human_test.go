@@ -276,3 +276,52 @@ func TestThePageIsToldOnlyWhatTheTableCanSee(t *testing.T) {
 	tb.now = nil
 	assert.Nil(t, tb.doing())
 }
+
+// summarizer is Random with a summary on every move, as if every speech
+// were long.
+type summarizer struct{}
+
+func (summarizer) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
+	a, err := brain.Random{}.Act(ctx, t)
+	a.Summary = "summary of " + t.Me.Name
+	return a, err
+}
+
+// A summary reaches the page on an AI's public speech, never on a private
+// one, and a person's move cannot write one.
+func TestTheSummaryOfASpeechIsShownOnlyOnAPublicAISpeech(t *testing.T) {
+	SetBrain(summarizer{})
+	client := startEngine(t)
+	startWorker(t, client)
+	g := Game{Lang: game.English, Humans: []Human{human("Eileen", "Karen", "eileen-key")}}
+	_, err := client.ScheduleWorkflow(t.Context(), "GameWorkflow", workflow.WithInstanceID("summaries"), workflow.WithInput(g))
+	require.NoError(t, err)
+	answer(t, client, "summaries", "eileen-key", func(p Pending, _ int) brain.Action {
+		a, err := brain.Random{}.Act(t.Context(), p.Turn)
+		require.NoError(t, err)
+		a.Summary = "a person's own summary"
+		return a
+	})
+	waitForGame(t, client, "summaries")
+	meta, err := client.FetchWorkflowMetadata(t.Context(), "summaries")
+	require.NoError(t, err)
+	v, _, err := ReadView(meta, "")
+	require.NoError(t, err)
+
+	var summarized int
+	for _, l := range v.Log {
+		switch {
+		case l.Speaker == "Eileen":
+			assert.Empty(t, l.Summary, "a person's move wrote a summary: %s", l.Summary)
+		case l.Private || l.Speaker == "":
+			assert.Empty(t, l.Summary, "a private or host line has a summary: %s", l.Text)
+		case l.Summary != "":
+			summarized++
+			assert.Equal(t, "summary of "+l.Speaker, l.Summary)
+		}
+		if l.Stance != "" {
+			assert.NotEmpty(t, l.Suspect, "a stance is laid out for the page too")
+		}
+	}
+	assert.Positive(t, summarized, "AI speeches are shown with their summary")
+}

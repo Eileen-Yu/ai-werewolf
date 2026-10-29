@@ -758,6 +758,9 @@ func (t *table) said(turn brain.Turn, m move, audience ...string) (brain.Action,
 	} else {
 		t.add(turn.Me.Name, a.Speech, audience...)
 	}
+	if a.Summary != "" && len(audience) == 0 {
+		t.s.Log[len(t.s.Log)-1].Summary = a.Summary
+	}
 	return a, nil
 }
 
