@@ -823,6 +823,11 @@ $("voiceBtn").onclick = () => {
 };
 $("voiceBtn").hidden = !window.speechSynthesis;
 
+// novelty is macOS's joke voices, which sing, wobble or whisper: hard to
+// follow a whole speech in.
+const novelty = new Set(["Albert", "Bad News", "Bahh", "Bells", "Boing", "Bubbles", "Cellos", "Good News",
+  "Jester", "Organ", "Superstar", "Trinoids", "Whisper", "Wobble", "Zarvox"]);
+
 function hash(s) { let h = 7; for (const c of s) h = (h * 31 + c.codePointAt(0)) >>> 0; return h; }
 
 // speakLine reads a new line of the log aloud, each character with a voice,
@@ -836,7 +841,7 @@ function speakLine(l, lang) {
   const u = new SpeechSynthesisUtterance(l.speaker ? `${l.speaker}：${text}` : text);
   u.lang = lang === "en" ? "en-US" : "zh-CN";
   // Prefer the exact accent (Mandarin over Cantonese, say) when there is one.
-  const all = speechSynthesis.getVoices(), tag = x => x.lang.replace("_", "-");
+  const all = speechSynthesis.getVoices().filter(x => !novelty.has(x.name)), tag = x => x.lang.replace("_", "-");
   const exact = all.filter(x => tag(x) === u.lang);
   const voices = exact.length ? exact : all.filter(x => tag(x).startsWith(lang === "en" ? "en" : "zh"));
   const h = hash(l.speaker || "");
@@ -844,7 +849,7 @@ function speakLine(l, lang) {
   if (voices.length) u.voice = !l.speaker || voices.length === 1 ? voices[0] : voices[1 + h % (voices.length - 1)];
   if (l.speaker) {
     u.pitch = 0.7 + (h % 7) / 10;
-    u.rate = 0.95 + ((h >> 3) % 4) / 10;
+    u.rate = 0.95 + ((h >>> 3) % 4) / 10;
   }
   speechSynthesis.speak(u);
 }
