@@ -599,6 +599,16 @@ func TestGoodPlayersRunAndDoNotTrustTheFirstSeer(t *testing.T) {
 	assert.Contains(t, englishText.instructions[SheriffVote], "neither for the first to claim")
 }
 
+// The badge follows the seer's checks, never an unchecked player.
+func TestTheBadgeFollowsTheSeersChecks(t *testing.T) {
+	assert.Contains(t, chineseText.rules, "警徽跟着查验走")
+	assert.Contains(t, englishText.rules, "the badge follows the checks")
+	assert.Contains(t, chineseText.strategies[game.Seer], "绝不留给你没验过的人")
+	assert.Contains(t, englishText.strategies[game.Seer], "never goes to someone you have not checked")
+	assert.Contains(t, chineseText.instructions[Badge], "按自己报过的警徽流交")
+	assert.Contains(t, englishText.instructions[Badge], "passes it by the badge flow they gave")
+}
+
 func TestPreparingWritesOnlyNotesAndTheTurnAfterOnlyWhatChanged(t *testing.T) {
 	base := Turn{Round: 1, Phase: game.Day, Me: game.Player{Name: "小红"}, Seats: []Seat{{Name: "小红"}, {Name: "老王"}}, Suspects: []string{"老王", game.Nobody}}
 

@@ -87,14 +87,14 @@ func (t Turn) text() *text {
 // zhFaker and enFaker are how a wolf fakes the seer, which every pack does
 // whatever its tactic.
 const zhFaker = "本局狼队一定悍跳：第1夜的计划指定悍跳的狼，一般一只，也可以两只（双狼悍跳）。悍跳的狼第1天上警，在竞选发言里跳预言家，和真预言家正面对跳抢警徽。这一步不能省：没人对跳，真预言家就能独自带着好人一路验下去，狼队必输。" +
-	"悍跳的狼要比真预言家更像预言家，也更犀利。起跳就报全：一个查验，为什么验他，再报警徽流（接下来两晚验谁、你出局时警徽交给谁）。含糊、犹豫、不报警徽流，一眼就假。" +
+	"悍跳的狼要比真预言家更像预言家，也更犀利。起跳就报全：一个查验，为什么验他，再报警徽流（接下来两晚先验谁、后验谁，警徽跟着查验走）。含糊、犹豫、不报警徽流，一眼就假。" +
 	"查杀给谁看局势：真预言家已经跳了，就直接把他打成来抢警徽的狼；还没跳，就报给发言最有威胁、或者最可能被真预言家报金水的好人。金水只给好人，绝不给同伴：给狼报金水、金水再跟着你投票，等于把同伴亮出来。" +
 	"进攻是你的主线：把对面预言家的每一个破绽都抓出来，验人理由站不站得住，警徽流合不合理，查验和死亡、票型对不对得上，盘成一条完整的逻辑链，结论只有一个：他是狼。语气笃定，敢点名，敢归票，不要退让。" +
 	"打法要灵活：每天根据新的死亡、票型和发言更新说法，新发生的事要解释进你的逻辑，不能装没看见；局势变了，攻击点也跟着换。" +
 	"但必须自洽：每天报新一晚的查验，按你自己的警徽流验；报过的查验、身份和说过的理由都不能改，主持人会把改口的发言打回去。编之前先想好，这个结果和你之前说的、和场上发生的能不能对上。"
 
 const enFaker = "This game the pack always counter-claims: the first night's plan names the fakers, usually one werewolf, sometimes two (a double claim), who run for sheriff on Day 1 and claim seer in the campaign, taking the real seer on head to head for the badge. This cannot be skipped: with nobody challenging them, the real seer leads the good side check by check, and the pack loses. " +
-	"The faker must look more like a seer than the real one, and be sharper. Claim with everything at once: a check, why you checked them, and a badge flow (who you check the next two nights, and who gets the badge if you fall). Vague, hesitant, or no badge flow, and you are plainly fake. " +
+	"The faker must look more like a seer than the real one, and be sharper. Claim with everything at once: a check, why you checked them, and a badge flow (who you check the next two nights, in order, with the badge following the checks). Vague, hesitant, or no badge flow, and you are plainly fake. " +
 	"Who you report as a werewolf depends on the table: if the real seer has claimed, call them the werewolf come to steal the badge; if not, report the most dangerous good speaker, or whoever the real seer would likely clear. Clear only good players, never a teammate: vouching for a werewolf who then votes with you gives them away. " +
 	"Attack is your line: take every hole in the other seer apart, whether their reason for a check holds up, whether their badge flow makes sense, whether their checks fit the deaths and the votes, and build one complete chain of reasoning with one conclusion: they are the werewolf. Sound certain, name names, call the vote, never back down. " +
 	"Stay flexible: every day, update your story with the new deaths, votes and speeches, fitting what happened into your reasoning instead of ignoring it; when the game moves, move your attack. " +
@@ -146,7 +146,8 @@ var chineseText = text{
 - 女巫声称某晚救了某人，而那晚这个人死了，或者那晚不是平安夜，她的说法就有问题。
 - 白天有人被放逐之后又有人死亡，说明被放逐的是猎人，开枪带走了他。猎人带走的人不一定是狼人。被放逐的人不一定是狼人，翻不翻牌要看结果。
 - 第1夜还没有任何公开信息，没有人能看出谁是神职。
-- 真预言家上警一般会报警徽流：接下来验谁、警徽交给谁。不报警徽流的预言家可以追问、施压，但这只说明他打得不好，不等于他是狼。
+- 警徽流是预言家接下来的验人顺序，警徽跟着查验走。比如"警徽流先A后B"：今晚验A，预言家今晚死了，A是好人就把警徽交给A（A就是他的金水），A是狼就把警徽交给B，借此告诉大家A是狼；明晚验B，同理。
+- 真预言家上警一般会报警徽流。不报警徽流、或者把警徽留给一个自己没打算验的人，可以追问、施压：那等于把1.5票交给一个谁都不知道底细的人。但这只说明他打得不好，不等于他是狼。
 - 先跳的不一定是真的。狼几乎每局都悍跳，而且常常抢在前面跳、说得最响，就是要你先信他。后跳的那个能先听到前面的发言，但他的查验是第1夜就定下的，后跳也不等于假。对跳时一条一条比：他第1夜验谁、为什么验他（第1夜谁都没信息，只能凭位置），查杀落在谁身上、被查的人怎么回应，警徽流合不合理，他之后的发言、投票和他自己报的查验对不对得上，以及谁急着站他的边。女巫知道昨晚的刀口：被刀的人一般是好人，谁给刀口报查杀，谁就很可疑。比完才站边，站边要说出你比出来的理由；没比清楚之前，两个预言家都可能是狼，三个人跳时至少两个是假的。
 
 说到自己时用"我"，不要用第三人称说自己的名字。
@@ -183,7 +184,7 @@ var chineseText = text{
 			"第1天你一般要上警：警徽在猎人手里最稳，狼不敢轻易推你，你出局时还能开枪再移交警徽。在警上你能当面逼问每个预言家，带着好人找出悍跳的狼。要强势，不要躲在警下等别人带队。",
 		game.Seer: "你的查验结果是好人阵营最重要的信息。查到狼人时应该果断表明身份、报出所有查验结果，带大家投票。" +
 			"如果有人和你对跳，用你的查验记录、他跳出来的时机和发言里的矛盾揭穿他。跳身份后你今晚很可能被杀，所以要把信息一次报完整。" +
-			"你一定上警：竞选发言就报身份和查验，再报警徽流：接下来两晚打算验谁、你出局时警徽按什么顺序交，这样你死了信息也断不了。拿到警徽好归票带队。",
+			"你一定上警：竞选发言就报身份和查验，再报警徽流：接下来两晚先验谁、后验谁。警徽跟着查验走，绝不留给你没验过的人：今晚验的人是好人，你出局就把警徽交给他；是狼，就交给警徽流里的下一个。这样你死了，警徽交给谁本身就把查验报了出去，信息断不了。拿到警徽好归票带队。",
 		game.Villager: "你没有任何夜间信息，只能靠分析发言找狼。关注谁的发言前后矛盾、谁在跟风、谁在保护谁、谁的投票和发言不一致。" +
 			"如果有两个人都自称预言家，必须判断真假：谁的查验结果和其他人的声明、死亡和投票更吻合，谁跳得更自然。不要因为谁先跳、谁说得更硬就信谁，狼最喜欢抢先跳。" +
 			"拿不准时要主动追问：让两个预言家各自解释第1夜为什么验那个人、警徽流为什么这么报，看谁答得自然。被报查杀或金水的人怎么回应，也是线索。" +
@@ -235,7 +236,8 @@ var chineseText = text{
 		SheriffVote: "投票选警长：从上警的人里选一个。比较他们的竞选发言，谁报的信息更可信、谁当警长对好人更有利，就投谁。谁都信不过可以选\"放弃\"弃票。" +
 			"几个人都跳预言家时，不要投先跳的那个，也不要投说得最硬的那个，要投比较下来更像真的那个：第1夜验人的理由、查杀落在谁身上、警徽流合不合理。",
 		Badge: "你是警长，现在出局了。选一个活着的人表示把警徽移交给他，选\"放弃\"表示撕掉警徽、从此没有警长。" +
-			"警徽应该交给你最信任的好人；没有把握、怕交到狼人手里，就撕掉。",
+			"警徽应该交给你最信任的好人；没有把握、怕交到狼人手里，就撕掉。" +
+			"跳过预言家的人，不管真假，都按自己报过的警徽流交：最近一晚验的人是好人就交给他，是狼就交给警徽流里的下一个。不按警徽流交，等于自己承认是假的。",
 	},
 
 	badTarget:      "target 必须是这些名字之一：%s，你给的是 %q",
@@ -414,7 +416,8 @@ Reasoning points people often get wrong:
 - If the witch claims she saved someone on a night when that person died, or on a night that was not peaceful, her story is wrong.
 - If someone dies by day right after an exile, the exiled player was the hunter and shot them. Whoever the hunter shoots is not necessarily a werewolf. Whoever is exiled is not necessarily a werewolf either.
 - On Night 1 there is no public information at all; nobody can tell who holds a power role.
-- A real seer running for sheriff usually gives a badge flow: who they check next and who gets the badge if they fall. A seer who gives none is fair to press, but that is weak play, not proof of a werewolf.
+- A badge flow is the order a seer will check in next, and the badge follows the checks. Say "badge flow A, then B": tonight they check A, and if they die tonight they pass the badge to A if A is good (A is then their cleared player), or to B if A is a werewolf, telling the table A is a werewolf; tomorrow night they check B, and the same again.
+- A real seer running for sheriff usually gives a badge flow. One who gives none, or leaves the badge to someone they do not mean to check, is fair to press: that hands one and a half votes to someone nobody knows anything about. But that is weak play, not proof of a werewolf.
 - The first to claim is not the real one. Werewolves fake the seer almost every game, and they often claim first and loudest, precisely so you believe them first. Whoever claims later has heard the speeches before them, but their check was set on Night 1, so claiming later is no proof of a lie either. When seers clash, compare them point by point: who they checked on Night 1 and why (nobody knows anything then, so only the seat can guide it), who their werewolf report lands on and how that player answers, whether their badge flow makes sense, whether their later speeches and votes fit their own checks, and who rushes to back them. The witch knows last night's kill: whoever was killed is usually good, so a seer who reports the kill as a werewolf is very suspicious. Take a side only after comparing, and give the reason the comparison gave you; until then either seer may be a werewolf, and with three claiming at least two are fake.
 
 Refer to yourself as "I", never by your own name.
@@ -452,7 +455,7 @@ Write everything in English.`,
 			"On Day 1 you usually run for sheriff: the badge is safest with the hunter, since werewolves dare not push you lightly, and if you go you shoot and still pass the badge on. In the race you can press every seer to their face and lead the good side to the fake. Play hard; do not hide on the floor waiting for someone else to lead.",
 		game.Seer: "Your checks are the good side's most important information. When you find a werewolf, claim seer firmly, report every check and lead the vote. " +
 			"If someone counter-claims, expose them with your check record, the timing of their claim and the contradictions in what they said. Once you claim you will probably be killed that night, so report everything at once. " +
-			"You always run for sheriff: claim and report your checks in the campaign, then give your badge flow: who you mean to check the next two nights and who the badge goes to if you fall, so your information outlives you. Take the badge to call the vote.",
+			"You always run for sheriff: claim and report your checks in the campaign, then give your badge flow: who you check the next two nights, in order. The badge follows your checks and never goes to someone you have not checked: if tonight's check is good, the badge goes to them when you fall; if a werewolf, to the next in your flow. Then who gets the badge reports your check for you, and your information outlives you. Take the badge to call the vote.",
 		game.Villager: "You have no night information; you find werewolves by reading the table. Watch for who contradicts themselves, who just follows others, who protects whom, and whose vote does not match their words. " +
 			"If two people both claim seer, you must decide which is real: whose checks fit the other claims, the deaths and the votes better, and whose claim came more naturally. Never believe one because they claimed first or sounded surest: werewolves love to claim first. " +
 			"When you cannot tell, press them: ask each seer why they checked that player on Night 1 and why their badge flow goes the way it does, and see whose answer comes naturally. How the players they reported answer is a clue too. " +
@@ -504,7 +507,8 @@ Write everything in English.`,
 		SheriffVote: "Vote for sheriff: pick one of those running. Compare their campaign speeches: whose information is more believable, and who as sheriff helps the good side more. If you trust none of them, pick \"pass\" to abstain. " +
 			"When several claim seer, vote neither for the first to claim nor for the one who sounds surest, but for the one who looks real once compared: their reason for the Night 1 check, who their werewolf report lands on, whether their badge flow makes sense.",
 		Badge: "You are the sheriff and you are out. Pick someone alive to pass the badge to, or \"pass\" to tear it up so there is no sheriff any more. " +
-			"Give it to the good player you trust most; if you are unsure and it might reach a werewolf, tear it up.",
+			"Give it to the good player you trust most; if you are unsure and it might reach a werewolf, tear it up. " +
+			"Whoever claimed seer, real or fake, passes it by the badge flow they gave: to the latest night's check if they are good, to the next in the flow if a werewolf. Passing it any other way is as good as admitting the claim was fake.",
 	},
 
 	badTarget:      "target must be one of: %s; you gave %q",
