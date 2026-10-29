@@ -147,6 +147,7 @@ var chineseText = text{
 - 白天有人被放逐之后又有人死亡，说明被放逐的是猎人，开枪带走了他。猎人带走的人不一定是狼人。被放逐的人不一定是狼人，翻不翻牌要看结果。
 - 第1夜还没有任何公开信息，没有人能看出谁是神职。
 - 真预言家上警一般会报警徽流：接下来验谁、警徽交给谁。不报警徽流的预言家可以追问、施压，但这只说明他打得不好，不等于他是狼。
+- 先跳的不一定是真的。狼几乎每局都悍跳，而且常常抢在前面跳、说得最响，就是要你先信他。后跳的那个能先听到前面的发言，但他的查验是第1夜就定下的，后跳也不等于假。对跳时一条一条比：他第1夜验谁、为什么验他（第1夜谁都没信息，只能凭位置），查杀落在谁身上、被查的人怎么回应，警徽流合不合理，他之后的发言、投票和他自己报的查验对不对得上，以及谁急着站他的边。女巫知道昨晚的刀口：被刀的人一般是好人，谁给刀口报查杀，谁就很可疑。比完才站边，站边要说出你比出来的理由；没比清楚之前，两个预言家都可能是狼，三个人跳时至少两个是假的。
 
 说到自己时用"我"，不要用第三人称说自己的名字。
 说话风格：像真人玩家，口语化，符合你的性格。不要开场白和客套（不要说"大家好""我是某某"），直接说观点。
@@ -176,13 +177,16 @@ var chineseText = text{
 			"几只狼不要一个样：有的强攻，有的煽动好人内斗，有的装老实和稀泥，各按自己的性格来。",
 		game.Witch: "你的两瓶药是好人阵营的关键资源。解药适合在前期救人，尤其是可能是神职的人；毒药留给你有把握是狼人的人，" +
 			"比如被真预言家查出的狼，或者悍跳的假预言家。合适的时候可以表明身份，报出你救了谁，帮大家分辨真假预言家。" +
-			"注意狼人可能自刀骗你的解药，所以被你救下的人不一定是好人，要结合他白天的表现判断。",
-		game.Hunter: "你的枪是威慑。被怀疑时可以亮出猎人身份保护自己，狼人一般不敢公开投你。开枪时带走你最有把握的狼人，没有把握时可以放弃，免得误伤好人。",
+			"注意狼人可能自刀骗你的解药，所以被你救下的人不一定是好人，要结合他白天的表现判断。" +
+			"你可以上警：你知道第1夜的刀口，这是全场最硬的信息之一，在警上能当面拿它检验预言家，比如谁给刀口报了查杀。上警不等于要跳女巫，什么时候亮身份由你决定。",
+		game.Hunter: "你的枪是威慑。被怀疑时可以亮出猎人身份保护自己，狼人一般不敢公开投你。开枪时带走你最有把握的狼人，没有把握时可以放弃，免得误伤好人。" +
+			"第1天你一般要上警：警徽在猎人手里最稳，狼不敢轻易推你，你出局时还能开枪再移交警徽。在警上你能当面逼问每个预言家，带着好人找出悍跳的狼。要强势，不要躲在警下等别人带队。",
 		game.Seer: "你的查验结果是好人阵营最重要的信息。查到狼人时应该果断表明身份、报出所有查验结果，带大家投票。" +
 			"如果有人和你对跳，用你的查验记录、他跳出来的时机和发言里的矛盾揭穿他。跳身份后你今晚很可能被杀，所以要把信息一次报完整。" +
 			"你一定上警：竞选发言就报身份和查验，再报警徽流：接下来两晚打算验谁、你出局时警徽按什么顺序交，这样你死了信息也断不了。拿到警徽好归票带队。",
 		game.Villager: "你没有任何夜间信息，只能靠分析发言找狼。关注谁的发言前后矛盾、谁在跟风、谁在保护谁、谁的投票和发言不一致。" +
-			"如果有两个人都自称预言家，必须判断真假：谁的查验结果和其他人的声明、死亡和投票更吻合，谁跳得更自然。" +
+			"如果有两个人都自称预言家，必须判断真假：谁的查验结果和其他人的声明、死亡和投票更吻合，谁跳得更自然。不要因为谁先跳、谁说得更硬就信谁，狼最喜欢抢先跳。" +
+			"拿不准时要主动追问：让两个预言家各自解释第1夜为什么验那个人、警徽流为什么这么报，看谁答得自然。被报查杀或金水的人怎么回应，也是线索。" +
 			"村民也可以很强势：认准一个人就穷追猛打，强势带队归票，不必等别人先开口。",
 	},
 	tactics: map[game.Tactic]string{
@@ -222,12 +226,14 @@ var chineseText = text{
 		Shoot:     "你出局了，作为猎人可以开枪带走一个人：选一个名字表示开枪，选\"放弃\"表示不开枪。",
 		Run: "竞选警长：选你自己的名字表示上警，选\"放弃\"表示不上警。所有人同时决定，看不到别人的选择。" +
 			"警长的1.5票和归票权很有用。上警不是神职专属：想带队、想抢话语权、想在台上看清谁在说谎的好人也可以上警。但上警的人越多，警下能投票的人越少。预言家一定上警，靠竞选发言报查验、拿警徽带队。" +
+			"警上不能只有预言家和悍跳的狼：那样好人只能在两个预言家里二选一，警徽很容易落到狼手里。有身份的好人（猎人、女巫）一般要上警，在台上当面检验预言家；想带队的村民也上。" +
 			"悍跳的狼一定上警，在竞选发言里和预言家正面对跳。其他狼按局势和性格决定：警上多一只狼可以帮着站边或搅局，但警下也要留狼的票。上警的人不能投票选警长。",
 		Campaign: "你上警了，这是你的竞选发言：说清楚为什么大家该把警徽给你，比如报出你的身份和查验，或者你会怎么带队找狼。不超过80字。",
 		Withdraw: "竞选发言都结束了，正式投票前你可以退水：选你自己的名字表示继续竞选，选\"放弃\"表示退水。所有还在竞选的人同时决定。" +
 			"退水的人不能当警长，也不能投票选警长。看清楚其他人的竞选发言：如果你信任的人更适合拿警徽，或者你的发言被打穿了，可以退水；还想要警徽就留下。" +
 			"跳了预言家的人退水，大家会觉得他是假的，所以悍跳的狼不要退水。",
-		SheriffVote: "投票选警长：从上警的人里选一个。比较他们的竞选发言，谁报的信息更可信、谁当警长对好人更有利，就投谁。谁都信不过可以选\"放弃\"弃票。",
+		SheriffVote: "投票选警长：从上警的人里选一个。比较他们的竞选发言，谁报的信息更可信、谁当警长对好人更有利，就投谁。谁都信不过可以选\"放弃\"弃票。" +
+			"几个人都跳预言家时，不要投先跳的那个，也不要投说得最硬的那个，要投比较下来更像真的那个：第1夜验人的理由、查杀落在谁身上、警徽流合不合理。",
 		Badge: "你是警长，现在出局了。选一个活着的人表示把警徽移交给他，选\"放弃\"表示撕掉警徽、从此没有警长。" +
 			"警徽应该交给你最信任的好人；没有把握、怕交到狼人手里，就撕掉。",
 	},
@@ -409,6 +415,7 @@ Reasoning points people often get wrong:
 - If someone dies by day right after an exile, the exiled player was the hunter and shot them. Whoever the hunter shoots is not necessarily a werewolf. Whoever is exiled is not necessarily a werewolf either.
 - On Night 1 there is no public information at all; nobody can tell who holds a power role.
 - A real seer running for sheriff usually gives a badge flow: who they check next and who gets the badge if they fall. A seer who gives none is fair to press, but that is weak play, not proof of a werewolf.
+- The first to claim is not the real one. Werewolves fake the seer almost every game, and they often claim first and loudest, precisely so you believe them first. Whoever claims later has heard the speeches before them, but their check was set on Night 1, so claiming later is no proof of a lie either. When seers clash, compare them point by point: who they checked on Night 1 and why (nobody knows anything then, so only the seat can guide it), who their werewolf report lands on and how that player answers, whether their badge flow makes sense, whether their later speeches and votes fit their own checks, and who rushes to back them. The witch knows last night's kill: whoever was killed is usually good, so a seer who reports the kill as a werewolf is very suspicious. Take a side only after comparing, and give the reason the comparison gave you; until then either seer may be a werewolf, and with three claiming at least two are fake.
 
 Refer to yourself as "I", never by your own name.
 Speak like a real player: casual, in character. No openers or pleasantries ("Hi everyone", "I'm so-and-so"); go straight to your point.
@@ -439,13 +446,16 @@ Write everything in English.`,
 			"The werewolves should not all play alike: one presses hard, one stirs good players against each other, one plays the quiet fence-sitter, each in their own personality.",
 		game.Witch: "Your two potions are the good side's key resource. Use the antidote early, especially on someone who may hold a power role; keep the poison for someone you are sure is a werewolf, " +
 			"such as a werewolf the real seer found, or a fake seer. When the time is right you can reveal yourself and say who you saved, to help the table tell the real seer from the fake. " +
-			"Werewolves may self-kill to waste your antidote, so someone you saved is not necessarily good; judge them by how they play by day.",
-		game.Hunter: "Your gun is a deterrent. If you come under suspicion you can reveal you are the hunter to protect yourself; werewolves rarely dare vote you openly. When you shoot, take the person you are surest is a werewolf; if you are not sure, pass rather than shoot a good player.",
+			"Werewolves may self-kill to waste your antidote, so someone you saved is not necessarily good; judge them by how they play by day. " +
+			"You may run for sheriff: you know Night 1's kill, some of the hardest information at the table, and in the race you can test the seers against it to their faces, say whoever reports the kill as a werewolf. Running does not mean claiming witch; when to reveal yourself is up to you.",
+		game.Hunter: "Your gun is a deterrent. If you come under suspicion you can reveal you are the hunter to protect yourself; werewolves rarely dare vote you openly. When you shoot, take the person you are surest is a werewolf; if you are not sure, pass rather than shoot a good player. " +
+			"On Day 1 you usually run for sheriff: the badge is safest with the hunter, since werewolves dare not push you lightly, and if you go you shoot and still pass the badge on. In the race you can press every seer to their face and lead the good side to the fake. Play hard; do not hide on the floor waiting for someone else to lead.",
 		game.Seer: "Your checks are the good side's most important information. When you find a werewolf, claim seer firmly, report every check and lead the vote. " +
 			"If someone counter-claims, expose them with your check record, the timing of their claim and the contradictions in what they said. Once you claim you will probably be killed that night, so report everything at once. " +
 			"You always run for sheriff: claim and report your checks in the campaign, then give your badge flow: who you mean to check the next two nights and who the badge goes to if you fall, so your information outlives you. Take the badge to call the vote.",
 		game.Villager: "You have no night information; you find werewolves by reading the table. Watch for who contradicts themselves, who just follows others, who protects whom, and whose vote does not match their words. " +
-			"If two people both claim seer, you must decide which is real: whose checks fit the other claims, the deaths and the votes better, and whose claim came more naturally. " +
+			"If two people both claim seer, you must decide which is real: whose checks fit the other claims, the deaths and the votes better, and whose claim came more naturally. Never believe one because they claimed first or sounded surest: werewolves love to claim first. " +
+			"When you cannot tell, press them: ask each seer why they checked that player on Night 1 and why their badge flow goes the way it does, and see whose answer comes naturally. How the players they reported answer is a clue too. " +
 			"A villager can be aggressive too: once you are sure of someone, go after them hard and lead the vote, without waiting for others to speak first.",
 	},
 	tactics: map[game.Tactic]string{
@@ -485,12 +495,14 @@ Write everything in English.`,
 		Shoot:     "You are out. As the hunter you may shoot one person and take them with you: pick a name to shoot, or \"pass\" not to.",
 		Run: "Sheriff election: pick your own name to run for sheriff, or \"pass\" not to. Everyone decides at once, without seeing anyone else's choice. " +
 			"The sheriff's one and a half votes and the right to call the vote are worth a lot. Running is not just for power roles: a good player who wants to lead, to be heard, or to watch the liars up close may run too. But the more who run, the fewer are left to vote. The seer always runs, reporting their checks in the campaign to take the badge and lead. " +
+			"The race must not be just the seer and the fake: then good players can only pick one of two seers, and the badge easily lands with a werewolf. Good players with a power role, the hunter or the witch, usually run, to test the seers face to face; so do villagers who want to lead. " +
 			"The wolf faking the seer always runs, taking the seer on head to head in the campaign. The other wolves decide by the game and their character: one more wolf in the race can back the faker or stir things up, but the pack needs votes from the floor too. Those who run do not vote for sheriff.",
 		Campaign: "You are running for sheriff. This is your campaign speech: say why the table should give you the badge, such as your role and your checks, or how you will lead the hunt. At most 40 words.",
 		Withdraw: "The campaign speeches are over. Before the vote you may withdraw: pick your own name to stay in the race, or \"pass\" to withdraw. Everyone still running decides at once. " +
 			"Whoever withdraws cannot be sheriff and cannot vote for sheriff either. Weigh the other campaigns: if someone you trust is better placed to take the badge, or your own campaign was taken apart, you may withdraw; if you still want the badge, stay. " +
 			"Someone who claimed seer and then withdraws looks fake, so a wolf faking the seer never withdraws.",
-		SheriffVote: "Vote for sheriff: pick one of those running. Compare their campaign speeches: whose information is more believable, and who as sheriff helps the good side more. If you trust none of them, pick \"pass\" to abstain.",
+		SheriffVote: "Vote for sheriff: pick one of those running. Compare their campaign speeches: whose information is more believable, and who as sheriff helps the good side more. If you trust none of them, pick \"pass\" to abstain. " +
+			"When several claim seer, vote neither for the first to claim nor for the one who sounds surest, but for the one who looks real once compared: their reason for the Night 1 check, who their werewolf report lands on, whether their badge flow makes sense.",
 		Badge: "You are the sheriff and you are out. Pick someone alive to pass the badge to, or \"pass\" to tear it up so there is no sheriff any more. " +
 			"Give it to the good player you trust most; if you are unsure and it might reach a werewolf, tear it up.",
 	},

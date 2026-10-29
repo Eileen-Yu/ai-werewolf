@@ -586,6 +586,19 @@ func TestWolvesMayChangeCourseWhenTheirPlayFails(t *testing.T) {
 	}
 }
 
+func TestGoodPlayersRunAndDoNotTrustTheFirstSeer(t *testing.T) {
+	assert.Contains(t, chineseText.strategies[game.Hunter], "第1天你一般要上警")
+	assert.Contains(t, englishText.strategies[game.Hunter], "On Day 1 you usually run for sheriff")
+	assert.Contains(t, chineseText.strategies[game.Witch], "你可以上警")
+	assert.Contains(t, englishText.strategies[game.Witch], "You may run for sheriff")
+	assert.Contains(t, chineseText.instructions[Run], "有身份的好人（猎人、女巫）一般要上警")
+	assert.Contains(t, englishText.instructions[Run], "the hunter or the witch, usually run")
+	assert.Contains(t, chineseText.rules, "先跳的不一定是真的")
+	assert.Contains(t, englishText.rules, "The first to claim is not the real one")
+	assert.Contains(t, chineseText.instructions[SheriffVote], "不要投先跳的那个")
+	assert.Contains(t, englishText.instructions[SheriffVote], "neither for the first to claim")
+}
+
 func TestPreparingWritesOnlyNotesAndTheTurnAfterOnlyWhatChanged(t *testing.T) {
 	base := Turn{Round: 1, Phase: game.Day, Me: game.Player{Name: "小红"}, Seats: []Seat{{Name: "小红"}, {Name: "老王"}}, Suspects: []string{"老王", game.Nobody}}
 
