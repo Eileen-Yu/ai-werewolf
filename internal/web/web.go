@@ -6,10 +6,11 @@ package web
 
 import (
 	"crypto/rand"
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"slices"
@@ -27,6 +28,27 @@ import (
 //go:embed index.html
 var page []byte
 
+// pictures holds a portrait for some characters, named for the character in
+// lower case with dashes for spaces. A character without one is drawn as
+// their initial.
+//
+//go:embed avatars
+var pictures embed.FS
+
+// avatars maps each character with a portrait to where the page gets it.
+var avatars = func() map[string]string {
+	out := map[string]string{}
+	for _, l := range []game.Lang{game.Chinese, game.English} {
+		for _, c := range game.Characters(l) {
+			f := "avatars/" + strings.ReplaceAll(strings.ToLower(c), " ", "-") + ".webp"
+			if _, err := fs.Stat(pictures, f); err == nil {
+				out[c] = "/" + f
+			}
+		}
+	}
+	return out
+}()
+
 // Handler serves the page and the API it calls.
 func Handler(client *workflow.Client) http.Handler {
 	s := &server{client: client}
@@ -34,6 +56,14 @@ func Handler(client *workflow.Client) http.Handler {
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write(page)
+	})
+	files := http.FileServerFS(pictures)
+	mux.HandleFunc("GET /avatars/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		files.ServeHTTP(w, r)
+	})
+	mux.HandleFunc("GET /api/avatars", func(w http.ResponseWriter, _ *http.Request) {
+		reply(w, map[string]any{"avatars": avatars})
 	})
 	mux.HandleFunc("GET /api/characters", s.characters)
 	mux.HandleFunc("POST /api/games", s.start)

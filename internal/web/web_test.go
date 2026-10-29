@@ -3,6 +3,7 @@ package web
 import (
 	"bytes"
 	"encoding/json"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -118,6 +119,29 @@ func playFromPage(t *testing.T, url string) bool {
 		if !moved {
 			time.Sleep(20 * time.Millisecond)
 		}
+	}
+}
+
+// Every English character has a portrait, and every portrait belongs to a
+// character, so renaming one cannot quietly lose its picture.
+func TestEveryEnglishCharacterHasAPortrait(t *testing.T) {
+	srv := httptest.NewServer(Handler(nil))
+	t.Cleanup(srv.Close)
+
+	got := get[map[string]map[string]string](t, srv.URL+"/api/avatars", http.StatusOK, true)["avatars"]
+	files, err := fs.Glob(pictures, "avatars/*")
+	require.NoError(t, err)
+	assert.Len(t, got, len(files))
+	for _, c := range game.Characters(game.English) {
+		url, ok := got[c]
+		if !assert.True(t, ok, "no portrait for %s", c) {
+			continue
+		}
+		r, err := http.Get(srv.URL + url)
+		require.NoError(t, err)
+		r.Body.Close()
+		assert.Equal(t, http.StatusOK, r.StatusCode, url)
+		assert.Equal(t, "image/webp", r.Header.Get("Content-Type"), url)
 	}
 }
 
