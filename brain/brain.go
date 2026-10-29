@@ -109,8 +109,8 @@ type Turn struct {
 //
 // Speech is said aloud and Target is the pick on a choice turn. Suspect and
 // Claim are a declaring speech's stance, put on the record so others can hold
-// the player to it; a wolf's Claim may be a lie. Faker, Hook and Focus are a
-// wolf plan's seer claimant, the wolf who sides with the good players, and
+// the player to it; a wolf's Claim may be a lie. Fakers, Hook and Focus are a
+// wolf plan's seer claimants, the wolf who sides with the good players, and
 // vote target.
 type Action struct {
 	Observations []string    `json:"observations,omitempty"`
@@ -120,7 +120,7 @@ type Action struct {
 	Target       string      `json:"target,omitempty"`
 	Suspect      string      `json:"suspect,omitempty"`
 	Claim        *game.Claim `json:"claim,omitempty"`
-	Faker        string      `json:"faker,omitempty"`
+	Fakers       []string    `json:"fakers,omitempty"`
 	Hook         string      `json:"hook,omitempty"`
 	Focus        string      `json:"focus,omitempty"`
 }
@@ -208,18 +208,19 @@ func (t Turn) ClaimProblems(c game.Claim) []string {
 	return problems
 }
 
-// planProblems checks a wolf plan against the game: the seer claimant must
-// be a wolf, and the first night's plan must name one; a hook, when the pack
-// plays one, must be another wolf; and the pack cannot push tomorrow's vote
-// onto a teammate, or onto tonight's victim, who will be dead by then.
+// planProblems checks a wolf plan against the game: the seer claimants must
+// be wolves, at most two, and the first night's plan must name as many as the
+// tactic needs; a hook, when the pack plays one and has a wolf to spare, must
+// be another wolf; and the pack cannot push tomorrow's vote onto a teammate,
+// or onto tonight's victim, who will be dead by then.
 func (t Turn) planProblems(a Action) []string {
 	tx, l := t.text(), t.Lang
 	var problems []string
-	named := t.PlanNames()
-	if !slices.Contains(named, a.Faker) {
-		problems = append(problems, fmt.Sprintf(tx.badFaker, l.List(l.SayAll(named)), a.Faker))
+	least, most := t.FakerCount()
+	if n := len(a.Fakers); n < least || n > most || len(game.Without(a.Fakers, t.Pack...)) > 0 || hasDuplicates(a.Fakers) {
+		problems = append(problems, fmt.Sprintf(tx.badFakers, least, most, l.List(t.Pack), l.List(a.Fakers)))
 	}
-	if hooks := t.HookNames(a.Faker); t.NamesHook() && !slices.Contains(hooks, a.Hook) {
+	if hooks := t.HookNames(a.Fakers); t.NamesHook() && len(hooks) > 0 && !slices.Contains(hooks, a.Hook) {
 		problems = append(problems, fmt.Sprintf(tx.badHook, l.List(l.SayAll(hooks)), a.Hook))
 	}
 	if !slices.Contains(t.Suspects, a.Focus) {
@@ -234,12 +235,27 @@ func (t Turn) planProblems(a Action) []string {
 // MustFakeSeer reports whether the pack's plan has this wolf claim to be the
 // seer today.
 func (t Turn) MustFakeSeer() bool {
-	return t.Plan != nil && t.Plan.Faker == t.Me.Name
+	return t.Plan != nil && slices.Contains(t.Plan.Fakers, t.Me.Name)
 }
 
-// PlanNames is who a wolf plan may name as the faker. The first night's plan
-// must name a wolf, so the pack always fights the real seer for the badge;
-// after that the pack may name nobody, once the faker is out or seen through.
+// FakerCount is how many seer claimants a wolf plan may name. The first
+// night's plan must name one, so the pack always fights the real seer for the
+// badge, or two when it plays the double claim; after that it may name none,
+// once the fakers are out or seen through. Never more than two, or more than
+// the pack.
+func (t Turn) FakerCount() (least, most int) {
+	least, most = 0, min(2, len(t.Pack))
+	if t.Round <= 1 {
+		least = 1
+		if t.Tactic == game.DoubleClaim {
+			least = most
+		}
+	}
+	return least, most
+}
+
+// PlanNames is who a wolf plan may name as the hook: any wolf, and after the
+// first night nobody.
 func (t Turn) PlanNames() []string {
 	if t.Round <= 1 {
 		return t.Pack
@@ -253,13 +269,14 @@ func (t Turn) NamesHook() bool {
 	return t.Kind == WolfPlan && t.Tactic == game.Hook && len(t.Pack) > 1
 }
 
-// HookNames is who a wolf plan may name as the hook, given its faker: any
-// other wolf, and on the first night nobody is not an option.
-func (t Turn) HookNames(faker string) []string {
-	if faker == game.Nobody {
-		return t.PlanNames()
-	}
-	return game.Without(t.PlanNames(), faker)
+// HookNames is who a wolf plan may name as the hook, given its fakers: any
+// other wolf, and after the first night nobody.
+func (t Turn) HookNames(fakers []string) []string {
+	return game.Without(t.PlanNames(), fakers...)
+}
+
+func hasDuplicates(names []string) bool {
+	return len(slices.Compact(slices.Sorted(slices.Values(names)))) != len(names)
 }
 
 // SuspectsSomeone reports whether this is a good player's turn to suspect,
@@ -362,7 +379,13 @@ func (t Turn) Normalize(a Action) Action {
 	}
 	if t.Kind == WolfPlan {
 		a.Focus = closest(a.Focus, t.Suspects)
-		a.Faker = closest(a.Faker, append(slices.Clone(t.Pack), game.Nobody))
+		var fakers []string
+		for _, f := range a.Fakers {
+			if f = closest(f, append(slices.Clone(t.Pack), game.Nobody)); f != game.Nobody && f != "" {
+				fakers = append(fakers, f)
+			}
+		}
+		a.Fakers = fakers
 		a.Hook = closest(a.Hook, append(slices.Clone(t.Pack), game.Nobody))
 	}
 	if a.Claim != nil {

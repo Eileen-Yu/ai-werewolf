@@ -320,9 +320,9 @@ func (t *table) wolvesHunt() (string, error) {
 	}
 	plan := &game.Plan{Round: s.Round, Victim: a.Target, Focus: a.Focus, Notes: a.Speech}
 	day := t.h.noFaker
-	if a.Faker != game.Nobody && a.Faker != "" {
-		plan.Faker = a.Faker
-		day = fmt.Sprintf(t.h.faker, a.Faker)
+	if len(a.Fakers) > 0 {
+		plan.Fakers = a.Fakers
+		day = fmt.Sprintf(t.h.faker, t.list(a.Fakers))
 	}
 	if a.Hook != "" && a.Hook != game.Nobody {
 		plan.Hook = a.Hook
@@ -563,10 +563,10 @@ func (t *table) withdraw(runners []string) ([]string, error) {
 }
 
 // planRuns reports whether the pack's plan sends this AI wolf to run for
-// sheriff: the faker, who claims seer in the campaign.
+// sheriff: a faker, who claims seer in the campaign.
 func (t *table) planRuns(name string) bool {
 	p := t.s.Plan
-	return p != nil && p.Round == t.s.Round && !t.s.Player(name).Human && name == p.Faker
+	return p != nil && p.Round == t.s.Round && !t.s.Player(name).Human && slices.Contains(p.Fakers, name)
 }
 
 // abstained reports whether every voter abstained.
@@ -937,9 +937,9 @@ func ActActivity(ctx workflow.ActivityContext) (any, error) {
 // after the brain's own re-asking, or a person's move the page let through,
 // is not allowed to stall the game: a bad pick counts as abstaining, an empty
 // speech as silence, a bad suspect as suspecting nobody; a bad claim is
-// dropped, and so are bad beliefs. A wolf plan's bad seer claimant means
-// nobody claims, a bad hook means nobody plays it, and a bad focus means
-// none. The rest is let through: a
+// dropped, and so are bad beliefs. A wolf plan keeps at most two seer
+// claimants from the pack, a bad hook means nobody plays it, and a bad focus
+// means none. The rest is let through: a
 // speech that quotes someone yet to speak, or a faker who does not claim, is
 // a slip, not a broken move.
 func settle(t brain.Turn, a brain.Action) brain.Action {
@@ -959,10 +959,14 @@ func settle(t brain.Turn, a brain.Action) brain.Action {
 		delete(a.Notes.Beliefs, name)
 	}
 	if t.Kind == brain.WolfPlan {
-		if !slices.Contains(t.Pack, a.Faker) {
-			a.Faker = game.Nobody
+		var fakers []string
+		for _, name := range a.Fakers {
+			if len(fakers) < 2 && slices.Contains(t.Pack, name) && !slices.Contains(fakers, name) {
+				fakers = append(fakers, name)
+			}
 		}
-		if !t.NamesHook() || !slices.Contains(t.HookNames(a.Faker), a.Hook) {
+		a.Fakers = fakers
+		if !t.NamesHook() || !slices.Contains(t.HookNames(a.Fakers), a.Hook) {
 			a.Hook = ""
 		}
 		if !slices.Contains(t.Suspects, a.Focus) || a.Focus == a.Target {

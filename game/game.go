@@ -513,8 +513,9 @@ type Belief struct {
 type Plan struct {
 	Round  int    `json:"round"`
 	Victim string `json:"victim"`
-	// Faker is the wolf who claims to be the seer tomorrow, "" for nobody.
-	Faker string `json:"faker,omitempty"`
+	// Fakers are the wolves who claim to be the seer tomorrow: one, two, or
+	// after the first night none.
+	Fakers []string `json:"fakers,omitempty"`
 	// Hook is the wolf who plays a staunch good player tomorrow, "" for nobody.
 	Hook string `json:"hook,omitempty"`
 	// Focus is who the pack pushes the vote onto tomorrow.
@@ -534,9 +535,12 @@ const (
 	// Hook has one more wolf side with the good players, even against the
 	// faker, to be trusted later.
 	Hook Tactic = "hook"
+	// DoubleClaim has two wolves claim to be the seer, so the real one has two
+	// to fight and the table three to choose from.
+	DoubleClaim Tactic = "double_claim"
 )
 
-var Tactics = []Tactic{Counterclaim, Hook}
+var Tactics = []Tactic{Counterclaim, Hook, DoubleClaim}
 
 type State struct {
 	Lang    Lang     `json:"lang,omitempty"`

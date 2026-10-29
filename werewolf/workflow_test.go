@@ -677,7 +677,7 @@ func holder(seats []brain.Seat) string {
 func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
-	passed, torn, withdrewOnce, deadRan := false, false, false, false
+	passed, torn, withdrewOnce, deadRan, doubled := false, false, false, false, false
 	for i := 0; i < 30 && !(passed && torn && deadRan); i++ {
 		b := &campaigner{tear: i%2 == 1}
 		SetBrain(b)
@@ -691,7 +691,11 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 		withdrawn := false
 		sheriff, elected := "", false
 		var lastDay1Speaker, day1Sheriff string
+		var tactic game.Tactic
 		for _, turn := range b.turns {
+			if turn.Tactic != "" {
+				tactic = turn.Tactic
+			}
 			switch turn.Kind {
 			case brain.Prepare:
 				continue // runs alongside a speech, so it may be recorded before it
@@ -714,7 +718,7 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 				deadRan = deadRan || diedNight1[turn.Me.Name]
 				if turn.Me.Role == game.Seer {
 					assert.Equal(t, []string{turn.Me.Name}, turn.Candidates, "the seer always runs")
-				} else if turn.Plan != nil && turn.Plan.Faker == turn.Me.Name {
+				} else if turn.Plan != nil && slices.Contains(turn.Plan.Fakers, turn.Me.Name) {
 					sent = append(sent, turn.Me.Name)
 					assert.Equal(t, []string{turn.Me.Name}, turn.Candidates, "the faker always runs")
 				} else {
@@ -765,10 +769,17 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 		if day1Sheriff != "" {
 			assert.Equal(t, day1Sheriff, lastDay1Speaker, "the sheriff speaks last")
 		}
-		assert.Len(t, sent, 1, "every pack fakes the seer on the first day")
+		if tactic == game.DoubleClaim {
+			assert.Len(t, sent, 2, "a double claim sends two wolves")
+		} else {
+			assert.NotEmpty(t, sent, "every pack fakes the seer on the first day")
+			assert.LessOrEqual(t, len(sent), 2, "never more than two fake the seer")
+		}
+		doubled = doubled || len(sent) == 2
 		assert.Subset(t, runners, sent, "the faker did not run")
 	}
 	assert.True(t, withdrewOnce, "no candidate withdrew in any game")
+	assert.True(t, doubled, "no pack sent two wolves to claim seer in thirty games")
 	assert.True(t, passed, "no sheriff passed the badge on in thirty games")
 	assert.True(t, torn, "no sheriff tore up the badge in thirty games")
 	assert.True(t, deadRan, "nobody who died on the first night was asked to run in thirty games")
@@ -978,11 +989,23 @@ func TestTheNextSpeakerPreparesWhileSomeoneSpeaks(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
 
-	playGame(t, client, "prepare")
+	// A game can end before anyone speaks, a wolf win at the first daybreak,
+	// so play until one has speeches to check.
+	checked := 0
+	for i := 0; checked == 0 && i < 10; i++ {
+		b.turns = nil
+		playGame(t, client, fmt.Sprint("prepare-", i))
+		checked = checkPrepared(t, b.turns)
+	}
+	assert.Positive(t, checked)
+}
 
+// checkPrepared checks every speech after the first against the speaker's
+// preparation, and returns how many it checked.
+func checkPrepared(t *testing.T, turns []brain.Turn) int {
 	prepared := map[string]brain.Turn{}
 	checked := 0
-	for _, turn := range b.turns {
+	for _, turn := range turns {
 		if turn.Kind == brain.Prepare {
 			prepared[fmt.Sprint(turn.Me.Name, turn.Round, turn.Phase)] = turn
 			continue
@@ -1008,7 +1031,7 @@ func TestTheNextSpeakerPreparesWhileSomeoneSpeaks(t *testing.T) {
 		assert.Equal(t, "strategy of "+turn.Me.Name, turn.Notes.Strategy, "an empty strategy keeps the old one")
 		checked++
 	}
-	assert.Positive(t, checked)
+	return checked
 }
 
 // preparer plays randomly. Preparing, it writes a belief about everyone and a
@@ -1065,7 +1088,7 @@ type loneRunner struct{ rec turnRecorder }
 func (b *loneRunner) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
 	a, err := b.rec.Act(ctx, t)
 	if t.Kind == brain.WolfPlan {
-		a.Faker = game.Nobody
+		a.Fakers = nil
 	}
 	if t.Kind == brain.Run {
 		a.Target = game.Pass

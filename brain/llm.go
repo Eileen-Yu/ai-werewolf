@@ -74,6 +74,7 @@ func parseAction(tx *text, reply string) (Action, error) {
 		Observations json.RawMessage `json:"observations"`
 		Claim        json.RawMessage `json:"claim"`
 		Notes        json.RawMessage `json:"notes"`
+		Fakers       json.RawMessage `json:"fakers"`
 	}
 	err := decodeObject(reply[start:], &raw)
 	if err != nil && decodeObject(repairCommas(reply[start:]), &raw) != nil {
@@ -83,7 +84,8 @@ func parseAction(tx *text, reply string) (Action, error) {
 	a.Observations = lines(raw.Observations)
 	a.Claim = parseClaim(raw.Claim)
 	a.Notes = parseNotes(raw.Notes)
-	for _, f := range []*string{&a.Target, &a.Speech, &a.Suspect, &a.Faker, &a.Hook, &a.Focus} {
+	a.Fakers = lines(raw.Fakers)
+	for _, f := range []*string{&a.Target, &a.Speech, &a.Suspect, &a.Hook, &a.Focus} {
 		*f = strings.TrimSpace(*f)
 	}
 	return a, nil
@@ -264,8 +266,8 @@ func prompt(t Turn) (system, user string) {
 	}
 	if p := t.Plan; p != nil && t.Phase == game.Day {
 		day := tx.noFaker
-		if p.Faker != "" {
-			day = fmt.Sprintf(tx.faker, p.Faker)
+		if len(p.Fakers) > 0 {
+			day = fmt.Sprintf(tx.faker, l.List(p.Fakers))
 		}
 		if p.Hook != "" {
 			day += fmt.Sprintf(tx.hook, p.Hook)
@@ -306,7 +308,7 @@ func prompt(t Turn) (system, user string) {
 	switch {
 	case t.Kind == Prepare:
 	case t.Kind == WolfPlan:
-		fields = append(fields, f.victim, f.faker)
+		fields = append(fields, f.victim, f.fakers)
 		if t.NamesHook() {
 			fields = append(fields, f.hook)
 		}
@@ -323,7 +325,8 @@ func prompt(t Turn) (system, user string) {
 		fmt.Fprintf(&b, tx.targetOnly, l.List(l.SayAll(t.Candidates)))
 	}
 	if t.Kind == WolfPlan {
-		fmt.Fprintf(&b, tx.fakerOnly, l.List(l.SayAll(t.PlanNames())))
+		least, most := t.FakerCount()
+		fmt.Fprintf(&b, tx.fakersOnly, l.List(t.Pack), least, most)
 		if t.NamesHook() {
 			fmt.Fprintf(&b, tx.hookOnly, l.List(l.SayAll(t.PlanNames())))
 		}
