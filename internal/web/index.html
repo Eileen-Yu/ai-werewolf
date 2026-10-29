@@ -346,7 +346,7 @@ const UI = {
 <li>狼人：村民全部出局，或神职（预言家、女巫、猎人）全部出局，或活着的狼人不少于其他人。</li>
 <li>游戏结束、身份公开后，AI 玩家会挨个复盘：哪里看对了、被谁骗了。</li></ul>
 <h4>你怎么玩</h4><ul>
-<li>轮到你时，屏幕底部会出现行动栏和倒计时，右边是操作框；3分钟没操作，AI 会替你走这一步。</li>
+<li>轮到你时，屏幕底部会出现行动栏和倒计时，右边是操作框；5分钟没操作，AI 会替你走这一步。</li>
 <li>发言时要选你怀疑谁（会公开记录），也可以声称一个身份。狼人也可以假装成任何身份。</li></ul>`,
     stage: { wolves: "狼人正在密谋", wolvesSub: "天黑请闭眼，狼人请睁眼", night: "夜色深沉，有人正悄悄行动", nightIdle: "夜深了",
       wait: "主持人正在等待", speech: n => `${n} 正在想怎么发言`, aftermath: n => `${n} 正在想怎么复盘`, campaign: n => `${n} 正在准备竞选发言`,
@@ -420,7 +420,7 @@ const UI = {
 <li>Werewolves: every villager is out, or every power role (seer, witch, hunter) is out, or the living werewolves are at least as many as everyone else.</li>
 <li>Once the game is over and the roles are out, each AI player looks back: what they read right and who fooled them.</li></ul>
 <h4>How you play</h4><ul>
-<li>On your turn an action bar with a countdown appears at the bottom, and the move box on the right; after three minutes, an AI plays the move for you.</li>
+<li>On your turn an action bar with a countdown appears at the bottom, and the move box on the right; after five minutes, an AI plays the move for you.</li>
 <li>When you speak, you pick who you suspect (it goes on the record) and may claim a role. Werewolves may claim anything.</li></ul>`,
     stage: { wolves: "The werewolves are plotting", wolvesSub: "Everyone close your eyes. Werewolves, open yours", night: "Deep in the night, someone is on the move", nightIdle: "Night falls",
       wait: "The host is waiting", speech: n => `${n} is thinking what to say`, aftermath: n => `${n} is thinking back`, campaign: n => `${n} is preparing a campaign speech`,
@@ -576,7 +576,7 @@ function render(v) {
 // what is asked and the time left, otherwise what the table is doing. On a
 // person's turn showTurn keeps it ticking.
 let stagePlain = "";
-const MOVE_SECS = 180; // werewolf.HumanTimeout
+const MOVE_SECS = 300; // werewolf.HumanTimeout
 function renderBar(v, t) {
   const bar = $("actionBar");
   bar.hidden = !v.you;

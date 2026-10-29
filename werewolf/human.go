@@ -27,7 +27,7 @@ type Human struct {
 const MaxHumans = 9
 
 // HumanTimeout is how long a person has for a move before an AI plays it.
-var HumanTimeout = 3 * time.Minute
+var HumanTimeout = 5 * time.Minute
 
 // View is the game as one person sees it, cut by ReadView from what the
 // workflow publishes for the web page. A spectator's view has no You, role

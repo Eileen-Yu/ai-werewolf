@@ -81,7 +81,7 @@ The process may die. The drama persists. [Try it yourself](#6-try-killing-the-ga
 - **The workflow is the game master.** The phases are plain Go code in one Dapr Workflow, which continues as new at the end of each round so its history stays short. Dealing roles, every player's move and the MVP verdict are activities, so their results are written to the workflow history on Catalyst.
 - **Secrets stay secret in code.** The workflow holds the whole truth. Before each move it builds that player's view with only what their role entitles them to; a seat has no role field at all, so there is nothing for the prompt to leak.
 - **Agents think in parallel where the rules allow.** Everyone votes at once, and the next speaker updates their notes while the current one talks.
-- **A person is just another event.** Your seat's move arrives as an external event, with a three-minute timer; if it fires, an AI plays the move for you.
+- **A person is just another event.** Your seat's move arrives as an external event, with a five-minute timer; if it fires, an AI plays the move for you.
 - **Restarts are free.** After a crash the workflow replays its history: finished moves return their recorded answers, no LLM is called twice, and the game carries on from the line it stopped at.
 
 ### Inside a real game
@@ -103,7 +103,7 @@ How each part works is in [docs/design.md](docs/design.md).
 - **A fake seer or two. Zero ethics.** Every game, one wolf, sometimes two, runs for sheriff and claims to be the seer, with a fake check, a badge flow and an attack on the real one, and is held to every check they have reported. The pack is secretly dealt how the rest play around them: back the fake seer, have one more wolf earn the village's trust by siding with the real seer, even against a teammate, or send two fake seers at once. The wolf who writes the plan answers what teammates proposed at night, so a person can talk the pack into a double claim. They never move as a bloc, because the village reads the votes, but never sit a vote out together either; they change course when a play fails, and may kill one of their own at night to bait the witch's antidote.
 - **Long-term memory. Short-term grudges.** Everyone keeps notes on who they trust, who they suspect and why. Each player sees only what their role entitles them to: a werewolf their pack, a seer their checks.
 - **Hallucinations are not a valid defense.** Voting for someone not at the table, quoting someone who never spoke, or "there is no proof" as a reason all get the answer sent back to try again.
-- **Think you're smarter than nine LLMs? Prove it.** From a web page, play in place of any character under your own name. Your role is dealt like anyone's, and if you take more than three minutes over a move, an AI plays it for you.
+- **Think you're smarter than nine LLMs? Prove it.** From a web page, play in place of any character under your own name. Your role is dealt like anyone's, and if you take more than five minutes over a move, an AI plays it for you.
 - **Even murder gets a performance review.** At the end an LLM judge reads the whole record, every role revealed, and names the most valuable player with a reason.
 - **Two villages.** English with internet archetypes, or Chinese with meme characters. Roles and seats are random every game.
 - **Try it without an API key.** Local mode plays with random players on a SQLite-backed engine. LLM games use Catalyst's Dapr Conversation API.
