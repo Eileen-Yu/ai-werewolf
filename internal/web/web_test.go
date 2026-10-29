@@ -3,6 +3,7 @@ package web
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"net"
 	"net/http"
@@ -142,6 +143,16 @@ func TestEveryEnglishCharacterHasAPortrait(t *testing.T) {
 		r.Body.Close()
 		assert.Equal(t, http.StatusOK, r.StatusCode, url)
 		assert.Equal(t, "image/webp", r.Header.Get("Content-Type"), url)
+	}
+}
+
+// Every character reads aloud in a voice picked for them, not one left to
+// chance.
+func TestEveryCharacterHasAVoice(t *testing.T) {
+	for _, l := range []game.Lang{game.Chinese, game.English} {
+		for _, c := range game.Characters(l) {
+			assert.Contains(t, string(page), fmt.Sprintf("%q: { sex:", c), "no voice for %s", c)
+		}
 	}
 }
 

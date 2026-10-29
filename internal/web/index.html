@@ -827,12 +827,57 @@ $("voiceBtn").hidden = !window.speechSynthesis;
 // follow a whole speech in.
 const novelty = new Set(["Albert", "Bad News", "Bahh", "Bells", "Boing", "Bubbles", "Cellos", "Good News",
   "Jester", "Organ", "Superstar", "Trinoids", "Whisper", "Wobble", "Zarvox"]);
+const baseName = v => v.name.replace(/ \(.*\)$/, ""), tag = v => v.lang.replace("_", "-");
+
+// Speaking voices by sex, best first: macOS's, then Chrome's own.
+const sexes = {
+  f: ["Shelley", "Sandy", "Flo", "Kathy", "Karen", "Moira", "Tessa", "Martha", "Catherine", "Nicky", "Grandma", "Samantha",
+    "Google US English", "Google UK English Female", "Tingting", "Yu-shu", "Meijia", "Google 普通话（中国大陆）"],
+  m: ["Aaron", "Daniel", "Eddy", "Reed", "Rocko", "Arthur", "Gordon", "Rishi", "Fred", "Ralph", "Junior", "Grandpa",
+    "Google UK English Male", "Li-Mu"],
+};
+
+// cast is each character's voice: the ones to try first, their sex for when
+// none of those is installed, and a pitch and pace for the persona. Mandarin
+// has few voices, so its characters are told apart mostly by pitch and pace.
+const cast = {
+  "Karen": { sex: "f", voices: ["Karen", "Shelley"], pitch: 1.05, rate: 1.1 },
+  "Florida Man": { sex: "m", voices: ["Rocko", "Eddy"], pitch: 1, rate: 1.1 },
+  "Sigma Chad": { sex: "m", voices: ["Daniel", "Gordon"], pitch: 0.8, rate: 0.95 },
+  "Discord Mod": { sex: "f", voices: ["Flo", "Kathy"], pitch: 1.05, rate: 1.05 },
+  "LinkedIn Influencer": { sex: "m", voices: ["Aaron", "Arthur"], pitch: 1, rate: 1.05 },
+  "Conspiracy Carl": { sex: "m", voices: ["Grandpa", "Ralph"], pitch: 1, rate: 1.1 },
+  "Gym Bro": { sex: "m", voices: ["Eddy", "Reed"], pitch: 0.95, rate: 1.15 },
+  "NPC Steve": { sex: "m", voices: ["Fred", "Ralph"], pitch: 1, rate: 1 },
+  "Chronically Online Girl": { sex: "f", voices: ["Sandy", "Nicky"], pitch: 1.15, rate: 1.15 },
+  "华妃": { sex: "f", voices: ["Tingting"], pitch: 1.15, rate: 1.1 },
+  "安陵容": { sex: "f", voices: ["Yu-shu", "Tingting"], pitch: 1.25, rate: 0.95 },
+  "皇后": { sex: "f", voices: ["Meijia", "Yu-shu"], pitch: 0.9, rate: 0.9 },
+  "懒羊羊": { sex: "f", voices: ["Yu-shu", "Tingting"], pitch: 1.4, rate: 0.85 },
+  "柯南": { sex: "m", voices: ["Li-Mu"], pitch: 1.3, rate: 1.15 },
+  "派大星": { sex: "m", voices: ["Li-Mu"], pitch: 1.15, rate: 0.9 },
+  "龙傲天": { sex: "m", voices: ["Li-Mu"], pitch: 0.75, rate: 1 },
+  "摸鱼王": { sex: "m", voices: ["Li-Mu"], pitch: 1, rate: 1.2 },
+  "闪电": { sex: "m", voices: ["Li-Mu"], pitch: 0.85, rate: 0.8 },
+  "卡皮巴拉": { sex: "m", voices: ["Li-Mu"], pitch: 0.9, rate: 0.9 },
+  "光头强": { sex: "m", voices: ["Li-Mu"], pitch: 0.95, rate: 1.3 },
+};
 
 function hash(s) { let h = 7; for (const c of s) h = (h * 31 + c.codePointAt(0)) >>> 0; return h; }
 
-// speakLine reads a new line of the log aloud, each character with a voice,
-// pitch and pace of their own so the table can be followed by ear. Claim tags
-// like 【声称预言家…】 are for reading, not for saying.
+// pickVoice is the first of names installed for the language, the exact
+// accent (Mandarin over Cantonese, say) ahead of others.
+function pickVoice(voices, names, want) {
+  for (const n of names) {
+    const v = voices.find(x => baseName(x) === n && tag(x) === want) || voices.find(x => baseName(x) === n);
+    if (v) return v;
+  }
+  return null;
+}
+
+// speakLine reads a new line of the log aloud, each character in a voice of
+// their own so the table can be followed by ear. Claim tags like
+// 【声称预言家…】 are for reading, not for saying.
 function speakLine(l, lang) {
   if (!voice.on || !window.speechSynthesis) return;
   const text = l.text.replace(/【[^】]*】|\[[^\]]*\]/g, "").trim();
@@ -840,16 +885,23 @@ function speakLine(l, lang) {
   if (voice.recording) { voice.held.push([l, lang]); return; }
   const u = new SpeechSynthesisUtterance(l.speaker ? `${l.speaker}：${text}` : text);
   u.lang = lang === "en" ? "en-US" : "zh-CN";
-  // Prefer the exact accent (Mandarin over Cantonese, say) when there is one.
-  const all = speechSynthesis.getVoices().filter(x => !novelty.has(x.name)), tag = x => x.lang.replace("_", "-");
-  const exact = all.filter(x => tag(x) === u.lang);
-  const voices = exact.length ? exact : all.filter(x => tag(x).startsWith(lang === "en" ? "en" : "zh"));
-  const h = hash(l.speaker || "");
-  // The host keeps the first voice; players share the rest when there are any.
-  if (voices.length) u.voice = !l.speaker || voices.length === 1 ? voices[0] : voices[1 + h % (voices.length - 1)];
-  if (l.speaker) {
-    u.pitch = 0.7 + (h % 7) / 10;
-    u.rate = 0.95 + ((h >>> 3) % 4) / 10;
+  const prefix = lang === "en" ? "en" : "zh";
+  const voices = speechSynthesis.getVoices().filter(x => tag(x).startsWith(prefix) && !novelty.has(baseName(x)));
+  const host = pickVoice(voices, [lang === "en" ? "Samantha" : "Tingting"], u.lang) ||
+    voices.find(x => tag(x) === u.lang && x.default) || voices.find(x => tag(x) === u.lang) || voices[0];
+  const c = cast[l.speaker];
+  if (c) {
+    u.voice = pickVoice(voices, [...c.voices, ...sexes[c.sex]], u.lang) || host;
+    u.pitch = c.pitch;
+    u.rate = c.rate;
+  } else if (l.speaker) {
+    // Someone not in the cast, a person's own name: a voice by their name.
+    const h = hash(l.speaker), rest = voices.filter(x => x !== host);
+    u.voice = rest.length ? rest[h % rest.length] : host;
+    u.pitch = 0.8 + (h % 5) / 10;
+    u.rate = 0.95 + ((h >>> 3) % 3) / 10;
+  } else {
+    u.voice = host;
   }
   speechSynthesis.speak(u);
 }
