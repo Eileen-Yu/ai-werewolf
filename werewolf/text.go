@@ -156,7 +156,7 @@ var englishHost = host{
 	takeover:     "You ran out of time, so an AI played this move for you.",
 	aftermath:    "After the game: the roles are out, so everyone says what they read right and where they were fooled.",
 
-	election:         "Day breaks. First the sheriff election; last night's deaths are announced once it is over. whoever wants the badge, run now. The sheriff's vote to exile counts one and a half; the sheriff speaks last each day, may call the vote, and may pass the badge on when they go.",
+	election:         "Day breaks. First the sheriff election; last night's deaths are announced once it is over. Whoever wants the badge, run now. The sheriff's vote to exile counts one and a half; the sheriff speaks last each day, may call the vote, and may pass the badge on when they go.",
 	noRunners:        "Nobody runs, so there is no sheriff this game.",
 	allRun:           "Everyone runs, so nobody is left to vote and there is no sheriff this game.",
 	runners:          "Running for sheriff: %s.",
