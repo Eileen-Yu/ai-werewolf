@@ -37,7 +37,7 @@ func (Random) Act(_ context.Context, t Turn) (Action, error) {
 	case Prepare:
 		return Action{}, nil
 	}
-	if t.Kind == Vote {
+	if t.Kind == Vote || t.Kind == PKVote {
 		return Action{Target: pick(spare(t, t.Candidates))}, nil
 	}
 	if t.Kind.IsChoice() {

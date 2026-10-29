@@ -683,6 +683,9 @@ type Ballot struct {
 	Sheriff string `json:"sheriff,omitempty"`
 	// Election marks the vote for sheriff.
 	Election bool `json:"election,omitempty"`
+	// PK is which PK this vote is, counting from 1, after the day's vote
+	// tied; 0 for the day's vote itself.
+	PK int `json:"pk,omitempty"`
 }
 
 // Election is how the sheriff election ended. Its ballot, when it came to a

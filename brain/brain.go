@@ -21,6 +21,8 @@ const (
 	WolfPlan  TurnKind = "wolf_plan"  // one wolf sets tonight's victim and the pack's plan for the day
 	LastWords TurnKind = "last_words" // after being voted out
 	Vote      TurnKind = "vote"       // daytime vote
+	PKSpeech  TurnKind = "pk_speech"  // after a tied vote: each tied player speaks again
+	PKVote    TurnKind = "pk_vote"    // after the PK speeches: everyone else votes between the tied
 	Inspect   TurnKind = "inspect"    // seer picks who to check
 	Save      TurnKind = "save"       // witch decides whether to save tonight's victim
 	Poison    TurnKind = "poison"     // witch decides whether to poison someone
@@ -41,7 +43,7 @@ const (
 // IsChoice reports whether the turn asks for a Target.
 func (k TurnKind) IsChoice() bool {
 	switch k {
-	case Vote, WolfPlan, Inspect, Save, Poison, Shoot, Run, Withdraw, SheriffVote, Badge:
+	case Vote, PKVote, WolfPlan, Inspect, Save, Poison, Shoot, Run, Withdraw, SheriffVote, Badge:
 		return true
 	}
 	return false
@@ -56,7 +58,7 @@ func (k TurnKind) Speaks() bool {
 // Declares reports whether a speech must also state, on the record, who the
 // player suspects and what they claim to be.
 func (k TurnKind) Declares() bool {
-	return k == Speech || k == Campaign
+	return k == Speech || k == Campaign || k == PKSpeech
 }
 
 // Seat is what everyone knows about a player: their name, whether they hold
@@ -153,7 +155,7 @@ func (t Turn) Check(a Action) error {
 	if t.Kind == WolfPlan {
 		problems = append(problems, t.planProblems(a)...)
 	}
-	if (t.Kind == Speech || t.Kind == Campaign) && t.MustFakeSeer() && (a.Claim == nil || a.Claim.Role != game.Seer) {
+	if t.Kind.Declares() && t.MustFakeSeer() && (a.Claim == nil || a.Claim.Role != game.Seer) {
 		problems = append(problems, tx.mustFake)
 	}
 	if t.Kind.Speaks() {
@@ -289,7 +291,7 @@ func (t Turn) SuspectsSomeone() bool {
 		return false
 	}
 	switch t.Kind {
-	case Speech, Campaign, LastWords, Vote, Shoot, Poison:
+	case Speech, Campaign, PKSpeech, LastWords, Vote, PKVote, Shoot, Poison:
 		return true
 	}
 	return false
@@ -320,7 +322,7 @@ func (t Turn) unspokenProblems(speech string) []string {
 			}
 		}
 	}
-	if t.Kind == Speech {
+	if t.Kind == Speech || t.Kind == PKSpeech {
 		for _, w := range t.Waiting {
 			if strings.Contains(speech, w+tx.justNow) {
 				problems = append(problems, fmt.Sprintf(tx.notYet, w, w, tx.justNow))

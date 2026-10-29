@@ -8,6 +8,7 @@ type host struct {
 	antidote, poison, noPotions, selfVictim, saved, poisoned                   string
 	inspected, peaceful, died, dawnDead, shot, diedNow, order                  string
 	stance, stances, vote, votes, abstain, tie, allAbstained                   string
+	pk, pkVotes, pkNoVoters                                                    string
 	votedOut, exiled, plan, noFaker, faker, hook, undecided, gameOver          string
 	tactic                                                                     string
 	tactics                                                                    map[game.Tactic]string
@@ -59,7 +60,10 @@ var chineseHost = host{
 	vote:         "%s→%s",
 	votes:        "投票结果：%s",
 	abstain:      "弃票",
-	tie:          "平票，今天无人出局。",
+	tie:          "第%d轮PK仍然平票，今天无人出局。",
+	pk:           "平票：%[2]s进入第%[1]d轮PK。他们按发言顺序再各发言一次，其他人听完后只能在他们中间投票放逐一人，他们自己不投票。",
+	pkVotes:      "第%d轮PK投票结果：%s",
+	pkNoVoters:   "%s平票，但活着的人都在PK台上，没有人能投票，今天无人出局。",
 	allAbstained: "所有人都弃票，今天无人出局。",
 	votedOut:     "被投票放逐",
 	exiled:       "%s被放逐了。",
@@ -135,7 +139,10 @@ var englishHost = host{
 	vote:         "%s→%s",
 	votes:        "Votes: %s",
 	abstain:      "abstained",
-	tie:          "A tie: nobody is voted out today.",
+	tie:          "PK %d tied too: nobody is voted out today.",
+	pk:           "A tie: %[2]s go to PK %[1]d. They speak again in speaking order, then everyone else votes one of them out; they do not vote themselves.",
+	pkVotes:      "PK %d votes: %s",
+	pkNoVoters:   "%s tied, but everyone alive is in the PK, so nobody can vote: nobody is voted out today.",
 	allAbstained: "Everyone abstained: nobody is voted out today.",
 	votedOut:     "voted out",
 	exiled:       "%s is voted out.",

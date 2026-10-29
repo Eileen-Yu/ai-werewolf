@@ -635,13 +635,11 @@ func (t *table) day() error {
 	s.Ballots = append(s.Ballots, game.Ballot{Round: s.Round, Votes: votes, Sheriff: s.Sheriff})
 	t.announce(game.KindVote, fmt.Sprintf(t.h.votes, t.tallyLine(votes)))
 
-	out, ok := game.Tally(votes, s.Sheriff)
-	if !ok {
-		line := t.h.tie
-		if abstained(votes) {
-			line = t.h.allAbstained
-		}
-		t.announce(game.KindResult, line)
+	out, err := t.settle(order, votes)
+	if err != nil {
+		return err
+	}
+	if out == "" {
 		return t.pause()
 	}
 	s.Remove(out, t.h.votedOut)
@@ -658,6 +656,49 @@ func (t *table) day() error {
 		}
 	}
 	return t.pause()
+}
+
+// MaxPK is how many PKs a tied vote may go to before nobody goes that day.
+const MaxPK = 3
+
+// settle decides the day's vote: who is exiled, or "" for nobody. A tie goes
+// to a PK: the tied players speak again in today's speaking order, and
+// everyone else votes between them. A PK that ties goes to another between
+// the newly tied, until one decides it or MaxPK have tied. Everyone
+// abstaining, or nobody being left to vote, sends nobody out.
+func (t *table) settle(order []string, votes []game.Vote) (string, error) {
+	s := t.s
+	for pk := 1; ; pk++ {
+		if out, ok := game.Tally(votes, s.Sheriff); ok {
+			return out, nil
+		}
+		if abstained(votes) {
+			t.announce(game.KindResult, t.h.allAbstained)
+			return "", nil
+		}
+		if pk > MaxPK {
+			t.announce(game.KindResult, fmt.Sprintf(t.h.tie, MaxPK))
+			return "", nil
+		}
+		leaders := game.Leaders(game.Totals(votes, s.Sheriff))
+		tied := slices.DeleteFunc(slices.Clone(order), func(n string) bool { return !slices.Contains(leaders, n) })
+		voters := game.Without(s.Living(), tied...)
+		if len(voters) == 0 {
+			t.announce(game.KindResult, fmt.Sprintf(t.h.pkNoVoters, t.list(tied)))
+			return "", nil
+		}
+		t.add("", fmt.Sprintf(t.h.pk, pk, t.list(tied)))
+		if _, err := t.goRound(brain.PKSpeech, tied, nil); err != nil {
+			return "", err
+		}
+		var err error
+		votes, err = t.chooseAll(brain.PKVote, voters, func(string) []string { return append(slices.Clone(tied), game.Pass) })
+		if err != nil {
+			return "", err
+		}
+		s.Ballots = append(s.Ballots, game.Ballot{Round: s.Round, Votes: votes, Sheriff: s.Sheriff, PK: pk})
+		t.announce(game.KindVote, fmt.Sprintf(t.h.pkVotes, pk, t.tallyLine(votes)))
+	}
 }
 
 // goRound has each speaker talk in order, each one told who has spoken

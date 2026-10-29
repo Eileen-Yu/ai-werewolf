@@ -298,18 +298,21 @@ const UI = {
       suspects: "怀疑", nobody: "暂不怀疑谁" },
     kinds: { speech: "轮到你发言", wolf_chat: "狼队夜聊", wolf_plan: "你来定今晚的计划",
       last_words: "留下遗言", vote: "投票放逐", inspect: "今晚查验谁", save: "要用解药救他吗", poison: "要用毒药吗", shoot: "开枪带走谁",
-      run: "竞选警长：要上警吗", campaign: "警长竞选发言", withdraw: "竞选结束：要退水吗", sheriff_vote: "投票选警长", badge: "移交警徽" },
+      run: "竞选警长：要上警吗", campaign: "警长竞选发言", withdraw: "竞选结束：要退水吗", sheriff_vote: "投票选警长", badge: "移交警徽",
+      pk_speech: "PK 发言：说服大家别投你", pk_vote: "PK 投票：在 PK 的人里放逐一人" },
     run: "上警", noRun: "不上警", stay: "继续竞选", withdraw: "退水", tearBadge: "撕掉警徽", sheriff: "警长",
     target: "选择", speech: "发言", planSpeech: "给队友的计划说明", suspect: "你怀疑谁（会记录在案）",
     claim: "声称身份（可选）", noClaim: "不声称", claimChecked: "查验了谁", claimResult: "查验结果", claimPotion: "救了/毒了谁",
     abstain: "弃票",
     vote: { locale: "zh", record: "已结束的投票", previous: "上一次结果", replay: "▶ 回放已结束的投票",
       live: { vote: "🗳️ 放逐投票进行中", sheriff_vote: "🗳️ 警长投票进行中", run: "🎖️ 警长竞选进行中：大家在决定要不要上警", withdraw: "🎖️ 警长竞选进行中：候选人在考虑退水",
-        campaign: "🎖️ 警长竞选进行中：竞选发言" }, liveNote: "所有人投完之后才公布结果", title: (w, k) => `${w} · ${{ election: "警长投票", race: "警长竞选", exile: "放逐投票" }[k]}`,
+        campaign: "🎖️ 警长竞选进行中：竞选发言", pk_speech: "⚔️ PK 进行中：平票的人再发言", pk_vote: "🗳️ PK 投票进行中" },
+      liveNote: "所有人投完之后才公布结果", title: (w, k) => `${w} · ${{ election: "警长投票", race: "警长竞选", exile: "放逐投票" }[k]}`,
+      pkTitle: (w, n) => `${w} · 第${n}轮 PK 投票`, pkNoVote: "PK 台上的人不投票",
       count: n => `${n}票`, candidates: xs => `候选人：${xs}`, noVote: "上警的人不投票", withdrew: xs => `退水：${xs}`,
       switched: x => `改票 · 上轮投${x}`, nowAbstains: x => `改为弃票 · 上轮投${x}`, wasAbstaining: "上轮弃票",
       skip: "跳过动画", close: "关闭",
-      exiled: n => `${n} 被放逐出局`, elected: n => `${n} 当选警长 🎖️`, tie: n => `${n} 平票，今天无人出局`,
+      exiled: n => `${n} 被放逐出局`, elected: n => `${n} 当选警长 🎖️`, tie: n => `${n} 平票，今天无人出局`, pk: n => `${n} 平票，进入 PK`,
       electionTie: n => `${n} 平票，警徽流失，本局没有警长`, abstained: "所有人都弃票，今天无人出局", electionAbstained: "所有人都弃票，警徽流失，本局没有警长",
       unopposed: n => `警上只剩 ${n} 一人，不用投票，直接当选 🎖️`, no_runners: "没有人上警，本局没有警长",
       all_ran: "所有人都上警了，没有人投票，本局没有警长", all_withdrew: "上警的人都退水了，本局没有警长" },
@@ -339,7 +342,8 @@ const UI = {
 <li>没上警的人投票选警长；上警的人（包括退水的）不能投。只剩一个候选人时直接当选；平票、没人上警或都退水，就没有警长。</li>
 <li>警长每天最后发言、可以归票，放逐票算1.5票。警长出局时可以把警徽交给活着的人，或者撕掉。</li></ul>
 <h4>白天</h4><ul>
-<li>每人发言一次，警长最后发言归票，说完直接投票放逐一人。可以弃票；平票或都弃票，就没人出局。</li>
+<li>每人发言一次，警长最后发言归票，说完直接投票放逐一人。可以弃票；都弃票就没人出局。</li>
+<li>平票就 PK：平票的人按发言顺序再各发言一次，其他人听完只能在他们中间投票，他们自己不投。再平就在新的平票者中再 PK，最多3轮；第3轮还平，今天就没人出局。</li>
 <li>被放逐的人留遗言。</li></ul>
 <h4>胜负</h4><ul>
 <li>好人：所有狼人出局。</li>
@@ -349,9 +353,9 @@ const UI = {
 <li>轮到你时，屏幕底部会出现行动栏和倒计时，右边是操作框；5分钟没操作，AI 会替你走这一步。</li>
 <li>发言时要选你怀疑谁（会公开记录），也可以声称一个身份。狼人也可以假装成任何身份。</li></ul>`,
     stage: { wolves: "狼人正在密谋", wolvesSub: "天黑请闭眼，狼人请睁眼", night: "夜色深沉，有人正悄悄行动", nightIdle: "夜深了",
-      wait: "主持人正在等待", speech: n => `${n} 正在想怎么发言`, aftermath: n => `${n} 正在想怎么复盘`, campaign: n => `${n} 正在准备竞选发言`,
+      wait: "主持人正在等待", speech: n => `${n} 正在想怎么发言`, aftermath: n => `${n} 正在想怎么复盘`, campaign: n => `${n} 正在准备竞选发言`, pk_speech: n => `${n} 正在准备 PK 发言`,
       last_words: n => `${n} 正在准备遗言`, badge: n => `${n} 正在决定警徽交给谁`, ai: "AI 生成中", person: n => `等 ${n}（真人）行动`,
-      reading: n => `🔊 正在朗读 ${n} 的发言`, vote: "大家正在投票", sheriff_vote: "大家正在投票选警长",
+      reading: n => `🔊 正在朗读 ${n} 的发言`, vote: "大家正在投票", sheriff_vote: "大家正在投票选警长", pk_vote: "大家正在 PK 投票",
       run: "大家正在决定要不要上警", withdraw: "候选人正在考虑要不要退水", left: n => `还有 ${n} 人在想`, elapsed: s => `已经 ${s}` },
   },
   en: {
@@ -370,19 +374,22 @@ const UI = {
       suspects: "Suspects", nobody: "Suspects nobody yet" },
     kinds: { speech: "Your turn to speak", wolf_chat: "Wolf chat", wolf_plan: "Set tonight's plan",
       last_words: "Your last words", vote: "Vote someone out", inspect: "Who to check tonight", save: "Use the antidote on them?", poison: "Use the poison?", shoot: "Who to shoot",
-      run: "Sheriff election: will you run?", campaign: "Your campaign speech", withdraw: "Campaign over: withdraw?", sheriff_vote: "Vote for sheriff", badge: "Pass on the badge" },
+      run: "Sheriff election: will you run?", campaign: "Your campaign speech", withdraw: "Campaign over: withdraw?", sheriff_vote: "Vote for sheriff", badge: "Pass on the badge",
+      pk_speech: "Your PK speech: talk your way out", pk_vote: "PK vote: exile one of those in the PK" },
     run: "Run for sheriff", noRun: "Stay out", stay: "Stay in the race", withdraw: "Withdraw", tearBadge: "Tear up the badge", sheriff: "Sheriff",
     target: "Pick", speech: "What you say", planSpeech: "The plan, for your pack", suspect: "Who you suspect (goes on the record)",
     claim: "Claim a role (optional)", noClaim: "No claim", claimChecked: "Who you checked", claimResult: "What you saw", claimPotion: "Who you saved or poisoned",
     abstain: "Abstained",
     vote: { locale: "en", record: "Finished votes", previous: "Previous result", replay: "▶ Replay this finished vote",
       live: { vote: "🗳️ Vote in progress", sheriff_vote: "🗳️ Sheriff vote in progress", run: "🎖️ Sheriff election: everyone is deciding whether to run",
-        withdraw: "🎖️ Sheriff election: the candidates are deciding whether to withdraw", campaign: "🎖️ Sheriff election: campaign speeches" },
+        withdraw: "🎖️ Sheriff election: the candidates are deciding whether to withdraw", campaign: "🎖️ Sheriff election: campaign speeches",
+        pk_speech: "⚔️ PK: the tied players speak again", pk_vote: "🗳️ PK vote in progress" },
       liveNote: "The result is shown once every vote is in", title: (w, k) => `${w} · ${{ election: "Sheriff vote", race: "Sheriff election", exile: "Vote" }[k]}`,
+      pkTitle: (w, n) => `${w} · PK vote ${n}`, pkNoVote: "Those in the PK do not vote",
       count: n => `${n} vote${n === 1 ? "" : "s"}`, candidates: xs => `Candidates: ${xs}`, noVote: "Candidates do not vote", withdrew: xs => `Withdrew: ${xs}`,
       switched: x => `switched · voted ${x} last time`, nowAbstains: x => `now abstains · voted ${x} last time`, wasAbstaining: "abstained last time",
       skip: "Skip animation", close: "Close",
-      exiled: n => `${n} is voted out`, elected: n => `${n} is elected sheriff 🎖️`, tie: n => `A tie between ${n}: nobody is voted out today`,
+      exiled: n => `${n} is voted out`, elected: n => `${n} is elected sheriff 🎖️`, tie: n => `A tie between ${n}: nobody is voted out today`, pk: n => `A tie between ${n}: they go to a PK`,
       electionTie: n => `A tie between ${n}: the badge is lost and there is no sheriff this game`, abstained: "Everyone abstained: nobody is voted out today",
       electionAbstained: "Everyone abstained: the badge is lost and there is no sheriff this game",
       unopposed: n => `${n} is the only candidate left, so is sheriff without a vote 🎖️`, no_runners: "Nobody ran, so there is no sheriff this game",
@@ -413,7 +420,8 @@ const UI = {
 <li>Those who never ran vote; candidates, even ones who withdrew, do not. A lone candidate wins without a vote; a tie, nobody running or everyone withdrawing means no sheriff.</li>
 <li>The sheriff speaks last each day, may call the vote, and their vote counts 1.5. A sheriff who is out passes the badge to a living player or tears it up.</li></ul>
 <h4>Day</h4><ul>
-<li>Everyone speaks once, the sheriff last to call the vote, and then everyone votes someone out. You may abstain; a tie, or everyone abstaining, means nobody goes.</li>
+<li>Everyone speaks once, the sheriff last to call the vote, and then everyone votes someone out. You may abstain; if everyone does, nobody goes.</li>
+<li>A tie goes to a PK: the tied players speak again in speaking order, then everyone else votes between them, and they do not vote. Another tie means another PK between the newly tied, at most 3; if the third ties too, nobody goes today.</li>
 <li>Whoever is voted out gets last words.</li></ul>
 <h4>Winning</h4><ul>
 <li>Good: every werewolf is out.</li>
@@ -423,9 +431,9 @@ const UI = {
 <li>On your turn an action bar with a countdown appears at the bottom, and the move box on the right; after five minutes, an AI plays the move for you.</li>
 <li>When you speak, you pick who you suspect (it goes on the record) and may claim a role. Werewolves may claim anything.</li></ul>`,
     stage: { wolves: "The werewolves are plotting", wolvesSub: "Everyone close your eyes. Werewolves, open yours", night: "Deep in the night, someone is on the move", nightIdle: "Night falls",
-      wait: "The host is waiting", speech: n => `${n} is thinking what to say`, aftermath: n => `${n} is thinking back`, campaign: n => `${n} is preparing a campaign speech`,
+      wait: "The host is waiting", speech: n => `${n} is thinking what to say`, aftermath: n => `${n} is thinking back`, campaign: n => `${n} is preparing a campaign speech`, pk_speech: n => `${n} is preparing a PK speech`,
       last_words: n => `${n} is preparing last words`, badge: n => `${n} is passing on the badge`, ai: "AI writing", person: n => `Waiting for ${n} (a person)`,
-      reading: n => `🔊 Reading out ${n}'s speech`, vote: "Everyone is voting", sheriff_vote: "Everyone is voting for sheriff",
+      reading: n => `🔊 Reading out ${n}'s speech`, vote: "Everyone is voting", sheriff_vote: "Everyone is voting for sheriff", pk_vote: "Everyone is voting in the PK",
       run: "Everyone is deciding whether to run", withdraw: "The candidates are deciding whether to withdraw", left: n => `${n} still deciding`, elapsed: s => `${s} so far` },
   },
 };
@@ -787,7 +795,7 @@ function renderVotes(v, t) {
   }
 }
 
-function voteTitle(r, t) { return t.vote.title(r.when, !r.election ? "exile" : r.votes ? "election" : "race"); }
+function voteTitle(r, t) { return r.pk ? t.vote.pkTitle(r.when, r.pk) : t.vote.title(r.when, !r.election ? "exile" : r.votes ? "election" : "race"); }
 function nameList(xs, t) { return new Intl.ListFormat(t.vote.locale, { type: "conjunction" }).format(xs); }
 function voteCount(n) { return Number.isInteger(n) ? String(n) : n.toFixed(1); }
 
@@ -795,6 +803,7 @@ function outcomeText(r, t) {
   const o = t.vote;
   switch (r.outcome) {
     case "tie": return (r.election ? o.electionTie : o.tie)(nameList(r.tied || [], t));
+    case "pk": return o.pk(nameList(r.tied || [], t));
     case "abstained": return r.election ? o.electionAbstained : o.abstained;
     default: { const say = o[r.outcome]; return typeof say === "function" ? say(r.winner) : say || r.outcome; }
   }
@@ -808,7 +817,7 @@ function outcomeText(r, t) {
 // outcome start out of sight for revealVote to bring in.
 function voteHTML(r, t, hidden) {
   const votes = r.votes || [];
-  const targets = r.election ? [...(r.candidates || [])] : [];
+  const targets = [...(r.candidates || [])];
   for (const v of votes) if (v.target && !targets.includes(v.target)) targets.push(v.target);
   const totals = Object.fromEntries((r.totals || []).map(x => [x.target, x.votes]));
   const cast = votes.reduce((n, v) => n + v.weight, 0) || 1;
@@ -831,7 +840,7 @@ function voteHTML(r, t, hidden) {
       `<div class="vr-voters">${mine.map(([v, i]) => chip(v, i)).join("")}</div></div>`;
   };
   const notes = [];
-  if (r.election && r.candidates && r.candidates.length) notes.push(t.vote.candidates(nameList(r.candidates, t)) + (r.votes ? " · " + t.vote.noVote : ""));
+  if (r.candidates && r.candidates.length) notes.push(t.vote.candidates(nameList(r.candidates, t)) + (r.votes ? " · " + (r.pk ? t.vote.pkNoVote : t.vote.noVote) : ""));
   if (r.withdrew && r.withdrew.length) notes.push(t.vote.withdrew(nameList(r.withdrew, t)));
   const abstained = votes.some(v => !v.target);
   return notes.map(n => `<div class="vr-note">${esc(n)}</div>`).join("") +
@@ -895,8 +904,8 @@ function showTurn(p, t, w) {
   $("turnCard").hidden = false; $("turnErr").textContent = "";
   $("turnTitle").textContent = t.kinds[k] || k;
   const opts = (xs, blank) => (blank ? `<option value="">${t.none}</option>` : "") + xs.map(x => `<option value="${esc(x)}">${esc(w(x))}</option>`).join("");
-  const choice = ["vote", "wolf_plan", "inspect", "save", "poison", "shoot", "run", "withdraw", "sheriff_vote", "badge"].includes(k);
-  const speaks = !choice || k === "wolf_plan", declares = ["speech", "campaign"].includes(k);
+  const choice = ["vote", "pk_vote", "wolf_plan", "inspect", "save", "poison", "shoot", "run", "withdraw", "sheriff_vote", "badge"].includes(k);
+  const speaks = !choice || k === "wolf_plan", declares = ["speech", "campaign", "pk_speech"].includes(k);
   let h = "";
   if (k === "run") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${x === "pass" ? t.noRun : t.run}</option>`).join("")}</select>`;
   else if (k === "withdraw") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${x === "pass" ? t.withdraw : t.stay}</option>`).join("")}</select>`;

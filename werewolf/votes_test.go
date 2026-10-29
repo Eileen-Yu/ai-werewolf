@@ -131,3 +131,48 @@ func TestVoteResultsShowAnElectionThatNeverCameToAVote(t *testing.T) {
 func TestVoteResultsShowNothingBeforeAnyVote(t *testing.T) {
 	assert.Empty(t, voteResults(&game.State{}))
 }
+
+func TestVoteResultsShowAPKBetweenTheTied(t *testing.T) {
+	s := &game.State{Round: 1, Phase: game.Day, Ballots: []game.Ballot{
+		{Round: 1, Votes: []game.Vote{vote("Ann", "Bob"), vote("Bob", "Ann"), vote("Cat", "Bob"), vote("Dan", "Ann")}},
+		{Round: 1, PK: 1, Votes: []game.Vote{vote("Cat", "Ann"), vote("Dan", "Bob")}},
+		{Round: 1, PK: 2, Votes: []game.Vote{vote("Cat", "Ann"), vote("Dan", "")}},
+	}}
+	r := voteResults(s)
+	require.Len(t, r, 3)
+	assert.Equal(t, []string{"1-exile", "1-pk1", "1-pk2"}, []string{r[0].Key, r[1].Key, r[2].Key})
+	assert.Equal(t, "pk", r[0].Outcome, "the tie went to a PK, so it did not end the day")
+	assert.Equal(t, []string{"Bob", "Ann"}, r[0].Tied)
+	assert.Equal(t, 1, r[1].PK)
+	assert.Equal(t, []string{"Bob", "Ann"}, r[1].Candidates, "a PK stands between those who tied")
+	assert.Equal(t, "pk", r[1].Outcome)
+	require.NotNil(t, r[1].Votes[0].Before)
+	assert.Equal(t, "Bob", *r[1].Votes[0].Before, "Cat switched from the vote that tied")
+	assert.Equal(t, "exiled", r[2].Outcome)
+	assert.Equal(t, "Ann", r[2].Winner)
+	require.NotNil(t, r[2].Votes[1].Before)
+	assert.Equal(t, "Bob", *r[2].Votes[1].Before, "a PK is compared with the PK before it")
+}
+
+func TestVoteResultsSayWhetherTheLatestTieGoesToAPK(t *testing.T) {
+	tie := []game.Vote{vote("Cat", "Ann"), vote("Dan", "Bob")}
+	alive := []game.Player{{Name: "Ann", Alive: true}, {Name: "Bob", Alive: true}, {Name: "Cat", Alive: true}, {Name: "Dan", Alive: true}}
+	cases := []struct {
+		name    string
+		ballots []game.Ballot
+		players []game.Player
+		phase   game.Phase
+		want    string
+	}{
+		{"the day's vote ties", []game.Ballot{{Round: 1, Votes: tie}}, alive, game.Day, "pk"},
+		{"a PK ties with more allowed", []game.Ballot{{Round: 1, Votes: tie}, {Round: 1, PK: 2, Votes: tie}}, alive, game.Day, "pk"},
+		{"the last PK allowed ties", []game.Ballot{{Round: 1, Votes: tie}, {Round: 1, PK: MaxPK, Votes: tie}}, alive, game.Day, "tie"},
+		{"everyone alive tied", []game.Ballot{{Round: 1, Votes: tie}}, alive[:2], game.Day, "tie"},
+		{"the day is over", []game.Ballot{{Round: 1, Votes: tie}}, alive, game.Night, "tie"},
+	}
+	for _, c := range cases {
+		s := &game.State{Round: 1, Phase: c.phase, Players: c.players, Ballots: c.ballots}
+		r := voteResults(s)
+		assert.Equal(t, c.want, r[len(r)-1].Outcome, c.name)
+	}
+}

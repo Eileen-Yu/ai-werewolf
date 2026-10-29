@@ -56,6 +56,7 @@ type text struct {
 	twoReadings string
 	// ballots is the vote record: every vote, then each player's votes in turn.
 	ballots, electionBallot, exileBallot, electionShort, votedFor, abstainedBy string
+	pkBallot, pkShort                                                          string
 	abstainStep, sheriffVoter, voteStep, ballotSep, stepSep, ballotLine        string
 	sheriffMark, sheriffLine                                                   string
 	line                                                                       string
@@ -115,7 +116,7 @@ var chineseText = text{
 - 猎人：出局时可以开枪带走一个人，只能在白天开枪：晚上被狼人杀的猎人，天亮公布死讯后再开枪；被女巫毒死时不能开枪。
 - 村民：没有特殊能力。
 流程：天亮后只公布昨晚谁死了（第1天要等警长竞选结束才公布），不公布死因（可能被狼人杀，也可能被女巫毒死；被救的人不会死）。猎人开枪也不公布，主持人只会说被带走的人死亡了。
-白天按顺序每人发言一次，有警长时警长最后发言归票，发完就直接投票放逐一人，没有第二轮发言，平票则无人出局。被放逐的人有遗言。
+白天按顺序每人发言一次，有警长时警长最后发言归票，发完就直接投票放逐一人，没有第二轮发言。平票就PK：平票的人按发言顺序再各发言一次，其他人听完后只能在他们中间投票，他们自己不投；再平票就在新的平票者中再PK，最多3轮，第3轮还平、所有人弃票或者没有人能投票，今天就无人出局。被放逐的人有遗言。
 警长：第1天天亮后先竞选警长，竞选结束后才公布第1夜的死讯，所以昨晚死的人也照常参加竞选，当选后出局就移交警徽。想当的人上警，按座位顺序发表竞选发言，没上警的人投票选警长，得票最多的当选；平票、没人上警或者所有人都上警，则没有警长。警长放逐投票算1.5票，每天最后一个发言，可以归票。警长出局时可以把警徽移交给一个活着的人，也可以撕掉警徽，从此没有警长。
 胜负：狼人全部出局则好人胜利；所有村民出局，或者预言家、女巫、猎人全部出局，或者活着的狼人不少于其他活着的人（狼人从此控制每一次投票），则狼人胜利。
 
@@ -226,10 +227,14 @@ var chineseText = text{
 		LastWords: "你被投票放逐了，发表遗言，不超过80字。",
 		Aftermath: "游戏结束了，所有人的身份都在【公开记录】的最后公开了。这是赛后复盘，像真人玩家散场前那样自然地聊：拿【你的笔记】对照真相，你哪里看对了、哪里看错了，被谁骗了、服不服，哪一手是关键，也可以接前面的人的话吐槽或者认错。按你的性格说，要具体到人和事，不超过100字。",
 		Vote:      "根据今天的发言、警长的归票和主持人汇总的表态，投票放逐一人。也可以选\"放弃\"弃票，不算任何人的票。",
-		Inspect:   "选择今晚要查验的人。优先查最可疑、或者发言最能带动大家的人。",
-		Save:      "今晚谁被狼人杀了在【你的秘密信息】里。决定要不要用解药救他：选他的名字表示救，选\"放弃\"表示不救。",
-		Poison:    "决定要不要用毒药：选一个名字表示毒死他，选\"放弃\"表示不用。毒错了好人会很伤，没有把握就别用。",
-		Shoot:     "你出局了，作为猎人可以开枪带走一个人：选一个名字表示开枪，选\"放弃\"表示不开枪。",
+		PKSpeech: "放逐投票平票了，你在PK台上，同台的人见主持人的公告。这是你的PK发言：说完后，PK台下的人只能在PK台上的人里投票放逐一人，PK台上的人不投票。" +
+			"说清楚你为什么不该出局，以及为什么更该出局的是同台的人；有身份、有查验，现在就是亮出来的时候。",
+		PKVote: "PK投票：今天的放逐投票平票，PK台上的人刚各自发了言。你只能在他们中间投票放逐一人，也可以选\"放弃\"弃票。" +
+			"对比他们的PK发言，以及今天的发言和投票来决定。再平票就再PK一轮，最多3轮，第3轮还平今天就无人出局，等于又给了狼人一晚。",
+		Inspect: "选择今晚要查验的人。优先查最可疑、或者发言最能带动大家的人。",
+		Save:    "今晚谁被狼人杀了在【你的秘密信息】里。决定要不要用解药救他：选他的名字表示救，选\"放弃\"表示不救。",
+		Poison:  "决定要不要用毒药：选一个名字表示毒死他，选\"放弃\"表示不用。毒错了好人会很伤，没有把握就别用。",
+		Shoot:   "你出局了，作为猎人可以开枪带走一个人：选一个名字表示开枪，选\"放弃\"表示不开枪。",
 		Run: "竞选警长：选你自己的名字表示上警，选\"放弃\"表示不上警。所有人同时决定，看不到别人的选择。" +
 			"警长的1.5票和归票权很有用。上警不是神职专属：想带队、想抢话语权、想在台上看清谁在说谎的好人也可以上警。但上警的人越多，警下能投票的人越少。预言家一定上警，靠竞选发言报查验、拿警徽带队。" +
 			"警上不能只有预言家和悍跳的狼：那样好人只能在两个预言家里二选一，警徽很容易落到狼手里。有身份的好人（猎人、女巫）一般要上警，在台上当面检验预言家；想带队的村民也上。" +
@@ -311,6 +316,8 @@ var chineseText = text{
 	electionBallot: "%s警长投票",
 	exileBallot:    "%s放逐投票",
 	electionShort:  "警长票",
+	pkBallot:       "%s第%d轮PK投票",
+	pkShort:        "%sPK%d",
 	votedFor:       "投%s的：%s",
 	abstainedBy:    "弃票：%s",
 	abstainStep:    "%s弃票",
@@ -389,7 +396,7 @@ Roles:
 - Hunter: when out of the game, may shoot one person and take them out too, but only by day: a hunter the werewolves kill at night shoots after the deaths are announced. Not if the witch poisoned them.
 - Villager: no power.
 Flow: at dawn only who died is announced (on Day 1, only once the sheriff election is over), never how (killed by werewolves or poisoned by the witch; a saved player does not die). A hunter's shot is not announced either: the host only says the player shot has died.
-By day everyone speaks once in order, the sheriff, if there is one, last, calling the vote, and then everyone votes one person out, with no second round; a tie means nobody goes. The exiled player gets last words.
+By day everyone speaks once in order, the sheriff, if there is one, last, calling the vote, and then everyone votes one person out, with no second round of speeches. A tie goes to a PK: the tied players speak again in speaking order, then everyone else votes between them, and they do not vote themselves. A PK that ties again goes to another PK between the newly tied, at most 3; if the third ties, everyone abstains, or nobody is left to vote, nobody goes today. The exiled player gets last words.
 Sheriff: on Day 1, before the day's speeches, there is a sheriff election, and Night 1's deaths are announced only once it is over: whoever died that night takes part like anyone, and passes the badge on if elected. Whoever wants the badge runs and gives a campaign speech in seat order; everyone not running votes, and the most votes wins. A tie, nobody running, or everyone running means no sheriff. The sheriff's vote to exile counts one and a half, the sheriff speaks last each day and may call the vote. A sheriff who goes out may pass the badge to someone alive, or tear it up, and then there is no sheriff.
 Winning: the good side wins when every werewolf is out; the werewolves win when every villager is out, when the seer, witch and hunter are all out, or when the living werewolves are at least as many as everyone else alive (from then on they control every vote).
 
@@ -501,10 +508,14 @@ Write everything in English.`,
 		LastWords: "You have been voted out. Give your last words, at most 40 words.",
 		Aftermath: "The game is over, and everyone's role was revealed at the end of the [Public record]. This is the chat after the game, as real players have before they leave: check [Your notes] against the truth, say what you read right and wrong, who fooled you and whether you saw it coming, which move decided it; answer those who spoke before you, tease them or own up. In character, about real people and moments, at most 50 words.",
 		Vote:      "Based on today's speeches, the sheriff's call and the stances the host summed up, vote one person out. You may also pick \"pass\" to abstain, which counts for nobody.",
-		Inspect:   "Choose who to check tonight. Check whoever is most suspicious, or whose speeches sway the table most.",
-		Save:      "Who the werewolves killed tonight is in [Your secrets]. Decide whether to save them with the antidote: pick their name to save them, or \"pass\" not to.",
-		Poison:    "Decide whether to use the poison: pick a name to poison them, or \"pass\" not to. Poisoning a good player hurts badly, so do not use it unless you are sure.",
-		Shoot:     "You are out. As the hunter you may shoot one person and take them with you: pick a name to shoot, or \"pass\" not to.",
+		PKSpeech: "The vote to exile tied, and you are in the PK; the host has said who else is. This is your PK speech: after it, everyone not in the PK votes one of you out, and those in the PK do not vote. " +
+			"Say why you should not go, and why the other player in the PK should. If you have a role or a check to reveal, now is the time.",
+		PKVote: "PK vote: today's vote to exile tied, and the players in the PK have just spoken again. You may only vote one of them out, or pick \"pass\" to abstain. " +
+			"Weigh their PK speeches against everything said and voted today. Another tie means another PK, at most 3; if the third ties too nobody goes today, which gives the wolves another night.",
+		Inspect: "Choose who to check tonight. Check whoever is most suspicious, or whose speeches sway the table most.",
+		Save:    "Who the werewolves killed tonight is in [Your secrets]. Decide whether to save them with the antidote: pick their name to save them, or \"pass\" not to.",
+		Poison:  "Decide whether to use the poison: pick a name to poison them, or \"pass\" not to. Poisoning a good player hurts badly, so do not use it unless you are sure.",
+		Shoot:   "You are out. As the hunter you may shoot one person and take them with you: pick a name to shoot, or \"pass\" not to.",
 		Run: "Sheriff election: pick your own name to run for sheriff, or \"pass\" not to. Everyone decides at once, without seeing anyone else's choice. " +
 			"The sheriff's one and a half votes and the right to call the vote are worth a lot. Running is not just for power roles: a good player who wants to lead, to be heard, or to watch the liars up close may run too. But the more who run, the fewer are left to vote. The seer always runs, reporting their checks in the campaign to take the badge and lead. " +
 			"The race must not be just the seer and the fake: then good players can only pick one of two seers, and the badge easily lands with a werewolf. Good players with a power role, the hunter or the witch, usually run, to test the seers face to face; so do villagers who want to lead. " +
@@ -586,6 +597,8 @@ Write everything in English.`,
 	electionBallot: "%s sheriff vote",
 	exileBallot:    "%s vote",
 	electionShort:  "sheriff vote",
+	pkBallot:       "%s PK vote %d",
+	pkShort:        "%s PK %d",
 	votedFor:       "for %s: %s",
 	abstainedBy:    "abstained: %s",
 	abstainStep:    "%s: abstained",

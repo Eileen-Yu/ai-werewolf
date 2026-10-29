@@ -274,7 +274,7 @@ func prompt(t Turn) (system, user string) {
 			day += fmt.Sprintf(tx.hook, p.Hook)
 		}
 		fmt.Fprintf(&b, tx.planLine, day, p.Focus)
-		if t.MustFakeSeer() && (t.Kind == Speech || t.Kind == Campaign) {
+		if t.MustFakeSeer() && t.Kind.Declares() {
 			b.WriteString(tx.mustFakeLine)
 		}
 		if t.IsHook() {
@@ -422,7 +422,7 @@ func (l *LLM) summarize(ctx context.Context, t Turn, speech string) string {
 // speeches get one.
 func summaryPrompt(t Turn, speech string) (system, user string, ok bool) {
 	switch t.Kind {
-	case Speech, Campaign, LastWords:
+	case Speech, Campaign, PKSpeech, LastWords:
 	default:
 		return "", "", false
 	}
@@ -475,8 +475,11 @@ func ballots(t Turn, tx *text) string {
 	for _, ballot := range t.Ballots {
 		when := l.When(ballot.Round, game.Day)
 		label, short := fmt.Sprintf(tx.exileBallot, when), when
-		if ballot.Election {
+		switch {
+		case ballot.Election:
 			label, short = fmt.Sprintf(tx.electionBallot, when), tx.electionShort
+		case ballot.PK > 0:
+			label, short = fmt.Sprintf(tx.pkBallot, when, ballot.PK), fmt.Sprintf(tx.pkShort, when, ballot.PK)
 		}
 		var targets []string
 		groups := map[string][]string{}
