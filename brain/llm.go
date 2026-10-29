@@ -1,6 +1,7 @@
 package brain
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -86,7 +87,7 @@ func parseAction(tx *text, reply string) (Action, error) {
 	a.Claim = parseClaim(raw.Claim)
 	a.Notes = parseNotes(raw.Notes)
 	a.Fakers = lines(raw.Fakers)
-	for _, f := range []*string{&a.Target, &a.Speech, &a.Suspect, &a.Hook, &a.Focus} {
+	for _, f := range []*string{&a.Target, &a.Speech, &a.Suspect, &a.Hook, &a.Focus, &a.Edge} {
 		*f = strings.TrimSpace(*f)
 	}
 	return a, nil
@@ -152,14 +153,16 @@ func parseClaim(raw json.RawMessage) *game.Claim {
 }
 
 // parseNotes reads notes, whose evidence may be a list or a single string.
-// Notes that are not an object at all are dropped, leaving the old ones.
+// Notes that are not an object at all are dropped, leaving the old ones;
+// pits that are not a list of objects are dropped on their own.
 func parseNotes(raw json.RawMessage) *game.Notes {
 	var n struct {
 		Beliefs map[string]struct {
 			Side     string          `json:"side"`
 			Evidence json.RawMessage `json:"evidence"`
 		} `json:"beliefs"`
-		Strategy string `json:"strategy"`
+		Pits     json.RawMessage `json:"pits"`
+		Strategy string          `json:"strategy"`
 	}
 	if json.Unmarshal(raw, &n) != nil {
 		return nil
@@ -170,6 +173,17 @@ func parseNotes(raw json.RawMessage) *game.Notes {
 			notes.Beliefs = map[string]game.Belief{}
 		}
 		notes.Beliefs[strings.TrimSpace(name)] = game.Belief{Side: strings.TrimSpace(b.Side), Evidence: lines(b.Evidence)}
+	}
+	var pits []struct {
+		Wolves  json.RawMessage `json:"wolves"`
+		For     json.RawMessage `json:"for"`
+		Against json.RawMessage `json:"against"`
+		Odds    string          `json:"odds"`
+	}
+	if json.Unmarshal(n.Pits, &pits) == nil {
+		for _, p := range pits {
+			notes.Pits = append(notes.Pits, game.Pit{Wolves: lines(p.Wolves), For: lines(p.For), Against: lines(p.Against), Odds: strings.TrimSpace(p.Odds)})
+		}
 	}
 	return notes
 }
@@ -274,12 +288,18 @@ func prompt(t Turn) (system, user string) {
 			day += fmt.Sprintf(tx.hook, p.Hook)
 		}
 		fmt.Fprintf(&b, tx.planLine, day, p.Focus)
+		if p.Edge != "" {
+			fmt.Fprintf(&b, tx.edgeNow, l.Say(p.Edge))
+		}
 		if t.MustFakeSeer() && t.Kind.Declares() {
 			b.WriteString(tx.mustFakeLine)
 		}
 		if t.IsHook() {
 			b.WriteString(tx.hookLine)
 		}
+	}
+	if t.Kind == WolfChat || t.Kind == WolfPlan {
+		b.WriteString(edges(t))
 	}
 	if t.Kind == Shoot && len(dead) > 0 {
 		fmt.Fprintf(&b, tx.shootAlive, l.List(game.Without(dead, t.Me.Name)))
@@ -302,14 +322,20 @@ func prompt(t Turn) (system, user string) {
 
 	f := tx.fields
 	notesField, notesLine := f.notes, tx.notesLine
+	if t.Me.Role == game.Werewolf {
+		notesField = f.wolfNotes
+	}
 	if t.Prepared {
 		notesField, notesLine = f.changedNotes, tx.changedNotesLine
+		if t.Me.Role == game.Werewolf {
+			notesField = f.wolfChangedNotes
+		}
 	}
 	fields := []string{f.observations, notesField, f.thinking}
 	switch {
 	case t.Kind == Prepare:
 	case t.Kind == WolfPlan:
-		fields = append(fields, f.victim, f.fakers)
+		fields = append(fields, f.victim, f.edge, f.fakers)
 		if t.NamesHook() {
 			fields = append(fields, f.hook)
 		}
@@ -332,6 +358,7 @@ func prompt(t Turn) (system, user string) {
 			fmt.Fprintf(&b, tx.hookOnly, l.List(l.SayAll(t.PlanNames())))
 		}
 		fmt.Fprintf(&b, tx.focusOnly, l.List(l.SayAll(t.Suspects)))
+		fmt.Fprintf(&b, tx.edgeOnly, l.List(l.SayAll(game.Edges)))
 	}
 	if t.Kind.Declares() {
 		fmt.Fprintf(&b, tx.declareOnly, l.List(l.SayAll(t.Suspects)))
@@ -367,10 +394,41 @@ func notes(t Turn) string {
 			fmt.Fprintf(&b, tx.beliefLine, s.Name, l.Say(v.Side), orNobody(l, v.Evidence))
 		}
 	}
+	for i, p := range t.Notes.Pits {
+		fmt.Fprintf(&b, tx.pitLine, i+1, cmp.Or(p.Odds, l.Say(game.Unsure)), l.List(p.Wolves), orNobody(l, p.For), orNobody(l, p.Against))
+	}
 	if t.Notes.Strategy != "" {
 		fmt.Fprintf(&b, tx.intends, t.Notes.Strategy)
 	}
 	return b.String()
+}
+
+// edges is, for a wolf at night, the count the pack wins by: who is left on
+// each side, the good players already out, whose roles nobody was shown, and
+// how this wolf reads each living good player. A wolf's beliefs are about
+// good players only, so one the notes leave out is unsure.
+func edges(t Turn) string {
+	tx, l := t.text(), t.Lang
+	var good, gone, gods, villagers, unsure []string
+	for _, s := range t.Seats {
+		switch {
+		case slices.Contains(t.Wolves, s.Name):
+		case s.Death != "":
+			gone = append(gone, s.Name)
+		default:
+			good = append(good, s.Name)
+			switch t.Notes.Beliefs[s.Name].Side {
+			case game.God:
+				gods = append(gods, s.Name)
+			case string(game.Villager):
+				villagers = append(villagers, s.Name)
+			default:
+				unsure = append(unsure, s.Name)
+			}
+		}
+	}
+	return fmt.Sprintf(tx.edges, l.List(t.Pack), len(t.Pack), orNobody(l, good), len(good), orNobody(l, gone),
+		orNobody(l, gods), orNobody(l, villagers), orNobody(l, unsure), max(0, len(good)-len(t.Pack)))
 }
 
 func speaker(tx *text, e game.Event, me string) string {

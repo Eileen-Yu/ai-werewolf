@@ -39,6 +39,18 @@ const (
 // Sides a belief may hold.
 var Sides = []string{string(Werewolf), Good, Unsure}
 
+// God is a wolf's read on a good player who seems to hold a power role. A
+// wolf knows who is good, so their beliefs are about which edge each good
+// player is on instead: God, string(Villager) or Unsure.
+const God = "power role"
+
+// WolfSides are the beliefs a wolf may hold about a good player.
+var WolfSides = []string{God, string(Villager), Unsure}
+
+// Edges are what a wolf plan may go for first: all the power roles, or all
+// the plain villagers.
+var Edges = []string{God, string(Villager)}
+
 // Side is what a seer learns about a role.
 func Side(r Role) string {
 	if r == Werewolf {
@@ -505,10 +517,27 @@ func (e Event) When(l Lang) string {
 }
 
 // Notes is a player's own running memory, rewritten every turn: what they
-// believe about each other player and why, and what they mean to do next.
+// believe about each other player and why, which whole packs could explain
+// the game, and what they mean to do next.
 type Notes struct {
-	Beliefs  map[string]Belief `json:"beliefs,omitempty"`
-	Strategy string            `json:"strategy,omitempty"`
+	Beliefs map[string]Belief `json:"beliefs,omitempty"`
+	// Pits are a good player's guesses at the whole pack, most likely first,
+	// at most MaxPits. A new list replaces the old one.
+	Pits     []Pit  `json:"pits,omitempty"`
+	Strategy string `json:"strategy,omitempty"`
+}
+
+// MaxPits is how many guesses at the pack a player keeps.
+const MaxPits = 3
+
+// Pit is one guess at who the wolves are: up to all of them, the dead
+// included, what points to it, what points against it, and how likely the
+// player thinks it is.
+type Pit struct {
+	Wolves  []string `json:"wolves"`
+	For     []string `json:"for,omitempty"`
+	Against []string `json:"against,omitempty"`
+	Odds    string   `json:"odds,omitempty"`
 }
 
 // Belief is what a player thinks of someone: which side, and the things that
@@ -529,6 +558,9 @@ type Plan struct {
 	Hook string `json:"hook,omitempty"`
 	// Focus is who the pack pushes the vote onto tomorrow.
 	Focus string `json:"focus,omitempty"`
+	// Edge is which side of the good players the pack is wiping out first,
+	// one of Edges, or "" if the plan did not say.
+	Edge  string `json:"edge,omitempty"`
 	Notes string `json:"notes,omitempty"`
 }
 

@@ -397,7 +397,10 @@ func TestVotersSeeStancesAndOnlyWolvesSeeThePlan(t *testing.T) {
 	for name, events := range b.heard {
 		var plan, stances, summary bool
 		for _, e := range events {
-			plan = plan || strings.HasPrefix(e.Text, "狼队计划")
+			if strings.HasPrefix(e.Text, "狼队计划") {
+				plan = true
+				assert.Regexp(t, `今晚杀[^，]+，先屠(神职|村民)；`, e.Text, "the plan says which side the pack wipes out first")
+			}
 			stances = stances || (e.Phase == game.Day && e.Speaker != "" && strings.Contains(e.Said(game.Chinese), "【怀疑"))
 			summary = summary || strings.HasPrefix(e.Text, "投票前，各人的最新表态")
 		}
@@ -865,15 +868,18 @@ func TestPlayersGetBackTheNotesTheyLastWrote(t *testing.T) {
 	playGame(t, client, "notes")
 
 	assert.Positive(t, b.checked)
+	assert.NotEmpty(t, b.lastPits, "some good player wrote pits")
 	assert.Empty(t, b.mismatches)
 }
 
-// noteTaker plays randomly, writes a fresh strategy every turn, and checks
-// that each turn hands back the strategy that player wrote last.
+// noteTaker plays randomly, writes a fresh strategy every turn and, as a
+// good player, fresh pits every other turn, and checks that each turn hands
+// back the strategy that player wrote last and the pits they last wrote.
 type noteTaker struct {
 	mu         sync.Mutex
 	n          int
 	last       map[string]string
+	lastPits   map[string][]game.Pit
 	checked    int
 	mismatches []string
 }
@@ -887,11 +893,26 @@ func (b *noteTaker) Act(ctx context.Context, t brain.Turn) (brain.Action, error)
 			b.mismatches = append(b.mismatches, fmt.Sprintf("%s got %q, wrote %q", t.Me.Name, t.Notes.Strategy, want))
 		}
 	}
+	if want := b.lastPits[t.Me.Name]; !slices.EqualFunc(t.Notes.Pits, want, func(x, y game.Pit) bool { return x.Odds == y.Odds }) {
+		b.mismatches = append(b.mismatches, fmt.Sprintf("%s got pits %v, wrote %v", t.Me.Name, t.Notes.Pits, want))
+	}
 	b.n++
 	strategy := fmt.Sprintf("plan %d", b.n)
 	b.last[t.Me.Name] = strategy
 	a, err := brain.Random{}.Act(ctx, t)
 	a.Notes = &game.Notes{Strategy: strategy}
+	if t.Me.Role != game.Werewolf && b.n%2 == 0 {
+		a.Notes.Pits = []game.Pit{{Wolves: []string{t.Seats[0].Name, t.Seats[1].Name}, Odds: strategy}}
+		if slices.Contains(a.Notes.Pits[0].Wolves, t.Me.Name) {
+			a.Notes.Pits = nil
+		}
+		if a.Notes.Pits != nil {
+			if b.lastPits == nil {
+				b.lastPits = map[string][]game.Pit{}
+			}
+			b.lastPits[t.Me.Name] = a.Notes.Pits
+		}
+	}
 	return a, err
 }
 
@@ -1100,4 +1121,16 @@ func (b *loneRunner) Act(ctx context.Context, t brain.Turn) (brain.Action, error
 		}
 	}
 	return a, err
+}
+
+func TestSettleKeepsTheOldPitsAndNoEdgeOverABadOne(t *testing.T) {
+	vote := brain.Turn{Kind: brain.Vote, Me: game.Player{Name: "小红", Role: game.Villager}, Seats: []brain.Seat{{Name: "小红"}, {Name: "老王"}}, Candidates: []string{"老王"}}
+	a := settle(vote, brain.Action{Target: "老王", Notes: &game.Notes{Pits: []game.Pit{{Wolves: []string{"老王", "小红"}}}}})
+	assert.Nil(t, a.Notes.Pits, "a pit counting the player a wolf is dropped, so the old pits stay")
+	a = settle(vote, brain.Action{Target: "老王", Notes: &game.Notes{Pits: []game.Pit{{Wolves: []string{"老王"}}}}})
+	assert.Len(t, a.Notes.Pits, 1)
+
+	plan := brain.Turn{Kind: brain.WolfPlan, Me: game.Player{Name: "阿杰", Role: game.Werewolf}, Pack: []string{"阿杰"}, Candidates: []string{"老王"}}
+	assert.Empty(t, settle(plan, brain.Action{Target: "老王", Edge: "seer"}).Edge)
+	assert.Equal(t, game.God, settle(plan, brain.Action{Target: "老王", Edge: game.God}).Edge)
 }

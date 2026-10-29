@@ -27,7 +27,7 @@ type text struct {
 	noNotes                                                                string
 	badFakers, badHook, badFocus, focusIsVictim, mustFake, quoted, notYet  string
 	leftSeer, changedCheck                                                 string
-	badBelief                                                              string
+	badBelief, badPit, selfInPit, bigPit, badEdge                          string
 	// quoteCues are ways of quoting what someone said, which cannot follow
 	// the name of someone who has not said anything in public yet; justNow
 	// is how a speech says someone has "just" spoken.
@@ -44,8 +44,11 @@ type text struct {
 	badJSON     string
 
 	// The user prompt.
-	seats, secrets, notes, thoughts, claims, public  string
-	alive, you, host, none, beliefLine, intends      string
+	seats, secrets, notes, thoughts, claims, public string
+	alive, you, host, none, beliefLine, intends     string
+	pitLine, edgeNow                                string
+	// edges is a wolf's count of the two sides the pack can win by wiping out.
+	edges                                            string
 	claimLine, now, order, planLine, noFaker         string
 	faker, hook, mustFakeLine, hookLine, habitNow    string
 	badgeNow                                         string
@@ -61,7 +64,7 @@ type text struct {
 	sheriffMark, sheriffLine                                                   string
 	line                                                                       string
 	fields                                                                     fields
-	targetOnly, fakersOnly, hookOnly, focusOnly                                string
+	targetOnly, fakersOnly, hookOnly, focusOnly, edgeOnly                      string
 	declareOnly, notesLine                                                     string
 	// preparedLine and changedNotesLine are for a turn after a Prepare turn.
 	preparedLine, changedNotesLine string
@@ -80,7 +83,9 @@ type text struct {
 // fields describe each JSON field of the answer.
 type fields struct {
 	observations, notes, changedNotes, thinking, victim, fakers, hook, focus, plan string
-	target, speech, suspect, claim                                                 string
+	// A wolf's notes read which edge each good player is on instead.
+	wolfNotes, wolfChangedNotes, edge string
+	target, speech, suspect, claim    string
 }
 
 func (t Turn) text() *text {
@@ -136,10 +141,14 @@ var chineseText = text{
    先看【票型】：谁和谁一直投同一个人，谁的票和他的发言对不上，谁在关键的一票上改票或弃票、这一票保护了谁。
    再逐条拆解新的发言，只看事实：他这一轮针对谁、拿的是哪个点、这个点在之前的记录里成不成立。成立的话，再想表面的推理之外他真正的意图：想把票引向谁、想保谁。带节奏和倒钩都是这种引导。
    拆解之前先代入他的视角：他是第几个发言、他之前的人说了什么、后面还有谁没说、他声称的身份那时能知道什么。再问：一个想赢的好人坐在他那个位置上，会不会也这么说？会的话，这一条就不是狼的证据。
-2. beliefs：对照【你的笔记】，逐个更新你对其他玩家的判断，不要写你自己。有新证据才改，没有就保持原样。
+2. pits（好人才写）：盘狼坑。本局一共3只狼，已经出局的也算在里面。列出1到3种最可能的整支狼队，最可能的写在前面。
+   先从站边和票型推，再用发言修正：两个人对跳预言家时，信其中一个是真的，狼坑多半就在另一个和替他说话、替他投票的人里，两种信法各盘一个；再看谁一直同票、谁在关键一票上保了谁。
+   每个狼坑写 for（支持它的真实事情）、against（和它对不上的事情）和 odds（高、中或低）。新的事情和某个狼坑对不上，就改它或者删掉它，不要硬圆。和【你的秘密信息】冲突的狼坑一定是错的。
+3. beliefs：对照【你的笔记】，逐个更新你对其他玩家的判断，不要写你自己。好人的判断要和你的狼坑对得上：在你最可能的狼坑里的人偏狼，哪个狼坑都没有他的人偏好。有新证据才改，没有就保持原样。
+   狼人知道谁是好人，所以 beliefs 不写好坏，只写好人，猜他是神职、村民还是不确定：谁跳过神职、谁的发言像有夜里的信息、谁被刀后没死。
    evidence 只能写真实发生过的具体事情。"发言平淡""可能在隐藏身份""感觉不对劲""没有实证支持"都不算证据，不要写：身份声明本来就没法当场证实，"没有实证"这句话对每个人都成立。
-3. strategy：根据新的判断，决定你接下来要做什么。
-4. 最后才是这次的行动。发言要说出新的东西：新的证据、新的推理，或者对别人新说法的回应。不要重复你之前说过的理由。
+4. strategy：根据新的判断，决定你接下来要做什么。
+5. 最后才是这次的行动。发言要说出新的东西：新的证据、新的推理，或者对别人新说法的回应。不要重复你之前说过的理由。
 
 推理要点，很多人会想错：
 - 预言家查验某人是好人，和女巫救了这个人，完全不矛盾：狼人刀了一个好人，女巫把他救了下来。
@@ -170,7 +179,10 @@ var chineseText = text{
 			"一般要保护同伴。但有具体的理由时，你可以怀疑、甚至投出同伴：他已经被可信地坐实、反正活不下来；替他说话会把你自己也拖下水；踩他能换来你后面要用的信任；或者牺牲他能让狼队整体赢面更大。" +
 			"卖队友是证据逼出来的例外，不是你做身份的常规手段，更不能只因为私人恩怨。" +
 			"刀口没死说明女巫救了他，女巫知道他是你们的刀口，随时可能公开：不要给他报查杀，也不要带头踩他，否则她一句话就能拆穿你。" +
-			"真预言家是你们最大的威胁。女巫的解药可能救下你们的刀，猎人出局会开枪，所以要尽早找出神职并优先杀掉。" +
+			"真预言家是你们最大的威胁。女巫的解药可能救下你们的刀，猎人出局会开枪，所以要尽早找出神职。" +
+			"屠边是你们的胜利条件，每晚都要算账：3个神职或者3个村民全部出局你们就赢，每晚刀一个，白天再借好人的票放逐一个。屠神还差几个、屠民还差几个，哪条路刀数少、更不容易被女巫的药和猎人的枪打断，就先走哪条。" +
+			"已经坐实的神职（比如被大家认下的真预言家、跳出来的女巫）一般先刀；神职藏得好、村民好认的时候，屠民更快。死人不翻牌，所以要从跳身份、发言里的夜间信息、刀口没死这些事情去猜剩下的人里谁是神、谁是民。" +
+			"狼队牺牲一只狼（卖队友、悍跳吸引火力、自刀），换来的应该是队友藏得更深，或者更快摸清谁是神。" +
 			"被放逐时的遗言也要继续伪装、搅浑水，绝不能承认自己是狼人。" +
 			"自刀是一手正经的牌，不是禁招：今晚刀自己或同伴。常见两种打法。" +
 			"一是第1夜自刀，赌女巫用解药救：骗掉解药，被救的狼第二天以\"银水\"（被女巫救过的人）的身份拿信任；他要是还要悍跳，就能说\"狼人第一晚就刀我\"来做实预言家身份。" +
@@ -220,9 +232,10 @@ var chineseText = text{
 	instructions: map[TurnKind]string{
 		Prepare:  "现在还没轮到你发言，别人正在发言。先把到目前为止新发生的事整理进你的笔记：observations、beliefs、strategy 照常写，这一步不说话。轮到你的时候，只需要再看这之后的新发言。",
 		Speech:   "白天发言环节，轮到你了。",
-		WolfChat: "现在是夜里，只有狼同伴能听到你说话。先回应前面同伴说过的提议：同意、补充还是反对，说清楚理由，不要各说各的。和同伴商量：今晚杀谁，要不要自刀；白天怎么按本局的打法来打，票往谁身上引；第1夜还要说好谁悍跳、查杀报给谁、警徽流怎么报。",
+		WolfChat: "现在是夜里，只有狼同伴能听到你说话。先回应前面同伴说过的提议：同意、补充还是反对，说清楚理由，不要各说各的。和同伴商量：先看【屠边】的账，先屠神还是屠民；今晚杀谁，要不要自刀；白天怎么按本局的打法来打，票往谁身上引；第1夜还要说好谁悍跳、查杀报给谁、警徽流怎么报。",
 		WolfPlan: "夜聊结束，你代表狼队定下最终计划，同伴白天会照着执行，主持人也会检查你的计划和局势是否一致。" +
-			"target 是今晚要杀的人：可能是神职、或者发言最有威胁的人，也可以自刀，选自己或同伴。按局势算哪个对狼队更划算，别想都不想就刀神职。" +
+			"edge 是狼队先屠哪一边：神职或村民。先看【屠边】的账再定：哪一边还差的人少、更好认，就先屠哪一边。" +
+			"target 是今晚要杀的人：一般是这一边里你们最有把握的人，也可以是发言最有威胁的人，或者自刀，选自己或同伴。按局势算哪个对狼队更划算，别想都不想就刀神职。" +
 			"focus 是明天要把票引向的人：他明天必须还活着，所以不能是今晚要杀的人。引票靠好人的票，不靠狼队一起投：speech 里说清楚谁投 focus、谁投别人。" +
 			"fakers 是上警悍跳预言家的狼：一般一只，也可以两只（双狼悍跳）。第1夜至少一只；之后悍跳的狼还在，一般就是他接着跳。" +
 			"定计划前先看夜聊：同伴提出的具体打法，比如谁悍跳、要不要两只一起跳、刀谁、票投谁，能采纳就采纳；不采纳，就在 speech 里点他的名说清楚为什么，他会看到你的计划。" +
@@ -269,6 +282,10 @@ var chineseText = text{
 	quoted:         "%s还没有公开发过言，你不能说\"%s%s\"",
 	notYet:         "%s今天还没发言，你不能说\"%s%s\"",
 	badBelief:      "notes.beliefs 里的 %q 有问题：名字必须是桌上的其他玩家，side 只能是%s",
+	badPit:         "notes.pits 里的 %q 不是桌上的人",
+	selfInPit:      "你知道自己是好人，notes.pits 的狼坑里不能有你自己",
+	bigPit:         "notes.pits 的狼坑%s超过了本局狼人的总数%d",
+	badEdge:        "edge 只能是%s，你写的是 %q",
 	quoteCues:      []string{"说过", "说的", "提到", "的发言", "发言里", "发言中", "的观点", "的说法"},
 	justNow:        "刚才",
 	noProof:        []string{"缺乏证据", "没有证据", "缺乏实证", "没有实证", "缺乏实质证据", "没有任何证据", "证据支持", "缺乏足够的证据", "更多证据", "其他人证实", "其他证实", "未得到证实", "没有得到证实", "没有被验证", "没有验证", "没有得到验证"},
@@ -291,10 +308,17 @@ var chineseText = text{
 	rivalry:  "宿敌：%s。宿敌只决定你们怎么互动（拌嘴、抬杠、抢话语权），不决定你认为谁是哪一边：怀疑宿敌也要有真实发生的依据，和怀疑别人一样。\n",
 	rivalTeammate: "你的宿敌%s也是狼人，是你的同伴。宿敌照当：夜里可以质疑他的指挥、和他争计划，白天可以公开互怼、和他保持距离，装作不是一伙的。" +
 		"但吵归吵，夜里最后要定下一个能执行的计划，白天以狼队获胜为先：不要因为讨厌他就拆台、投他或暴露他。牺牲他和牺牲任何同伴一样，要有具体的局势理由，不能是因为宿怨。\n",
-	host:         "主持人",
-	none:         "（无）\n",
-	beliefLine:   "- %s：%s。证据：%s\n",
-	intends:      "打算：%s\n",
+	host:       "主持人",
+	none:       "（无）\n",
+	beliefLine: "- %s：%s。证据：%s\n",
+	pitLine:    "- 狼坑%d（可能性%s）：%s。依据：%s。对不上的：%s\n",
+	intends:    "打算：%s\n",
+	edges: "\n【屠边】你们的胜负账，只有狼人看得到：\n" +
+		"- 活着的狼：%s（%d只）。活着的好人：%s（%d个）。\n" +
+		"- 已经出局的好人：%s。他们是神职还是村民没有公开，只能推断。\n" +
+		"- 按你的笔记，活着的好人里像神职的：%s；像村民的：%s；还不确定的：%s。\n" +
+		"- 3个神职（预言家、女巫、猎人）或者3个村民全部出局，你们就赢；活着的狼不少于活着的好人也赢，现在还差%d个好人。每晚刀一个，白天再借好人的票放逐一个。\n",
+	edgeNow:      "狼队现在先屠%s。\n",
 	claimLine:    "- [%s] %s声称：%s（未验证）\n",
 	now:          "\n【现在】%s。%s\n",
 	order:        "你是这一轮第%d个发言。已经发言：%s。还没发言：%s。\n",
@@ -344,19 +368,22 @@ var chineseText = text{
 - 我这次说的有新东西吗？还是在重复之前的理由？
 `,
 	fields: fields{
-		observations: `"observations": ["你上次行动之后新发生的、和判断有关的具体事情"]`,
-		notes:        `"notes": {"beliefs": {"其他玩家的名字": {"side": "狼人、好人或不确定", "evidence": ["支持这个判断的、真实发生过的具体事情"]}}, "strategy": "你接下来的打算"}`,
-		changedNotes: `"notes": {"beliefs": {"判断有变化的玩家": {"side": "狼人、好人或不确定", "evidence": ["这个人全部的证据，新的加在后面"]}}, "strategy": "打算变了才写"}`,
-		thinking:     `"thinking": "这次行动的理由，只有你自己看得到"`,
-		victim:       `"target": "今晚杀的人"`,
-		fakers:       `"fakers": ["明天悍跳预言家的狼"]`,
-		hook:         `"hook": "倒钩的狼"`,
-		focus:        `"focus": "明天把票引向的人"`,
-		plan:         `"speech": "白天的具体打法"`,
-		target:       `"target": "名字"`,
-		speech:       `"speech": "你要说出口的话"`,
-		suspect:      `"suspect": "你现在最怀疑的人"`,
-		claim:        `"claim": {"role": "你声称的身份：预言家、女巫、猎人或村民", "target": "和这个身份相关的人，没有就留空", "result": "查验结果（好人或狼人），或者救了、毒了，没有就留空"}`,
+		observations:     `"observations": ["你上次行动之后新发生的、和判断有关的具体事情"]`,
+		notes:            `"notes": {"beliefs": {"其他玩家的名字": {"side": "狼人、好人或不确定", "evidence": ["支持这个判断的、真实发生过的具体事情"]}}, "pits": [{"wolves": ["这个狼坑里的人，最多3个"], "for": ["支持它的真实事情"], "against": ["和它对不上的事情"], "odds": "高、中或低"}], "strategy": "你接下来的打算"}`,
+		changedNotes:     `"notes": {"beliefs": {"判断有变化的玩家": {"side": "狼人、好人或不确定", "evidence": ["这个人全部的证据，新的加在后面"]}}, "pits": [{"wolves": ["这个狼坑里的人，最多3个"], "for": ["支持它的真实事情"], "against": ["和它对不上的事情"], "odds": "高、中或低"}], "strategy": "打算变了才写"}`,
+		wolfNotes:        `"notes": {"beliefs": {"好人的名字": {"side": "神职、村民或不确定", "evidence": ["让你这么猜的、真实发生过的具体事情"]}}, "strategy": "你接下来的打算"}`,
+		wolfChangedNotes: `"notes": {"beliefs": {"猜测有变化的好人": {"side": "神职、村民或不确定", "evidence": ["这个人全部的依据，新的加在后面"]}}, "strategy": "打算变了才写"}`,
+		edge:             `"edge": "先屠哪一边：神职或村民"`,
+		thinking:         `"thinking": "这次行动的理由，只有你自己看得到"`,
+		victim:           `"target": "今晚杀的人"`,
+		fakers:           `"fakers": ["明天悍跳预言家的狼"]`,
+		hook:             `"hook": "倒钩的狼"`,
+		focus:            `"focus": "明天把票引向的人"`,
+		plan:             `"speech": "白天的具体打法"`,
+		target:           `"target": "名字"`,
+		speech:           `"speech": "你要说出口的话"`,
+		suspect:          `"suspect": "你现在最怀疑的人"`,
+		claim:            `"claim": {"role": "你声称的身份：预言家、女巫、猎人或村民", "target": "和这个身份相关的人，没有就留空", "result": "查验结果（好人或狼人），或者救了、毒了，没有就留空"}`,
 	},
 	onlyJSON:         "只回复一个JSON对象，不要任何其他内容：",
 	seatLine:         "- %s：%s\n",
@@ -367,11 +394,12 @@ var chineseText = text{
 	fakersOnly:       "fakers 只能从%s里选，写%d到%d只。\n",
 	hookOnly:         "hook 只能是：%s，不能是 fakers 里的狼。之前定过的倒钩还在场的话，不要换人。\n",
 	focusOnly:        "focus 只能是：%s，而且不能和 target 是同一个人。\n",
+	edgeOnly:         "edge 只能是：%s。\n",
 	declareOnly:      "suspect 只能是这些之一：%s。claim 是你这次公开声明的身份；不声明身份就写 null，不要写成字符串。suspect 和 claim 会由主持人公开记录，必须和你的 speech 一致。\n",
 	preparedLine:     "你的笔记刚刚整理到了最新一段发言之前。这次 observations 只写那之后的新事，想清楚怎么回应它们。\n",
-	changedNotesLine: "notes 只写这次判断有变化的人，没写的人保持原来的笔记；什么都没变就不写 notes。名字只能是桌上的人，不要写你自己。JSON 里每一项之间都要有逗号，最后一项后面不要有逗号。",
+	changedNotesLine: "notes 只写这次判断有变化的人，没写的人保持原来的笔记；什么都没变就不写 notes。名字只能是桌上的人，不要写你自己。狼坑变了才写 pits，写就写完整的新列表；狼人不写 pits。JSON 里每一项之间都要有逗号，最后一项后面不要有逗号。",
 	noNotes:          "这一步要写 notes",
-	notesLine:        "notes 是你完整的新笔记，会替换旧笔记：每个你有判断的其他玩家都要写上，名字只能是桌上的人，不要写你自己。JSON 里每一项之间都要有逗号，最后一项后面不要有逗号。",
+	notesLine:        "notes 是你完整的新笔记，会替换旧笔记：每个你有判断的其他玩家都要写上，名字只能是桌上的人，不要写你自己。好人每次都写完整的 pits；狼人不写 pits。JSON 里每一项之间都要有逗号，最后一项后面不要有逗号。",
 
 	speechLines: []string{
 		"我觉得%s有点可疑。",
@@ -419,10 +447,14 @@ How to think, in this order every time:
    Start with [Votes]: who keeps voting with whom, whose vote does not match what they said, who switched or abstained on a vote that mattered, and who that vote protected.
    Then take each new speech apart, on facts only: who they went after this round, which point they used, and whether that point holds up in the earlier record. If it does, ask what they are really after beyond the reasoning on the surface: whose vote they are steering where, and who they are protecting. Pushing the table and playing the hook are both this kind of steering.
    Before taking it apart, put yourself in their seat: where they were in the speaking order, what had been said before them, who was still to speak, and what their claimed role could have known then. Then ask whether a good player who wants to win, in that seat, might say the same. If so, it is no evidence of a werewolf.
-2. beliefs: go through [Your notes] and update what you think of each other player, never yourself. Change a belief only on new evidence; otherwise keep it.
+2. pits (good players only): work out the pack. This game has 3 werewolves, counting any who are already out. List 1 to 3 whole packs that could explain the game, the likeliest first.
+   Start from who backs whom and how people voted, then refine with the speeches: when two players both claim seer, believe one of them and the pack is most likely the other one and those who speak and vote for them, so work out a pit for each reading; then look at who keeps voting together and whose vote shielded whom when it mattered.
+   For each pit write for (things that happened that support it), against (things that do not fit it) and odds (high, medium or low). When something new does not fit a pit, change it or drop it; do not explain it away. A pit that contradicts [Your secrets] is wrong.
+3. beliefs: go through [Your notes] and update what you think of each other player, never yourself. A good player's beliefs follow from their pits: those in your likeliest pit lean werewolf, those in none of them lean good. Change a belief only on new evidence; otherwise keep it.
+   A werewolf knows who is good, so their beliefs are about good players only, and say whether each seems to be a power role, a villager or unsure: who has claimed a power role, whose speeches carry night information, who was killed and did not die.
    evidence must be concrete things that actually happened. "Spoke blandly", "may be hiding their role", "feels off" and "has no proof" are not evidence, do not write them: no role claim can be proven on the spot, so "has no proof" is true of everyone.
-3. strategy: from your updated beliefs, decide what you will do next.
-4. Only then this move. Say something new: new evidence, new reasoning, or an answer to something new someone said. Do not repeat reasons you have already given.
+4. strategy: from your updated beliefs, decide what you will do next.
+5. Only then this move. Say something new: new evidence, new reasoning, or an answer to something new someone said. Do not repeat reasons you have already given.
 
 Reasoning points people often get wrong:
 - A seer checking someone as good and the witch saving that same person do not contradict each other: the werewolves killed a good player and the witch saved them.
@@ -454,7 +486,10 @@ Write everything in English.`,
 			"Protect your teammates as a rule. You may still suspect or vote out a teammate when there is a concrete reason: they are credibly exposed and will not survive anyway, defending them would expose you, turning on them buys trust you will need later, or losing them improves the pack's chances. " +
 			"Sacrificing a teammate is an exception the evidence forces, not your usual way to look good, and never just because you dislike them. " +
 			"If your victim did not die, the witch saved them and knows they were your kill, and may say so at any time: never report them as a werewolf or lead the charge against them, or one sentence from her exposes you. " +
-			"The real seer is your biggest threat. The witch's antidote can undo your kill and the hunter shoots when he goes, so find the power roles early and kill them first. " +
+			"The real seer is your biggest threat. The witch's antidote can undo your kill and the hunter shoots when he goes, so find the power roles early. " +
+			"Wiping out one side is how you win, so count every night: you win once all 3 power roles or all 3 villagers are out, and each night you kill one, while by day good players' votes can exile another. Go first for whichever side needs fewer kills and is harder for the witch's potions and the hunter's gun to interrupt. " +
+			"A confirmed power role, such as a seer the table believes or a witch who has come out, usually goes first; when the power roles hide well and the villagers are easy to read, wiping out the villagers is faster. Nobody's role is shown when they die, so read who is left from role claims, speeches that carry night information, and kills that did not die. " +
+			"When the pack gives up a werewolf, by turning on a teammate, sending a faker to draw fire or a self-kill, it should buy teammates a deeper cover or a faster read on who the power roles are. " +
 			"In your last words, keep up the act and muddy the water; never admit to being a werewolf. " +
 			"A self-kill is a real play, not a forbidden one: kill yourself or a teammate tonight. Two common ways to use it. " +
 			"One, self-kill on Night 1 and bet the witch saves: it wastes her antidote and the saved werewolf looks trusted the next day; if they are about to fake the seer, they can say \"the werewolves went for me on the first night\" to make the claim stick. " +
@@ -504,9 +539,10 @@ Write everything in English.`,
 	instructions: map[TurnKind]string{
 		Prepare:  "It is not your turn to speak yet; someone else is speaking. Bring your notes up to date with everything new so far: write observations, beliefs and strategy as usual, and say nothing this time. When your turn comes, you will only need to read what was said after this.",
 		Speech:   "It is the day's speeches and your turn to speak.",
-		WolfChat: "It is night, and only your fellow werewolves can hear you. First answer what the teammates before you proposed: agree, add to it or argue against it, and say why, rather than talking past them. Agree on who to kill tonight, a self-kill included, and how to play the day the way this game's play calls for, and who to push the vote onto; on the first night, also agree who fakes the seer, who they report as a werewolf, and their badge flow.",
+		WolfChat: "It is night, and only your fellow werewolves can hear you. First answer what the teammates before you proposed: agree, add to it or argue against it, and say why, rather than talking past them. Check the count in [Wiping out a side] and agree which side to go for first, who to kill tonight, a self-kill included, and how to play the day the way this game's play calls for, and who to push the vote onto; on the first night, also agree who fakes the seer, who they report as a werewolf, and their badge flow.",
 		WolfPlan: "The night chat is over. Set the pack's final plan; your teammates will follow it by day, and the host will check it against the game. " +
-			"target is who to kill tonight: someone who may hold a power role, someone whose speeches are most dangerous to you, or a self-kill, picking yourself or a teammate. Weigh which buys the pack more right now rather than killing a power role by reflex. " +
+			"edge is which side the pack wipes out first: power roles or villagers. Check the count in [Wiping out a side] first, and go for the side that needs fewer and is easier to read. " +
+			"target is who to kill tonight: usually the player on that side you are surest of, or someone whose speeches are most dangerous to you, or a self-kill, picking yourself or a teammate. Weigh which buys the pack more right now rather than killing a power role by reflex. " +
 			"focus is who the pack steers the vote onto tomorrow: they must still be alive then, so not tonight's target. You steer with good players' votes, not by all voting together: say in speech who votes for focus and who votes elsewhere. " +
 			"fakers are the werewolves who run and claim seer: usually one, sometimes two (a double claim). The first night's plan names at least one, and after that, while a faker is alive, it is usually them again. " +
 			"Before you set the plan, read the night chat: when a teammate proposed something concrete, such as who fakes the seer, whether two of you claim together, who to kill or who to vote, take it up if you can; if you do not, name them in speech and say why, since they will see your plan. " +
@@ -553,6 +589,10 @@ Write everything in English.`,
 	quoted:         "%s has not said anything in public yet; you cannot write \"%s%s\"",
 	notYet:         "%s has not spoken today yet; you cannot write \"%s%s\"",
 	badBelief:      "%q in notes.beliefs is wrong: names must be other players at the table, and side one of %s",
+	badPit:         "%q in notes.pits is not at the table",
+	selfInPit:      "you know you are good, so no pit in notes.pits can include you",
+	bigPit:         "the pit %s in notes.pits has more players than the game's %d werewolves",
+	badEdge:        "edge must be one of %s, not %q",
 	quoteCues:      []string{" said", " says", " mentioned", "'s speech", "'s point", "'s argument", " argued", " claimed"},
 	justNow:        " just",
 	noProof:        []string{"no proof", "no evidence", "lack of evidence", "lacks evidence", "without evidence", "without proof", "no real evidence", "no solid evidence", "more evidence", "not been verified", "not verified", "nobody has confirmed", "no one has confirmed"},
@@ -575,10 +615,17 @@ Write everything in English.`,
 	rivalry:  "Your rivalries: %s. A rivalry shapes how you talk to each other (banter, arguments, fights over who leads), never which side you think anyone is on: suspecting a rival takes real evidence, like suspecting anyone else.\n",
 	rivalTeammate: "Your rival %s is also a werewolf, on your team. Keep the rivalry going: at night challenge their lead and fight over the plan; by day bicker in public and keep your distance so you do not look like a team. " +
 		"But however much you argue, the night must end with a plan you can carry out, and by day the pack winning comes first: never sabotage them, vote for them or give them away because you dislike them. Sacrifice them only for the same concrete reasons as any teammate, never for the grudge.\n",
-	host:         "Host",
-	none:         "(none)\n",
-	beliefLine:   "- %s: %s. Evidence: %s\n",
-	intends:      "Plan: %s\n",
+	host:       "Host",
+	none:       "(none)\n",
+	beliefLine: "- %s: %s. Evidence: %s\n",
+	pitLine:    "- Pit %d (odds %s): %s. For: %s. Against: %s\n",
+	intends:    "Plan: %s\n",
+	edges: "\n[Wiping out a side] The count you win by, which only the werewolves see:\n" +
+		"- Werewolves alive: %s (%d). Good players alive: %s (%d).\n" +
+		"- Good players already out: %s. Nobody was shown whether they were power roles or villagers; you can only work it out.\n" +
+		"- By your notes, the living good players who seem to be power roles: %s; villagers: %s; still unsure: %s.\n" +
+		"- You win once all 3 power roles (seer, witch, hunter) or all 3 villagers are out, or once the werewolves alive are at least as many as the good players alive, which is %d good players away. You kill one each night, and by day good players' votes can exile another.\n",
+	edgeNow:      "The pack is wiping out the %ss first.\n",
 	claimLine:    "- [%s] %s claims: %s (unverified)\n",
 	now:          "\n[Now] %s. %s\n",
 	order:        "You are speaker %d this round. Already spoke: %s. Still to speak: %s.\n",
@@ -628,19 +675,22 @@ Write everything in English.`,
 - Am I saying something new, or repeating my earlier reasons?
 `,
 	fields: fields{
-		observations: `"observations": ["concrete things that newly happened since your last move and matter"]`,
-		changedNotes: `"notes": {"beliefs": {"a player whose belief changes": {"side": "werewolf, good or unsure", "evidence": ["all the evidence on them, new items last"]}}, "strategy": "only if your plan changes"}`,
-		notes:        `"notes": {"beliefs": {"another player's name": {"side": "werewolf, good or unsure", "evidence": ["concrete things that actually happened and support this"]}}, "strategy": "what you mean to do next"}`,
-		thinking:     `"thinking": "your reasoning for this move, seen only by you"`,
-		victim:       `"target": "who to kill tonight"`,
-		fakers:       `"fakers": ["the werewolves who claim seer tomorrow"]`,
-		hook:         `"hook": "the werewolf who plays the hook"`,
-		focus:        `"focus": "who you steer the vote onto tomorrow"`,
-		plan:         `"speech": "the plan for the day"`,
-		target:       `"target": "a name"`,
-		speech:       `"speech": "what you say out loud"`,
-		suspect:      `"suspect": "who you suspect most right now"`,
-		claim:        `"claim": {"role": "the role you claim: seer, witch, hunter or villager", "target": "the player it concerns, or \"\"", "result": "the check result (good or werewolf), or saved / poisoned, or \"\""}`,
+		observations:     `"observations": ["concrete things that newly happened since your last move and matter"]`,
+		changedNotes:     `"notes": {"beliefs": {"a player whose belief changes": {"side": "werewolf, good or unsure", "evidence": ["all the evidence on them, new items last"]}}, "pits": [{"wolves": ["the players in this pit, at most 3"], "for": ["things that happened that support it"], "against": ["things that do not fit it"], "odds": "high, medium or low"}], "strategy": "only if your plan changes"}`,
+		notes:            `"notes": {"beliefs": {"another player's name": {"side": "werewolf, good or unsure", "evidence": ["concrete things that actually happened and support this"]}}, "pits": [{"wolves": ["the players in this pit, at most 3"], "for": ["things that happened that support it"], "against": ["things that do not fit it"], "odds": "high, medium or low"}], "strategy": "what you mean to do next"}`,
+		wolfNotes:        `"notes": {"beliefs": {"a good player's name": {"side": "power role, villager or unsure", "evidence": ["concrete things that actually happened and make you think so"]}}, "strategy": "what you mean to do next"}`,
+		wolfChangedNotes: `"notes": {"beliefs": {"a good player whose read changes": {"side": "power role, villager or unsure", "evidence": ["all the evidence on them, new items last"]}}, "strategy": "only if your plan changes"}`,
+		edge:             `"edge": "which side to wipe out first: power role or villager"`,
+		thinking:         `"thinking": "your reasoning for this move, seen only by you"`,
+		victim:           `"target": "who to kill tonight"`,
+		fakers:           `"fakers": ["the werewolves who claim seer tomorrow"]`,
+		hook:             `"hook": "the werewolf who plays the hook"`,
+		focus:            `"focus": "who you steer the vote onto tomorrow"`,
+		plan:             `"speech": "the plan for the day"`,
+		target:           `"target": "a name"`,
+		speech:           `"speech": "what you say out loud"`,
+		suspect:          `"suspect": "who you suspect most right now"`,
+		claim:            `"claim": {"role": "the role you claim: seer, witch, hunter or villager", "target": "the player it concerns, or \"\"", "result": "the check result (good or werewolf), or saved / poisoned, or \"\""}`,
 	},
 	onlyJSON:         "Reply with a single JSON object and nothing else: ",
 	seatLine:         "- %s: %s\n",
@@ -651,11 +701,12 @@ Write everything in English.`,
 	fakersOnly:       "fakers may only name %s, from %d to %d of them.\n",
 	hookOnly:         "hook must be one of: %s, and not one of the fakers. If a hook was named before and is still in the game, keep them.\n",
 	focusOnly:        "focus must be one of: %s, and not the same person as target.\n",
+	edgeOnly:         "edge must be one of: %s.\n",
 	declareOnly:      "suspect must be one of: %s. claim is the role you publicly claim in this speech; if you claim none, write null, not a string. The host puts suspect and claim on the record, so they must match your speech.\n",
 	preparedLine:     "Your notes were just brought up to date, up to before the latest speech. This time, observations covers only what came after that; think about how to answer it.\n",
-	changedNotesLine: "In notes, write only the players whose belief changes this time; anyone left out keeps their old notes. If nothing changes, leave notes out. Only names at the table, never yourself. Put a comma between JSON items and none after the last one.",
+	changedNotesLine: "In notes, write only the players whose belief changes this time; anyone left out keeps their old notes. If nothing changes, leave notes out. Only names at the table, never yourself. Write pits only if your pits change, and then the whole new list; a werewolf writes no pits. Put a comma between JSON items and none after the last one.",
 	noNotes:          "this step needs notes",
-	notesLine:        "notes are your complete new notes and replace the old ones: include every other player you have a view on, only names at the table, never yourself. Put a comma between JSON items and none after the last one.",
+	notesLine:        "notes are your complete new notes and replace the old ones: include every other player you have a view on, only names at the table, never yourself. A good player writes the whole list of pits every time; a werewolf writes no pits. Put a comma between JSON items and none after the last one.",
 
 	speechLines: []string{
 		"%s seems a bit suspicious to me.",

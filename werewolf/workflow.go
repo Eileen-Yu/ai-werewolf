@@ -8,6 +8,7 @@
 package werewolf
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -318,7 +319,7 @@ func (t *table) wolvesHunt() (string, error) {
 	if a.Target == "" {
 		return "", nil
 	}
-	plan := &game.Plan{Round: s.Round, Victim: a.Target, Focus: a.Focus, Notes: a.Speech}
+	plan := &game.Plan{Round: s.Round, Victim: a.Target, Focus: a.Focus, Edge: a.Edge, Notes: a.Speech}
 	day := t.h.noFaker
 	if len(a.Fakers) > 0 {
 		plan.Fakers = a.Fakers
@@ -333,7 +334,11 @@ func (t *table) wolvesHunt() (string, error) {
 	if focus == "" {
 		focus = t.h.undecided
 	}
-	t.add("", fmt.Sprintf(t.h.plan, leader, plan.Victim, day, focus, plan.Notes), wolves...)
+	edge, ok := t.h.edges[plan.Edge]
+	if !ok {
+		edge = t.h.undecided
+	}
+	t.add("", fmt.Sprintf(t.h.plan, leader, plan.Victim, edge, day, focus, plan.Notes), wolves...)
 	return plan.Victim, nil
 }
 
@@ -761,6 +766,11 @@ func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brai
 	}
 	if turn.Me.Role == game.Werewolf {
 		turn.Pack = t.s.Living(game.Werewolf)
+		for _, p := range t.s.Players {
+			if p.Role == game.Werewolf {
+				turn.Wolves = append(turn.Wolves, p.Name)
+			}
+		}
 		turn.Tactic = t.s.Tactic
 		if p := t.s.Plan; p != nil && p.Round == t.s.Round {
 			turn.Plan = p
@@ -884,6 +894,17 @@ func (t *table) remember(name string, a brain.Action) {
 		notes.Beliefs = map[string]game.Belief{}
 	}
 	maps.Copy(notes.Beliefs, a.Notes.Beliefs)
+	samePit := func(x, y game.Pit) bool { return slices.Equal(x.Wolves, y.Wolves) && x.Odds == y.Odds }
+	if len(a.Notes.Pits) > 0 && !slices.EqualFunc(notes.Pits, a.Notes.Pits, samePit) {
+		pits := make([]string, len(a.Notes.Pits))
+		for i, p := range a.Notes.Pits {
+			pits[i] = fmt.Sprintf(t.h.pit, i+1, cmp.Or(p.Odds, t.say(game.Unsure)), t.list(p.Wolves))
+		}
+		t.aside(name, t.h.repitted, strings.Join(pits, t.h.semicolon))
+	}
+	if len(a.Notes.Pits) > 0 {
+		notes.Pits = a.Notes.Pits
+	}
 	if a.Notes.Strategy != "" {
 		notes.Strategy = a.Notes.Strategy
 	}
@@ -991,9 +1012,9 @@ func ActActivity(ctx workflow.ActivityContext) (any, error) {
 // after the brain's own re-asking, or a person's move the page let through,
 // is not allowed to stall the game: a bad pick counts as abstaining, an empty
 // speech as silence, a bad suspect as suspecting nobody; a bad claim is
-// dropped, and so are bad beliefs. A wolf plan keeps at most two seer
-// claimants from the pack, a bad hook means nobody plays it, and a bad focus
-// means none. The rest is let through: a
+// dropped, and so are bad beliefs, and bad pits keep the old ones. A wolf
+// plan keeps at most two seer claimants from the pack, a bad hook means
+// nobody plays it, and a bad focus or edge means none. The rest is let through: a
 // speech that quotes someone yet to speak, or a faker who does not claim, is
 // a slip, not a broken move.
 func settle(t brain.Turn, a brain.Action) brain.Action {
@@ -1012,6 +1033,11 @@ func settle(t brain.Turn, a brain.Action) brain.Action {
 	for _, name := range t.BadBeliefs(a.Notes) {
 		delete(a.Notes.Beliefs, name)
 	}
+	if a.Notes != nil && len(t.PitProblems(a.Notes.Pits)) > 0 {
+		n := *a.Notes
+		n.Pits = nil
+		a.Notes = &n
+	}
 	if t.Kind == brain.WolfPlan {
 		var fakers []string
 		for _, name := range a.Fakers {
@@ -1025,6 +1051,9 @@ func settle(t brain.Turn, a brain.Action) brain.Action {
 		}
 		if !slices.Contains(t.Suspects, a.Focus) || a.Focus == a.Target {
 			a.Focus = ""
+		}
+		if !slices.Contains(game.Edges, a.Edge) {
+			a.Edge = ""
 		}
 	}
 	return a

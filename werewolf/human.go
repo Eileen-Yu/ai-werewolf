@@ -315,7 +315,7 @@ func (t *table) publish() {
 	for _, r := range brain.Claimable {
 		b.Words[string(r)] = t.say(string(r))
 	}
-	for _, w := range []string{game.Good, string(game.Werewolf)} {
+	for _, w := range []string{game.Good, string(game.Werewolf), game.God} {
 		b.Words[w] = t.say(w)
 	}
 	for _, e := range t.s.Log {

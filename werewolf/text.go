@@ -12,8 +12,10 @@ type host struct {
 	votedOut, exiled, plan, noFaker, faker, hook, undecided, gameOver          string
 	tactic                                                                     string
 	tactics                                                                    map[game.Tactic]string
-	revealed, comma, semicolon, result, silence                                string
-	mvp, takeover, aftermath                                                   string
+	// edges is how a plan names the side it wipes out first.
+	edges                                       map[string]string
+	revealed, comma, semicolon, result, silence string
+	mvp, takeover, aftermath                    string
 
 	// The sheriff: the election, the badge's weight in a vote, and passing it on.
 	election, noRunners, allRun, runners, campaign, sheriffVotes string
@@ -24,6 +26,7 @@ type host struct {
 
 	// The god's-eye feed: asides, thoughts and secret lines.
 	observed, rejudged, judged, fromNothing, thinks, onlyFor, narrator string
+	repitted, pit                                                      string
 }
 
 func hostFor(l game.Lang) *host {
@@ -67,7 +70,8 @@ var chineseHost = host{
 	allAbstained: "所有人都弃票，今天无人出局。",
 	votedOut:     "被投票放逐",
 	exiled:       "%s被放逐了。",
-	plan:         "狼队计划（%s定）：今晚杀%s；明天%s，票投%s。打法：%s",
+	plan:         "狼队计划（%s定）：今晚杀%s，先屠%s；明天%s，票投%s。打法：%s",
+	edges:        map[string]string{game.God: "神职", string(game.Villager): "村民"},
 	noFaker:      "没人悍跳",
 	faker:        "%s悍跳预言家",
 	hook:         "，%s倒钩",
@@ -107,6 +111,8 @@ var chineseHost = host{
 	rejudged:    "改判",
 	judged:      "%s %s→%s，依据：%s",
 	fromNothing: "无",
+	repitted:    "盘狼坑",
+	pit:         "狼坑%d（%s）：%s",
 	thinks:      "内心",
 	onlyFor:     "仅%s可见",
 	narrator:    "主持人",
@@ -146,7 +152,8 @@ var englishHost = host{
 	allAbstained: "Everyone abstained: nobody is voted out today.",
 	votedOut:     "voted out",
 	exiled:       "%s is voted out.",
-	plan:         "Pack plan (set by %s): kill %s tonight; tomorrow %s, and vote out %s. How: %s",
+	plan:         "Pack plan (set by %s): kill %s tonight, wiping out the %s first; tomorrow %s, and vote out %s. How: %s",
+	edges:        map[string]string{game.God: "power roles", string(game.Villager): "villagers"},
 	noFaker:      "nobody claims seer",
 	faker:        "%s claims seer",
 	hook:         ", %s plays the hook",
@@ -186,6 +193,8 @@ var englishHost = host{
 	rejudged:    "rethinks",
 	judged:      "%s %s→%s, because: %s",
 	fromNothing: "none",
+	repitted:    "works out the pack",
+	pit:         "pit %d (%s): %s",
 	thinks:      "thinks",
 	onlyFor:     "only %s can see this",
 	narrator:    "Host",

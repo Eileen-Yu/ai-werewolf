@@ -283,6 +283,9 @@ func Check(t brain.Turn, a brain.Action) error {
 		if a.Hook != "" && a.Hook != game.Nobody && (!t.NamesHook() || !slices.Contains(t.HookNames(a.Fakers), a.Hook)) {
 			problems = append(problems, "only a packmate other than the fakers may be the hook, and only when the pack plays the hook")
 		}
+		if a.Edge != "" && !slices.Contains(game.Edges, a.Edge) {
+			problems = append(problems, fmt.Sprintf("edge is one of %v, or left out", game.Edges))
+		}
 	}
 	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, "; "))

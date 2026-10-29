@@ -19,7 +19,7 @@ func (Random) Act(_ context.Context, t Turn) (Action, error) {
 	case WolfPlan:
 		victim := pick(t.Candidates)
 		focus := pick(slices.DeleteFunc(slices.Clone(t.Suspects), func(s string) bool { return s == victim }))
-		a := Action{Target: victim, Focus: focus, Speech: fmt.Sprintf(tx.randomPlan, victim, focus)}
+		a := Action{Target: victim, Focus: focus, Edge: pick(game.Edges), Speech: fmt.Sprintf(tx.randomPlan, victim, focus)}
 		least, most := t.FakerCount()
 		for _, i := range rand.Perm(len(t.Pack))[:least+rand.IntN(most-least+1)] {
 			a.Fakers = append(a.Fakers, t.Pack[i])

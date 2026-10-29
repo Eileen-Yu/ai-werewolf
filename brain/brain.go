@@ -88,8 +88,10 @@ type Turn struct {
 	// this go round the table and who is still to.
 	Spoken  []string `json:"spoken,omitempty"`
 	Waiting []string `json:"waiting,omitempty"`
-	// Pack is, for a wolf, the living wolves, this one included.
-	Pack []string `json:"pack,omitempty"`
+	// Pack is, for a wolf, the living wolves, this one included, and Wolves
+	// every wolf in the game, the dead included.
+	Pack   []string `json:"pack,omitempty"`
+	Wolves []string `json:"wolves,omitempty"`
 	// Plan is, for a wolf, the pack's plan for this round, if there is one.
 	Plan *game.Plan `json:"plan,omitempty"`
 	// Tactic is, for a wolf, how the pack plays this game.
@@ -106,15 +108,16 @@ type Turn struct {
 // Observations, Thinking and Notes are private and are the player's memory:
 // what has newly happened, how they reasoned about this move, and what they
 // now believe and plan. Notes updates their previous notes: a belief given
-// replaces the old one about that player, others are kept, and an empty
-// strategy keeps the old one.
+// replaces the old one about that player, others are kept, a list of pits
+// replaces the old list, and an empty strategy keeps the old one.
 //
 // Speech is said aloud and Target is the pick on a choice turn. Suspect and
 // Claim are a declaring speech's stance, put on the record so others can hold
-// the player to it; a wolf's Claim may be a lie. Fakers, Hook and Focus are a
-// wolf plan's seer claimants, the wolf who sides with the good players, and
-// vote target. Summary is a line on a long public speech for the page,
-// written apart from the player (see LLM.summarize); a player never sets it.
+// the player to it; a wolf's Claim may be a lie. Fakers, Hook, Focus and Edge
+// are a wolf plan's seer claimants, the wolf who sides with the good players,
+// vote target, and which side of the good players it wipes out first.
+// Summary is a line on a long public speech for the page, written apart from
+// the player (see LLM.summarize); a player never sets it.
 type Action struct {
 	Observations []string    `json:"observations,omitempty"`
 	Thinking     string      `json:"thinking"`
@@ -126,6 +129,7 @@ type Action struct {
 	Fakers       []string    `json:"fakers,omitempty"`
 	Hook         string      `json:"hook,omitempty"`
 	Focus        string      `json:"focus,omitempty"`
+	Edge         string      `json:"edge,omitempty"`
 	Summary      string      `json:"summary,omitempty"`
 }
 
@@ -173,7 +177,10 @@ func (t Turn) Check(a Action) error {
 		}
 	}
 	for _, name := range t.BadBeliefs(a.Notes) {
-		problems = append(problems, fmt.Sprintf(tx.badBelief, name, l.List(l.SayAll(game.Sides))))
+		problems = append(problems, fmt.Sprintf(tx.badBelief, name, l.List(l.SayAll(t.sides()))))
+	}
+	if a.Notes != nil {
+		problems = append(problems, t.PitProblems(a.Notes.Pits)...)
 	}
 	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, tx.sep))
@@ -233,7 +240,52 @@ func (t Turn) planProblems(a Action) []string {
 	if a.Focus != "" && a.Focus == a.Target {
 		problems = append(problems, fmt.Sprintf(tx.focusIsVictim, a.Focus))
 	}
+	if !slices.Contains(game.Edges, a.Edge) {
+		problems = append(problems, fmt.Sprintf(tx.badEdge, l.List(l.SayAll(game.Edges)), a.Edge))
+	}
 	return problems
+}
+
+// PitProblems checks a good player's guesses at the pack: each names only
+// players at the table, no more than the game has wolves, and never the
+// player, who knows they are good.
+func (t Turn) PitProblems(pits []game.Pit) []string {
+	tx := t.text()
+	var problems []string
+	for _, p := range pits {
+		if len(p.Wolves) > wolfCount() {
+			problems = append(problems, fmt.Sprintf(tx.bigPit, t.Lang.List(p.Wolves), wolfCount()))
+		}
+		for _, name := range p.Wolves {
+			switch {
+			case name == t.Me.Name:
+				problems = append(problems, tx.selfInPit)
+			case !slices.ContainsFunc(t.Seats, func(s Seat) bool { return s.Name == name }):
+				problems = append(problems, fmt.Sprintf(tx.badPit, name))
+			}
+		}
+	}
+	return problems
+}
+
+// wolfCount is how many wolves the game deals.
+func wolfCount() int {
+	n := 0
+	for _, r := range game.Lineup {
+		if r == game.Werewolf {
+			n++
+		}
+	}
+	return n
+}
+
+// sides are the beliefs this player may hold: a wolf reads which edge each
+// good player is on, everyone else which side.
+func (t Turn) sides() []string {
+	if t.Me.Role == game.Werewolf {
+		return game.WolfSides
+	}
+	return game.Sides
 }
 
 // MustFakeSeer reports whether the pack's plan has this wolf claim to be the
@@ -350,14 +402,14 @@ func (t Turn) Silent() []string {
 }
 
 // BadBeliefs lists the names in notes' beliefs that are not other players at
-// the table, or whose side is not one of game.Sides.
+// the table, or whose side is not one this player may hold.
 func (t Turn) BadBeliefs(n *game.Notes) []string {
 	if n == nil {
 		return nil
 	}
 	var bad []string
 	for name, b := range n.Beliefs {
-		if !slices.Contains(t.others(), name) || !slices.Contains(game.Sides, b.Side) {
+		if !slices.Contains(t.others(), name) || !slices.Contains(t.sides(), b.Side) {
 			bad = append(bad, name)
 		}
 	}
@@ -371,9 +423,11 @@ func (t Turn) BadBeliefs(n *game.Notes) []string {
 // allowed, and words written in either language are read as the game's own,
 // which are English. A claim of no role
 // ("null", "none") is no claim, and one about nobody ("empty") is about no
-// one in particular. Beliefs about themselves, or that are not one of
-// game.Sides, are dropped: they are private notes, and only a name that is
-// not at the table is worth asking again over.
+// one in particular. Beliefs about themselves, a wolf's about a fellow wolf,
+// and sides this player may not hold are dropped, and pits are trimmed (see
+// normalPits): they are private notes, and only a name that is not at the
+// table, or a good player counting themselves a wolf, is worth asking again
+// over.
 func (t Turn) Normalize(a Action) Action {
 	if t.Kind.IsChoice() {
 		a.Target = closest(a.Target, t.Candidates)
@@ -391,6 +445,7 @@ func (t Turn) Normalize(a Action) Action {
 		}
 		a.Fakers = fakers
 		a.Hook = closest(a.Hook, append(slices.Clone(t.Pack), game.Nobody))
+		a.Edge = game.Read(a.Edge)
 	}
 	if a.Claim != nil {
 		c := *a.Claim
@@ -408,13 +463,40 @@ func (t Turn) Normalize(a Action) Action {
 		n.Beliefs = map[string]game.Belief{}
 		for name, b := range a.Notes.Beliefs {
 			b.Side = game.Read(b.Side)
-			if name != t.Me.Name && slices.Contains(game.Sides, b.Side) {
+			if name != t.Me.Name && !slices.Contains(t.Wolves, name) && slices.Contains(t.sides(), b.Side) {
 				n.Beliefs[name] = b
 			}
 		}
 		a.Notes = &n
 	}
+	if a.Notes != nil {
+		n := *a.Notes
+		n.Pits = t.normalPits(n.Pits)
+		a.Notes = &n
+	}
 	return a
+}
+
+// normalPits trims a player's pits: none for a wolf, who knows the pack;
+// otherwise no empty pit, no name twice in one, and at most game.MaxPits.
+func (t Turn) normalPits(pits []game.Pit) []game.Pit {
+	if t.Me.Role == game.Werewolf {
+		return nil
+	}
+	var out []game.Pit
+	for _, p := range pits {
+		var wolves []string
+		for _, w := range p.Wolves {
+			if w = strings.TrimSpace(w); w != "" && !slices.Contains(wolves, w) {
+				wolves = append(wolves, w)
+			}
+		}
+		if len(wolves) > 0 {
+			p.Wolves = wolves
+			out = append(out, p)
+		}
+	}
+	return out[:min(len(out), game.MaxPits)]
 }
 
 // declines are words that, where no name was given, mean passing.

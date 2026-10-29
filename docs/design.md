@@ -58,9 +58,10 @@ The host only ever states what everyone at the table could see. The page a perso
 The system prompt asks a player to think in a fixed order, and each step is a field of the JSON answer:
 
 1. `observations`: what happened since their last move. Concrete events only.
-2. `notes.beliefs`: each read updated against the old notes. Only new evidence changes a read: "a flat speech" or "feels suspicious" is not evidence.
-3. `notes.strategy`: what they plan to do next.
-4. `thinking` and the move: `speech` is what they say out loud and `target` is who they pick. A day speech also gives `suspect` (who they suspect most, or nobody) and `claim` (`{"role", "target", "result"}`, or null). A wolf may lie.
+2. `notes.pits`, for good players: one to three whole packs that could explain the game, the likeliest first, each with what supports it, what does not fit and how likely it is.
+3. `notes.beliefs`: each read updated against the old notes. Only new evidence changes a read: "a flat speech" or "feels suspicious" is not evidence.
+4. `notes.strategy`: what they plan to do next.
+5. `thinking` and the move: `speech` is what they say out loud and `target` is who they pick. A day speech also gives `suspect` (who they suspect most, or nobody) and `claim` (`{"role", "target", "result"}`, or null). A wolf may lie.
 
 The prompt also lists the places where rules combine in ways models get wrong. A seer checking someone as good and the witch saving that same person back each other up rather than contradict. When someone reports a check on you, you know your own role, so a right one is strong evidence they are the real seer. The player killed at night is not necessarily good, since wolves can kill their own. "There is no proof" is not evidence, since no claim can be proven on the spot.
 
@@ -68,13 +69,19 @@ The prompt also lists the places where rules combine in ways models get wrong. A
 
 Every player keeps notes: `beliefs` (werewolf, good or unsure about each player, with a list of evidence) and `strategy`. Every move hands back notes, which update the old ones: a belief given replaces the old one about that player, a player left out keeps theirs, and an empty strategy keeps the old one.
 
+**Problem.** Werewolf is a logic game under the talk. A good player who only holds one read per player thinks "X is a wolf because of Y" and gets stuck on one suspicion, when the real question is which three players explain every death, claim and vote together. And a wolf's `beliefs` were wasted: every non-wolf is good, which the wolf already knows.
+
+**Decision.** Good players also keep `pits`: up to three whole packs, the dead included, written from who backs which seer and how people voted first, then refined by the speeches. Two seers counter-claiming give two readings, and each gets a pit. A new list replaces the old one, and a turn that writes none keeps it. The game master sends back a pit that names someone not at the table, has more players than the game has wolves, or counts the player themselves a wolf; if the answer still fails, the old pits stay. A wolf writes no pits. Instead a wolf's `beliefs` say whether each good player seems to be a power role, a villager or unsure, since the wolves win by wiping out either side, and no role is shown when a player dies.
+
+**Tradeoff.** A longer answer on every move. The pits are a guess the player writes, not a fact, and they come back under the notes, which are labelled as the player's own.
+
 **Problem.** Most of a move's time is the model rewriting its notes, not the speech. Speeches have to go one at a time, since each speaker answers the last, so a day of nine speeches waits on nine full note rewrites in a row.
 
 **Decision.** While one player speaks, the next one has a `prepare` turn: no speech, only their notes, brought up to date with the record as it stands, which does not yet hold the speech being given. Their own turn is then marked `Prepared`. It still sees the whole record, the latest speech included, but is asked to take in only what came after its notes and to write only the beliefs that changed.
 
 **Tradeoff.** About one extra LLM call per speaker. In return the wait for a speech is roughly the longer of the two turns, not both added up, and the speaker's own turn is short. Only the next speaker prepares, and a human seat never does.
 
-The god's-eye feed in the game master's terminal prints each player's observations and changed reads, such as "rethinks: NPC Steve unsure→werewolf, because: …", so you can watch a read build up.
+The god's-eye feed in the game master's terminal prints each player's observations, changed reads and changed pits, such as "rethinks: NPC Steve unsure→werewolf, because: …" and "works out the pack: pit 1 (high): Karen, Gym Bro", so you can watch a read build up.
 
 ### Personalities with consequences
 
@@ -103,7 +110,9 @@ The English cast is exactly nine, so everyone is always seated. The Chinese cast
 
 **Tradeoff.** A dealt tactic can be the wrong one for the cards. So it changes what the wolves are told and what the night-1 plan asks for, never what they may do. After the first night the pack may drop the fakers or the hook, and when a play fails, wolves are offered ways to change course, such as a called-out wolf counter-claiming seer on the spot, as options to weigh rather than rules. Each plays it in their own character, so the pack does not all sound alike.
 
-The rest of the two playbooks follows three principles. The exact wording, in both languages, is in `brain/text.go`.
+**Wiping out a side.** The pack wins once all three power roles or all three villagers are out, or once the wolves alive are at least as many as everyone else. At night the wolves get a count the game master works out, which only they see: who is alive on each side, the good players already out, whose roles nobody was shown, and which living good players this wolf reads as power roles or villagers. The night chat settles which side to go for first, and the plan names it as `edge`, `power role` or `villager`; the plan line and the next day's turns carry it. Wolves are told a confirmed power role usually goes first, that wiping out the villagers is faster when the power roles hide well, and that a wolf the pack gives up, by turning on a teammate, sending a faker or a self-kill, should buy cover or a faster read on the power roles. A person writing the plan may leave the edge out.
+
+The rest of the two playbooks follows these principles. The exact wording, in both languages, is in `brain/text.go`.
 
 - **The pack hides in the votes, not just the speeches.** The good side is told to read the votes across days, so the wolves are told how not to look like a bloc: no piling on together when they drive a push, no public defence of a teammate, and a teammate sacrificed only for a concrete reason. Splitting is not dodging, though. When good players are already voting out a good player, the wolves join in, and they never abstain together: a pack that sits out a vote everyone else takes a side on gives itself away. An earlier rule, at most two wolves on any one target, did exactly that, with all three wolves abstaining on a lopsided vote. Both sides get the same model of what a pack looks like, from opposite ends.
 - **Following the crowd is a tell, not cover.** Repeating others' reasons and riding the room's push looks like a player who is not trying to win. Wolves are told to bring a reason of their own each time they take a side, and to go against the room when a good player would; good players are told that, in a one-sided swing, whoever only echoes is where to look.
@@ -229,6 +238,7 @@ go test ./...
 - **PK**: `werewolf/pk_test.go` ties the first day's vote. In one game the PK's votes go one way: only the tied speak again, only the others vote, only between the tied, and that vote exiles. In another every PK splits evenly: there are exactly `MaxPK` of them and nobody goes.
 - **Looking back**: once the game is over, every AI player takes one look back, with the roles on the record, and nothing comes after.
 - **Votes**: every vote offers `pass`, and a day where everyone abstains sends nobody out, and the host says so rather than calling it a tie. Nobody is asked to vote while that vote's ballot is already on the record. `werewolf/votes_test.go` covers what the page is told: the sheriff's one and a half, ties, everyone abstaining, a tie that goes to a PK and the PKs that follow, who changed their vote, withdrawals, and an election that never came to a vote.
+- **Notes**: every turn hands a player back the strategy they last wrote, and the pits a good player last wrote, kept across turns that write none. A pit that counts the player a wolf, or a plan edge that is not a side, is dropped rather than kept.
 - **Preparing**: while one player speaks, the next prepares from a record without that speech; their own turn hears it, is marked prepared, and keeps the prepared notes when it writes none.
 
 `werewolf/human_test.go` plays games with a person in a seat, answering through events: the AI never plays a move the person answered, the person only sees what their seat may see, and the page only learns what the table can see of who is moving. A game with two people checks each sees only their own role and private lines, and that a link without a key only watches. A game nobody plays in must still be published for spectators, with every line in its stage, the stages in order, and speeches, votes, deaths and results each marked as such. Another game has the person never answer, and must still finish. `internal/web/web_test.go` plays a whole game through the HTTP API with two people on their own links, including a bad move the page must refuse, a move the game is no longer waiting for, a move from the other person's link, and a link that opens no seat. Another plays a game nobody plays in and watches it to the end from a spectator's link, which never sees a private line or makes a move.
