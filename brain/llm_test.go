@@ -774,3 +774,20 @@ func TestAWolfCountsTheEdgesAndReadsPowerRoles(t *testing.T) {
 	assert.Contains(t, user, "狼队现在先屠村民。\n", "by day the pack is told the edge it chose")
 	assert.NotContains(t, user, "【屠边】")
 }
+
+func TestPowerRolesHideAndVillagersMaySmokeScreen(t *testing.T) {
+	for role, want := range map[game.Role][]string{
+		game.Witch:    {"不要主动跳女巫", "上警不报女巫身份"},
+		game.Hunter:   {"只有你马上要被放逐时（在PK台上，或者票已经压到你身上）才亮猎人身份", "上警不报猎人身份"},
+		game.Villager: {"假跳神职放烟雾弹", "不是每局都用", "场上已经有人跳过猎人或女巫，就不要再跳"},
+	} {
+		turn := Turn{
+			Kind: Speech, Round: 1, Phase: game.Day, Me: game.Player{Name: "阿杰", Role: role},
+			Seats: []Seat{{Name: "阿杰"}, {Name: "小宇"}}, Suspects: []string{"小宇"},
+		}
+		system, user := prompt(turn)
+		for _, w := range want {
+			assert.Contains(t, system+user, w, role)
+		}
+	}
+}
