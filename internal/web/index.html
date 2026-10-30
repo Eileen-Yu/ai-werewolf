@@ -171,9 +171,16 @@
   #votes .prev { color:var(--accent); font-weight:700; }
   #newPill { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); margin:0; padding:6px 14px; border-radius:999px;
     box-shadow:0 4px 14px rgba(0,0,0,.5); z-index:2; }
-  /* Who you are: a badge for your role and, for a werewolf, the pack. The
-     wolves' side gets a quiet red edge and their seats a red ring, not a red
-     page. Day is warm, night is blue, and at night the pack's edge glows. */
+  /* Who you are: a badge for your role, and a side the page wears quietly:
+     the pack red, the power roles gold, the villagers the green of the
+     fields. The side tints the top of the page, the board's edge and your
+     seat, never the page itself. Day is warm, night is blue; at night only
+     the pack's edge glows, since everyone else has their eyes shut. */
+  body.side-wolf { --side: 217,83,79; } body.side-god { --side: 226,184,92; } body.side-villager { --side: 128,178,112; }
+  body[class*="side-"]::before { content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+    background: radial-gradient(ellipse 90% 40% at 50% -6%, rgba(var(--side),.16), transparent 72%); transition: opacity 1.2s; }
+  body.night.side-god::before, body.night.side-villager::before { opacity:.45; }
+  main { position:relative; z-index:1; }
   .me { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
   .rolebadge { display:inline-flex; align-items:center; gap:6px; font-size:16px; font-weight:700; padding:3px 12px 3px 8px; border-radius:999px;
     color:var(--accent); background:rgba(224,168,74,.12); border:1px solid rgba(224,168,74,.35); }
@@ -186,12 +193,16 @@
   .packmark { display:inline-flex; align-items:center; gap:4px; font-size:12.5px; color:#ffb3b0; padding:2px 8px 2px 6px; border-radius:999px; background:rgba(217,83,79,.08); }
   .packmark .avatar.sm { width:22px; height:22px; font-size:11px; box-shadow:0 0 0 1.5px rgba(217,83,79,.7); }
   .packmark .avatar.gone { filter:grayscale(1); opacity:.5; }
-  #board.wolfside { border-color:rgba(217,83,79,.35); box-shadow: inset 3px 0 0 rgba(217,83,79,.8);
-    background: linear-gradient(90deg, rgba(217,83,79,.08), transparent 45%), var(--card); }
-  body.night #board.wolfside { box-shadow: inset 3px 0 0 rgba(217,83,79,.9), 0 0 26px rgba(217,83,79,.16);
-    background: linear-gradient(90deg, rgba(217,83,79,.10), transparent 45%), rgba(22,26,44,.88); }
-  .wolfside .seat.me { border-color:var(--wolf); background:rgba(217,83,79,.08); }
-  .wolfside .seat.me .tag.you { background:var(--wolf); color:#fff; }
+  .sidemark { font-size:12.5px; padding:2px 9px; border-radius:999px; color:rgb(var(--side)); background:rgba(var(--side),.10); }
+  #board.side { border-color:rgba(var(--side),.32); box-shadow: inset 3px 0 0 rgba(var(--side),.75);
+    background: linear-gradient(90deg, rgba(var(--side),.08), transparent 45%), var(--card); }
+  body.night #board.side { box-shadow: inset 3px 0 0 rgba(var(--side),.5);
+    background: linear-gradient(90deg, rgba(var(--side),.05), transparent 45%), rgba(22,26,44,.88); }
+  body.night.side-wolf #board.side { box-shadow: inset 3px 0 0 rgba(var(--side),.9), 0 0 26px rgba(var(--side),.16);
+    background: linear-gradient(90deg, rgba(var(--side),.10), transparent 45%), rgba(22,26,44,.88); }
+  #board.side .seat.me { border-color:rgb(var(--side)); background:rgba(var(--side),.08); }
+  #board.side .seat.me .tag.you { background:rgb(var(--side)); color:#14161c; }
+  body.side-wolf #board.side .seat.me .tag.you { color:#fff; }
   .seat.mate { border-color:rgba(217,83,79,.45); }
   body.day { background: radial-gradient(ellipse at top, #2a2416 0%, var(--bg) 55%) fixed var(--bg); }
   .dim { color:var(--dim); font-size:13px; }
@@ -313,7 +324,7 @@ const UI = {
     title: "AI 狼人杀", count: "真人玩家人数（其余座位由AI坐）", player: i => `玩家${i}`, name: "名字", start: "开始游戏",
     linksTitle: "游戏开始了：每人一条链接", copy: "复制", copied: "已复制", open: "打开",
     linksHint: "把链接分别发给每位玩家，在同一个 Wi-Fi 下用各自的手机或电脑打开。每条链接只能看到自己的座位，别点开别人的。",
-    youAre: "你是", pack: "狼队", waiting: "等待其他玩家……", dead: "你已出局，继续观战。", submit: "提交",
+    youAre: "你是", pack: "狼队", godSide: "✨ 神民", waiting: "等待其他玩家……", dead: "你已出局，继续观战。", submit: "提交",
     timeLeft: s => `剩余 ${s}，超时由AI代打`,
     bar: { yours: k => `⏰ 轮到你了 · ${k}`, go: "去操作", notYet: s => `⏳ 还没轮到你 · ${s}`, out: "👻 你已出局，正在观战", title: "⏰ 轮到你了" },
     sync: { ok: a => `● 已同步 · ${a}`, retry: (at, a) => `⚠️ 连接中断，正在重连… 上次同步 ${at}（${a}）`,
@@ -389,7 +400,7 @@ const UI = {
     title: "AI Werewolf", count: "How many people play (AI takes the other seats)", player: i => `Player ${i}`, name: "Name", start: "Start game",
     linksTitle: "The game is on: one link each", copy: "Copy", copied: "Copied", open: "Open",
     linksHint: "Send each player their own link, to open on their own phone or computer on the same Wi-Fi. A link only shows its own seat, so don't open anyone else's.",
-    youAre: "You are", pack: "Pack", waiting: "Waiting for the others…", dead: "You are out. Keep watching.", submit: "Submit",
+    youAre: "You are", pack: "Pack", godSide: "✨ Power role", waiting: "Waiting for the others…", dead: "You are out. Keep watching.", submit: "Submit",
     timeLeft: s => `${s} left before an AI plays this for you`,
     bar: { yours: k => `⏰ Your move · ${k}`, go: "Go to it", notYet: s => `⏳ Not your turn yet · ${s}`, out: "👻 You are out, watching", title: "⏰ Your move" },
     sync: { ok: a => `● Synced · ${a}`, retry: (at, a) => `⚠️ Connection lost, reconnecting… last synced ${at} (${a})`,
@@ -595,8 +606,8 @@ function render(v) {
   } else {
     $("youAre").textContent = t.watching;
     $("role").hidden = $("pack").hidden = true;
+    setSide("");
   }
-  $("board").classList.toggle("wolfside", !!v.pack);
   document.body.classList.toggle("night", v.phase === "night");
   document.body.classList.toggle("day", v.phase !== "night");
   renderSeats(v, t);
@@ -608,23 +619,37 @@ function render(v) {
   if (v.pending.event !== shownEvent) showTurn(v.pending, t, w);
 }
 
-// renderIdentity is the seat's role as a badge and, for a werewolf, the pack
-// with a portrait each, a fallen packmate greyed out. The role comes in the
-// game's words, so its key is found by its word.
+// renderIdentity is the seat's role as a badge and its side: for a werewolf
+// the pack with a portrait each, a fallen packmate greyed out; for a power
+// role a mark that it is one. The role comes in the game's words, so its key
+// is found by its word.
 const ROLE_ICON = { werewolf: "🐺", seer: "🔮", witch: "🧪", hunter: "🏹", villager: "🌾" };
 function renderIdentity(v, t) {
   const key = Object.keys(ROLE_ICON).find(k => v.words[k] === v.role) || "";
+  const side = key === "werewolf" ? "wolf" : key === "villager" ? "villager" : key ? "god" : "";
+  setSide(side);
   const role = $("role");
   role.hidden = false;
   role.className = "rolebadge " + key;
   role.innerHTML = `<span class="ico">${ROLE_ICON[key] || "🎭"}</span>${esc(v.role)}`;
   const pack = $("pack");
-  pack.hidden = !v.pack;
-  if (!v.pack) return;
+  pack.hidden = side !== "wolf" && side !== "god";
+  if (side === "god") {
+    pack.className = "sidemark";
+    pack.textContent = t.godSide;
+  }
+  if (side !== "wolf") return;
   const dead = new Set(v.seats.filter(s => s.death).map(s => s.name));
   pack.className = "packmark";
-  pack.innerHTML = `🐺 ${esc(t.pack)} ` + v.pack.filter(n => n !== v.you)
+  pack.innerHTML = `🐺 ${esc(t.pack)} ` + (v.pack || []).filter(n => n !== v.you)
     .map(n => avatar(n, true).replace('class="avatar sm"', `class="avatar sm${dead.has(n) ? " gone" : ""}" title="${esc(n)}"`)).join("");
+}
+
+// setSide is which side the page wears: "wolf", "god", "villager", or "" to
+// watch.
+function setSide(side) {
+  for (const s of ["wolf", "god", "villager"]) document.body.classList.toggle("side-" + s, s === side);
+  $("board").classList.toggle("side", !!side);
 }
 
 // renderBar is the bar along the bottom for a seat at the table: on its turn
