@@ -86,14 +86,21 @@
   .pill.suspect { background:#2f2230; color:#f0b5c8; }
   .pill.suspect.none { background:#262a36; color:var(--dim); font-weight:500; }
   .pill .avatar.sm { width:20px; height:20px; font-size:10px; }
-  /* A long speech's summary is the game master's, not the speaker's: folded
-     under the words, opened on demand. */
+  /* A long speech's summary is the game master's, not the speaker's, under
+     the words. The latest few and the one being read stay open; older ones
+     fold to a single line that still shows how the summary starts. */
   .sum { margin-top:4px; font-size:13.5px; color:#c9ccd6; }
-  .sum summary { display:inline-block; cursor:pointer; font-size:11.5px; color:#8fb3cc; padding:0 8px; border-radius:999px; list-style:none; opacity:.75; }
+  .sum summary { display:flex; gap:6px; align-items:baseline; min-width:0; cursor:pointer; font-size:12px; color:#8fb3cc; list-style:none;
+    padding:1px 8px; border-radius:6px; opacity:.8; }
   .sum summary::-webkit-details-marker { display:none; }
-  .sum summary:hover, .sum[open] summary { opacity:1; background:rgba(127,209,255,.08); }
+  .sum summary .lbl { flex:none; }
+  .sum summary .pv { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dim); }
+  .sum summary:hover { opacity:1; background:rgba(127,209,255,.06); }
   .sum[open] { background:rgba(127,209,255,.06); border-left:2px solid #4f7da0; border-radius:0 6px 6px 0; padding:4px 10px 6px; }
-  .sum[open] summary { padding:0; background:none; margin-bottom:2px; }
+  .sum[open] summary { padding:0; background:none; margin-bottom:2px; opacity:1; }
+  .sum[open] summary .pv { display:none; }
+  .logbar { display:flex; justify-content:flex-end; padding:8px 16px 0; }
+  .logbar button { margin:0; padding:3px 12px; font-size:12.5px; }
   .at { font-weight:700; color:#e6e6ea; background:rgba(255,255,255,.07); border-radius:3px; padding:0 2px; }
   .at.hit { color:#ffb3c6; background:rgba(240,120,150,.16); }
   .msg.reading .bubble .text { box-shadow: inset 3px 0 0 #7fd1ff; }
@@ -297,7 +304,7 @@
       <div class="seats" id="seats"></div>
     </div>
     <div class="grid">
-      <div class="card timeline"><div id="log"></div><button id="newPill" type="button" hidden></button></div>
+      <div class="card timeline"><div class="logbar" id="logBar" hidden><button id="sumAll" class="secondary" type="button"></button></div><div id="log"></div><button id="newPill" type="button" hidden></button></div>
       <div class="side">
         <div class="card" id="result" hidden></div>
         <div class="card" id="turnCard" hidden>
@@ -332,7 +339,7 @@ const UI = {
       gone: "⛔ 找不到这局游戏：主持人（gm）可能重启过或换了引擎，这局已经丢失", connecting: "连接中…", over: "● 游戏已结束",
       paused: "连接中断，计时暂停", now: "刚刚", secs: n => `${n}秒前`, mins: n => `${n}分钟前` },
     seatState: { thinking: "💭 思考中", speaking: "🔊 发言中" },
-    line: { summary: "🔍 分析", summaryTip: "AI 主持人写的摘要，不是角色原话", claims: r => `声称${r}`, checked: (x, r) => `查验 ${x}：${r}`, potion: x => `用药：${x}`,
+    line: { summary: "🔍 分析", summaryTip: "AI 主持人写的摘要，不是角色原话", sumAll: "展开全部分析", sumAuto: "恢复自动折叠", claims: r => `声称${r}`, checked: (x, r) => `查验 ${x}：${r}`, potion: x => `用药：${x}`,
       suspects: "怀疑", nobody: "暂不怀疑谁" },
     kinds: { speech: "轮到你发言", wolf_chat: "狼队夜聊", wolf_plan: "你来定今晚的计划",
       last_words: "留下遗言", vote: "投票放逐", inspect: "今晚查验谁", save: "要用解药救他吗", poison: "要用毒药吗", shoot: "开枪带走谁",
@@ -408,7 +415,7 @@ const UI = {
       gone: "⛔ Game not found: the game master (gm) may have restarted or changed engine, and this game is lost", connecting: "Connecting…", over: "● Game over",
       paused: "Connection lost, timer paused", now: "just now", secs: n => `${n}s ago`, mins: n => `${n} min ago` },
     seatState: { thinking: "💭 Thinking", speaking: "🔊 Speaking" },
-    line: { summary: "🔍 Analysis", summaryTip: "The AI game master's summary, not the character's words", claims: r => `Claims ${r}`, checked: (x, r) => `checked ${x}: ${r}`, potion: x => `potion on ${x}`,
+    line: { summary: "🔍 Analysis", summaryTip: "The AI game master's summary, not the character's words", sumAll: "Expand all analysis", sumAuto: "Back to auto-fold", claims: r => `Claims ${r}`, checked: (x, r) => `checked ${x}: ${r}`, potion: x => `potion on ${x}`,
       suspects: "Suspects", nobody: "Suspects nobody yet" },
     kinds: { speech: "Your turn to speak", wolf_chat: "Wolf chat", wolf_plan: "Set tonight's plan",
       last_words: "Your last words", vote: "Vote someone out", inspect: "Who to check tonight", save: "Use the antidote on them?", poison: "Use the poison?", shoot: "Who to shoot",
@@ -739,6 +746,7 @@ function renderLog(v, t) {
     if (l.speaker !== v.you) speakLine(l, v.lang);
   }
   logCount = v.log.length;
+  foldSums();
   if (first || atBottom) { log.scrollTop = log.scrollHeight; unseen = 0; }
   else unseen += fresh.length;
   $("newPill").hidden = !unseen;
@@ -759,7 +767,7 @@ function lineHTML(l, v, t) {
   if (l.kind === "speech") {
     const cls = ["msg", l.speaker === v.you && "mine", l.private && "private"].filter(Boolean).join(" ");
     const tag = l.private ? `<span class="tag wolf">${esc(v.pack ? t.packTag : t.secret)}</span>` : "";
-    const sum = l.summary ? `<details class="sum"><summary title="${esc(t.line.summaryTip)}">${esc(t.line.summary)}</summary>${esc(l.summary)}</details>` : "";
+    const sum = l.summary ? `<details class="sum"><summary title="${esc(t.line.summaryTip)}"><span class="lbl">${esc(t.line.summary)}</span><span class="pv">${esc(l.summary)}</span></summary>${esc(l.summary)}</details>` : "";
     return `<div class="${cls}" data-n="${l.n}">${avatar(l.speaker, true)}<div class="bubble"><div class="meta"><b>${esc(l.speaker)}</b>${tag}</div>` +
       stanceHTML(l, v, t) + `<div class="text">${mentions(text, l, v)}</div>` + sum + `</div></div>`;
   }
@@ -790,6 +798,33 @@ function mentions(text, l, v) {
   const re = new RegExp(names.map(n => `(?<![A-Za-z])${esc(n).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z])`).join("|"), "g");
   return text.replace(re, m => `<span class="at${m === esc(l.suspect || "") ? " hit" : ""}">${m}</span>`);
 }
+
+// foldSums keeps open the summaries of the latest few speeches and of the one
+// being read aloud, and folds the rest; with every one asked for, it opens
+// them all. One the reader opened or closed is left as they set it.
+const OPEN_SPEECHES = 3;
+let allSums = false;
+function foldSums() {
+  const recent = new Set([...$("log").querySelectorAll(".msg")].slice(-OPEN_SPEECHES));
+  if (reading) recent.add($("log").querySelector(`.msg[data-n="${reading.n}"]`));
+  for (const d of $("log").querySelectorAll(".sum")) {
+    if (!d.dataset.set) d.open = allSums || recent.has(d.closest(".msg"));
+  }
+  $("logBar").hidden = !revealed || !$("log").querySelector(".sum");
+}
+$("log").addEventListener("click", e => {
+  const s = e.target.closest(".sum summary");
+  if (s) s.parentElement.dataset.set = "1";
+});
+function renderSumAll(t) {
+  $("sumAll").textContent = allSums ? t.line.sumAuto : t.line.sumAll;
+}
+$("sumAll").onclick = () => {
+  allSums = !allSums;
+  for (const d of $("log").querySelectorAll(".sum")) delete d.dataset.set;
+  foldSums();
+  renderSumAll(UI[(view && view.lang) || "zh"]);
+};
 
 // renderStage shows what the table is waiting on: only what anyone at a real
 // table could tell, which the game master has already narrowed it to.
@@ -1043,6 +1078,8 @@ function finish(g) {
   if (g.error) { r.innerHTML = `<div class="err">${t.failed}${esc(g.error)}</div>`; return; }
   const res = g.result, w = k => (view && view.words[k]) || k;
   revealed = Object.fromEntries(res.players.map(p => [p.name, p.role]));
+  renderSumAll(t);
+  foldSums();
   if (view) renderSeats(view, t);
   r.innerHTML = `<div style="font-weight:700">${t.over} · ${esc(t.winner(w(res.winner)))}</div>` +
     (res.mvp && res.mvp.name ? `<p class="mvp">${t.mvp}: <b>${esc(res.mvp.name)}</b></p><p>${esc(res.mvp.reason)}</p>` : "") +
@@ -1163,6 +1200,7 @@ function speakLine(l, lang) {
 let reading = null;
 function setReading(l) {
   reading = l;
+  foldSums();
   for (const x of $("log").querySelectorAll(".msg.reading")) x.classList.remove("reading");
   if (l) { const m = $("log").querySelector(`.msg[data-n="${l.n}"]`); if (m) m.classList.add("reading"); }
   if (view) renderSeats(view, UI[view.lang] || UI.zh);
