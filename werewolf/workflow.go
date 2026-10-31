@@ -40,9 +40,6 @@ type Game struct {
 	// PhaseDelay is a durable timer between phases, so people watching can
 	// keep up and have time to kill something.
 	PhaseDelay time.Duration `json:"phaseDelay"`
-	// Tactic pins how the pack plays, for a demo; left out, one is dealt at
-	// random. It only takes effect when the game is dealt.
-	Tactic game.Tactic `json:"tactic,omitempty"`
 	// Humans seats people in place of some of the cast, to play from the web
 	// page. It only takes effect when the game is dealt.
 	Humans []Human `json:"humans,omitempty"`
@@ -98,10 +95,6 @@ func GameWorkflow(ctx *workflow.WorkflowContext) (any, error) {
 			return nil, err
 		}
 		g.State.Lang = lang
-		if g.Tactic != "" && !slices.Contains(game.Tactics, g.Tactic) {
-			return nil, fmt.Errorf("unknown tactic %q: use one of %v", g.Tactic, game.Tactics)
-		}
-		g.State.Tactic = g.Tactic
 		for _, h := range g.Humans {
 			if !slices.Contains(game.Characters(lang), h.Replaces) {
 				return nil, fmt.Errorf("a human can replace one of %v, not %q", game.Characters(lang), h.Replaces)
@@ -189,11 +182,11 @@ func (t *table) list(names []string) string { return t.s.Lang.List(names) }
 func (t *table) setup(people []game.Person) error {
 	t.s.Round, t.s.Phase, t.s.Stage = 1, game.Night, game.StageNight
 	var dealt deal
-	in := deal{Players: t.s.Players, Lang: t.s.Lang, Tactic: t.s.Tactic, Humans: people}
+	in := deal{Players: t.s.Players, Lang: t.s.Lang, Humans: people}
 	if err := t.ctx.CallActivity(AssignRolesActivity, workflow.WithActivityInput(in)).Await(&dealt); err != nil {
 		return err
 	}
-	t.s.Players, t.s.Tactic = dealt.Players, dealt.Tactic
+	t.s.Players = dealt.Players
 
 	t.add("", fmt.Sprintf(t.h.welcome, len(t.s.Players), t.s.Lang.LineupSummary()))
 	wolves := t.s.Living(game.Werewolf)
@@ -201,7 +194,6 @@ func (t *table) setup(people []game.Person) error {
 		t.add("", fmt.Sprintf(t.h.yourRole, t.say(string(p.Role))), p.Name)
 	}
 	t.add("", fmt.Sprintf(t.h.pack, t.list(wolves)), wolves...)
-	t.add("", fmt.Sprintf(t.h.tactic, t.h.tactics[t.s.Tactic]), wolves...)
 	return nil
 }
 
@@ -329,7 +321,7 @@ func (t *table) wolvesHunt() (string, error) {
 		plan.Hook = a.Hook
 		day += fmt.Sprintf(t.h.hook, a.Hook)
 	}
-	s.Plan = plan
+	s.Plans = append(s.Plans, *plan)
 	focus := plan.Focus
 	if focus == "" {
 		focus = t.h.undecided
@@ -480,10 +472,10 @@ func (t *table) election() error {
 	alive := s.Living()
 	s.Stage = game.StageElection
 	t.add("", t.h.election)
-	// The seer always runs: their checks are worth the most with the badge.
-	// So does the wolf the pack's plan has fake the seer, unless a person
-	// plays them.
-	mustRun := func(v string) bool { return s.Player(v).Role == game.Seer || t.planRuns(v) }
+	// A wolf the pack's plan has fake the seer runs, unless a person plays
+	// them: the claim is made in the campaign. Everyone else, the seer
+	// included, decides.
+	mustRun := t.planRuns
 	runs, err := t.chooseAll(brain.Run, alive, func(v string) []string {
 		if mustRun(v) {
 			return []string{v}
@@ -593,11 +585,10 @@ func (t *table) sheriffVote(standing, voters []string) (string, error) {
 	}
 }
 
-// withdraw asks every candidate but the seer, who always stays in, whether to
-// stay in the race, and returns those still running.
+// withdraw asks every candidate whether to stay in the race, and returns
+// those still running.
 func (t *table) withdraw(runners []string) ([]string, error) {
-	asked := slices.DeleteFunc(slices.Clone(runners), func(v string) bool { return t.s.Player(v).Role == game.Seer })
-	stays, err := t.chooseAll(brain.Withdraw, asked, func(v string) []string { return []string{v, game.Pass} })
+	stays, err := t.chooseAll(brain.Withdraw, runners, func(v string) []string { return []string{v, game.Pass} })
 	if err != nil {
 		return nil, err
 	}
@@ -616,8 +607,8 @@ func (t *table) withdraw(runners []string) ([]string, error) {
 // planRuns reports whether the pack's plan sends this AI wolf to run for
 // sheriff: a faker, who claims seer in the campaign.
 func (t *table) planRuns(name string) bool {
-	p := t.s.Plan
-	return p != nil && p.Round == t.s.Round && !t.s.Player(name).Human && slices.Contains(p.Fakers, name)
+	p := t.s.PlanFor(t.s.Round)
+	return p != nil && !t.s.Player(name).Human && slices.Contains(p.Fakers, name)
 }
 
 // abstained reports whether every voter abstained.
@@ -807,10 +798,7 @@ func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brai
 				turn.Wolves = append(turn.Wolves, p.Name)
 			}
 		}
-		turn.Tactic = t.s.Tactic
-		if p := t.s.Plan; p != nil && p.Round == t.s.Round {
-			turn.Plan = p
-		}
+		turn.Plan = t.s.PlanFor(t.s.Round)
 	}
 	return turn
 }
@@ -983,19 +971,18 @@ func (t *table) narrate(e game.Event) {
 	}
 }
 
-// deal is what sits down and how the pack plays. Going in, the players and
-// tactic are empty unless the game was started with them, and Lang is the
-// language to pick a cast in; coming out, all are filled in.
+// deal is who sits down. Going in, the players are empty unless the game was
+// started with them, and Lang is the language to pick a cast in; coming out,
+// the players are seated and dealt their roles.
 type deal struct {
 	Players []game.Player `json:"players,omitempty"`
 	Lang    game.Lang     `json:"lang,omitempty"`
-	Tactic  game.Tactic   `json:"tactic,omitempty"`
 	Humans  []game.Person `json:"humans,omitempty"`
 }
 
-// AssignRolesActivity picks a cast and a tactic if there are none, and deals
-// the roles. It is an activity because all three are random, and the workflow
-// must replay the same.
+// AssignRolesActivity picks a cast if there is none, and deals the roles. It
+// is an activity because both are random, and the workflow must replay the
+// same.
 func AssignRolesActivity(ctx workflow.ActivityContext) (any, error) {
 	var in deal
 	if err := ctx.GetInput(&in); err != nil {
@@ -1022,9 +1009,6 @@ func (d deal) fill(rng *rand.Rand) (deal, error) {
 			return d, err
 		}
 		d.Players = seated
-	}
-	if d.Tactic == "" {
-		d.Tactic = game.Tactics[rng.IntN(len(game.Tactics))]
 	}
 	d.Players = game.AssignRoles(d.Players, rng)
 	return d, nil

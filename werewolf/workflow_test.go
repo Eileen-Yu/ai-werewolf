@@ -3,7 +3,6 @@ package werewolf
 import (
 	"context"
 	"fmt"
-	"math/rand/v2"
 	"net"
 	"regexp"
 	"slices"
@@ -436,24 +435,20 @@ func (b *firstVotes) Act(ctx context.Context, t brain.Turn) (brain.Action, error
 func TestOnlyWolvesGetThePlanAndAnyWolfMayTurnOnATeammate(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
-	for _, tactic := range game.Tactics {
-		b := &planWatcher{}
-		SetBrain(b)
-		g := newGame()
-		g.Tactic = tactic
-		// The wolves win before anyone speaks if every power role dies on
-		// the first night, so play until there are speeches to check.
-		for i := 0; i < 5 && len(b.turns) == 0; i++ {
-			play(t, client, fmt.Sprintf("plan-%s-%d", tactic, i), g)
-		}
-		require.NotEmpty(t, b.turns)
-		checkWolvesMayTurnOnEachOther(t, b.turns)
+	b := &planWatcher{}
+	SetBrain(b)
+	// The wolves win before anyone speaks if every power role dies on the
+	// first night, so play until there are speeches to check.
+	for i := 0; i < 5 && len(b.turns) == 0; i++ {
+		play(t, client, fmt.Sprintf("plan-%d", i), newGame())
 	}
+	require.NotEmpty(t, b.turns)
+	checkWolvesMayTurnOnEachOther(t, b.turns)
 }
 
 // checkWolvesMayTurnOnEachOther checks only wolves get the pack and the plan,
 // and that whether to name a teammate is every wolf's own call, whatever the
-// tactic: each living teammate is on every wolf's vote and suspect list.
+// plan: each living teammate is on every wolf's vote and suspect list.
 func checkWolvesMayTurnOnEachOther(t *testing.T, turns []brain.Turn) {
 	t.Helper()
 	for _, turn := range turns {
@@ -477,57 +472,6 @@ func checkWolvesMayTurnOnEachOther(t *testing.T, turns []brain.Turn) {
 			assert.Contains(t, names, wolf, "%s may name teammate %s on a %s turn", turn.Me.Name, wolf, turn.Kind)
 		}
 	}
-}
-
-func TestThePackIsDealtATacticOnlyTheWolvesAreTold(t *testing.T) {
-	dealt := map[game.Tactic]bool{}
-	for seed := range uint64(30) {
-		d, err := deal{}.fill(rand.New(rand.NewPCG(seed, 1)))
-		require.NoError(t, err)
-		dealt[d.Tactic] = true
-	}
-	assert.Len(t, dealt, len(game.Tactics), "every tactic gets dealt")
-	pinned, err := deal{Tactic: game.Hook}.fill(rand.New(rand.NewPCG(1, 2)))
-	require.NoError(t, err)
-	assert.Equal(t, game.Hook, pinned.Tactic, "a pinned tactic is kept")
-
-	client := startEngine(t)
-	startWorker(t, client)
-	for i := range 3 {
-		b := &turnRecorder{}
-		SetBrain(b)
-		play(t, client, fmt.Sprintf("tactic-%d", i), newGame())
-		require.NotEmpty(t, b.turns)
-		for _, turn := range b.turns {
-			if turn.Me.Role == game.Werewolf {
-				require.Contains(t, game.Tactics, turn.Tactic)
-				told := slices.ContainsFunc(turn.Transcript, func(e game.Event) bool {
-					return e.Text == fmt.Sprintf(chineseHost.tactic, chineseHost.tactics[turn.Tactic])
-				})
-				assert.True(t, told, "%s is told the pack's tactic", turn.Me.Name)
-				continue
-			}
-			assert.Empty(t, turn.Tactic, "%s is not a wolf", turn.Me.Name)
-			for _, e := range turn.Transcript {
-				assert.NotContains(t, e.Text, "本局狼队的打法", "%s is not a wolf", turn.Me.Name)
-			}
-		}
-	}
-}
-
-func TestAGameRefusesAnUnknownTactic(t *testing.T) {
-	SetBrain(brain.Random{})
-	client := startEngine(t)
-	startWorker(t, client)
-
-	g := newGame()
-	g.Tactic = "yolo"
-	_, err := client.ScheduleWorkflow(t.Context(), "GameWorkflow", workflow.WithInstanceID("yolo"), workflow.WithInput(g))
-	require.NoError(t, err)
-	meta, err := client.WaitForWorkflowCompletion(t.Context(), "yolo")
-	require.NoError(t, err)
-	_, err = ReadResult(meta)
-	assert.ErrorContains(t, err, "unknown tactic")
 }
 
 // planWatcher plays randomly and records every daytime speech turn.
@@ -614,8 +558,8 @@ func TestAGameRefusesAnUnknownLanguage(t *testing.T) {
 }
 
 // turnRecorder plays randomly and records every turn it is given.
-// campaigner runs the first two living seats for sheriff, and the seer, who
-// always runs. The second of those two withdraws after the campaign, and every
+// campaigner runs the first two living seats for sheriff, and whoever the
+// pack's plan sends. The second of those two withdraws after the campaign, and every
 // voter backs the first candidate left. A sheriff on the way out passes the
 // badge to the first name offered, or tears it up if tear is set.
 type campaigner struct {
@@ -680,7 +624,7 @@ func holder(seats []brain.Seat) string {
 func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
-	passed, torn, withdrewOnce, deadRan, doubled := false, false, false, false, false
+	passed, torn, withdrewOnce, deadRan, doubled, none := false, false, false, false, false, false
 	for i := 0; i < 30 && !(passed && torn && deadRan); i++ {
 		b := &campaigner{tear: i%2 == 1}
 		SetBrain(b)
@@ -694,11 +638,7 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 		withdrawn := false
 		sheriff, elected := "", false
 		var lastDay1Speaker, day1Sheriff string
-		var tactic game.Tactic
 		for _, turn := range b.turns {
-			if turn.Tactic != "" {
-				tactic = turn.Tactic
-			}
 			switch turn.Kind {
 			case brain.Prepare:
 				continue // runs alongside a speech, so it may be recorded before it
@@ -719,9 +659,7 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 					assert.Empty(t, s.Death, "%s's death is announced before the election", s.Name)
 				}
 				deadRan = deadRan || diedNight1[turn.Me.Name]
-				if turn.Me.Role == game.Seer {
-					assert.Equal(t, []string{turn.Me.Name}, turn.Candidates, "the seer always runs")
-				} else if turn.Plan != nil && slices.Contains(turn.Plan.Fakers, turn.Me.Name) {
+				if turn.Plan != nil && slices.Contains(turn.Plan.Fakers, turn.Me.Name) {
 					sent = append(sent, turn.Me.Name)
 					assert.Equal(t, []string{turn.Me.Name}, turn.Candidates, "the faker always runs")
 				} else {
@@ -738,7 +676,6 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 				assert.Contains(t, runners, turn.Me.Name, "only a candidate campaigns")
 			case brain.Withdraw:
 				assert.Contains(t, runners, turn.Me.Name, "only a candidate may withdraw")
-				assert.NotEqual(t, game.Seer, turn.Me.Role, "the seer always stays in")
 				assert.Equal(t, []string{turn.Me.Name, game.Pass}, turn.Candidates)
 				left = game.Without(runners, b.withdrew...)
 				withdrawn = withdrawn || len(b.withdrew) > 0
@@ -779,17 +716,14 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 		if day1Sheriff != "" {
 			assert.Equal(t, day1Sheriff, lastDay1Speaker, "the sheriff speaks last")
 		}
-		if tactic == game.DoubleClaim {
-			assert.Len(t, sent, 2, "a double claim sends two wolves")
-		} else {
-			assert.NotEmpty(t, sent, "every pack fakes the seer on the first day")
-			assert.LessOrEqual(t, len(sent), 2, "never more than two fake the seer")
-		}
+		assert.LessOrEqual(t, len(sent), 2, "never more than two fake the seer")
 		doubled = doubled || len(sent) == 2
+		none = none || len(sent) == 0
 		assert.Subset(t, runners, sent, "the faker did not run")
 	}
 	assert.True(t, withdrewOnce, "no candidate withdrew in any game")
 	assert.True(t, doubled, "no pack sent two wolves to claim seer in thirty games")
+	assert.True(t, none, "every pack sent a wolf to claim seer in thirty games")
 	assert.True(t, passed, "no sheriff passed the badge on in thirty games")
 	assert.True(t, torn, "no sheriff tore up the badge in thirty games")
 	assert.True(t, deadRan, "nobody who died on the first night was asked to run in thirty games")

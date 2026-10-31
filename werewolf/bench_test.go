@@ -30,7 +30,7 @@ func TestBenchesSeeOnlyTheirOwnSecrets(t *testing.T) {
 				t.Errorf("%s sees %s's thinking", b.Name, e.Speaker)
 			}
 		}
-		if !wolf && (len(b.Turn.Pack) > 0 || b.Turn.Plan != nil || b.Turn.Tactic != "") {
+		if !wolf && (len(b.Turn.Pack) > 0 || b.Turn.Plan != nil) {
 			t.Errorf("%s is told the pack's business", b.Name)
 		}
 		if wolf && len(b.Turn.Wolves) != 3 {

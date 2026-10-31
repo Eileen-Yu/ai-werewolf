@@ -10,8 +10,6 @@ type host struct {
 	stance, stances, vote, votes, abstain, tie, allAbstained                   string
 	pk, pkVotes, pkNoVoters                                                    string
 	votedOut, exiled, plan, noFaker, faker, hook, undecided, gameOver          string
-	tactic                                                                     string
-	tactics                                                                    map[game.Tactic]string
 	// edges is how a plan names the side it wipes out first.
 	edges                                       map[string]string
 	revealed, comma, semicolon, result, silence string
@@ -76,8 +74,6 @@ var chineseHost = host{
 	noFaker:      "没人悍跳",
 	faker:        "%s悍跳预言家",
 	hook:         "，%s倒钩",
-	tactic:       "本局狼队的打法是%s。",
-	tactics:      map[game.Tactic]string{game.Counterclaim: "悍跳加冲锋", game.Hook: "悍跳加倒钩", game.DoubleClaim: "双狼悍跳"},
 	undecided:    "未定",
 	gameOver:     "游戏结束，%s胜利！身份公开：%s",
 	revealed:     "%s=%s",
@@ -160,8 +156,6 @@ var englishHost = host{
 	noFaker:      "nobody claims seer",
 	faker:        "%s claims seer",
 	hook:         ", %s plays the hook",
-	tactic:       "This game the pack plays %s.",
-	tactics:      map[game.Tactic]string{game.Counterclaim: "a counter-claim the pack backs", game.Hook: "a counter-claim with a hook", game.DoubleClaim: "a double counter-claim"},
 	undecided:    "undecided",
 	gameOver:     "Game over: the %s side wins! Roles: %s",
 	revealed:     "%s=%s",

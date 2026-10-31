@@ -551,8 +551,7 @@ type Belief struct {
 type Plan struct {
 	Round  int    `json:"round"`
 	Victim string `json:"victim"`
-	// Fakers are the wolves who claim to be the seer tomorrow: one, two, or
-	// after the first night none.
+	// Fakers are the wolves who claim to be the seer tomorrow: none, one or two.
 	Fakers []string `json:"fakers,omitempty"`
 	// Hook is the wolf who plays a staunch good player tomorrow, "" for nobody.
 	Hook string `json:"hook,omitempty"`
@@ -563,25 +562,6 @@ type Plan struct {
 	Edge  string `json:"edge,omitempty"`
 	Notes string `json:"notes,omitempty"`
 }
-
-// Tactic is how the rest of the pack plays a whole game around the faker:
-// every pack has a wolf claim to be the seer on Day 1, since a pack that
-// leaves the real seer unchallenged loses. It is dealt with the roles, so that
-// the wolves do not settle on the same play every game.
-type Tactic string
-
-const (
-	// Counterclaim has the rest of the pack back the faker.
-	Counterclaim Tactic = "counterclaim"
-	// Hook has one more wolf side with the good players, even against the
-	// faker, to be trusted later.
-	Hook Tactic = "hook"
-	// DoubleClaim has two wolves claim to be the seer, so the real one has two
-	// to fight and the table three to choose from.
-	DoubleClaim Tactic = "double_claim"
-)
-
-var Tactics = []Tactic{Counterclaim, Hook, DoubleClaim}
 
 type State struct {
 	Lang    Lang     `json:"lang,omitempty"`
@@ -594,10 +574,8 @@ type State struct {
 	PoisonUsed   bool `json:"poisonUsed,omitempty"`
 	// Notes holds each player's latest notes, by name.
 	Notes map[string]Notes `json:"notes,omitempty"`
-	// Tactic is how the pack plays this game; only the wolves are told.
-	Tactic Tactic `json:"tactic,omitempty"`
-	// Plan is the wolves' latest plan.
-	Plan *Plan `json:"plan,omitempty"`
+	// Plans is every plan the wolves made, one a night, in order.
+	Plans []Plan `json:"plans,omitempty"`
 	// Ballots is every vote so far, the sheriff election included, in order.
 	Ballots []Ballot `json:"ballots,omitempty"`
 	// Election is how the sheriff election went, once it is over.
@@ -664,6 +642,16 @@ func (s *State) Player(name string) *Player {
 	for i := range s.Players {
 		if s.Players[i].Name == name {
 			return &s.Players[i]
+		}
+	}
+	return nil
+}
+
+// PlanFor is the wolves' plan for a round, nil if they made none.
+func (s *State) PlanFor(round int) *Plan {
+	for i := range s.Plans {
+		if s.Plans[i].Round == round {
+			return &s.Plans[i]
 		}
 	}
 	return nil

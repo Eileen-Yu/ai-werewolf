@@ -160,7 +160,7 @@ func twoFakersDay1() (*table, []string) {
 	for i := range cast {
 		cast[i].Role, cast[i].Alive = seats[i].role, true
 	}
-	s := &game.State{Lang: game.Chinese, Round: 1, Phase: game.Night, Stage: game.StageNight, Players: cast, Tactic: game.DoubleClaim}
+	s := &game.State{Lang: game.Chinese, Round: 1, Phase: game.Night, Stage: game.StageNight, Players: cast}
 	t := &table{s: s, h: hostFor(game.Chinese)}
 	wolves := s.Living(game.Werewolf)
 
@@ -169,7 +169,6 @@ func twoFakersDay1() (*table, []string) {
 		s.Add("", fmt.Sprintf(t.h.yourRole, t.say(string(p.Role))), p.Name)
 	}
 	s.Add("", fmt.Sprintf(t.h.pack, t.list(wolves)), wolves...)
-	s.Add("", fmt.Sprintf(t.h.tactic, t.h.tactics[s.Tactic]), wolves...)
 	s.Add("", fmt.Sprintf(t.h.nightFalls, s.Lang.When(1, game.Night)))
 	s.Add("安陵容", "我和柯南都跳预言家。我给今晚的刀口卡皮巴拉发金水，柯南去查杀华妃。", wolves...)
 	s.Add("柯南", "行，我查杀华妃。", wolves...)
@@ -249,7 +248,7 @@ func (t *table) replayPlan(round int, victim, edge string, fakers []string, focu
 	if len(fakers) > 0 {
 		day = fmt.Sprintf(t.h.faker, t.list(fakers))
 	}
-	t.s.Plan = &game.Plan{Round: round, Victim: victim, Fakers: fakers, Focus: focus, Edge: edge, Notes: notes}
+	t.s.Plans = append(t.s.Plans, game.Plan{Round: round, Victim: victim, Fakers: fakers, Focus: focus, Edge: edge, Notes: notes})
 	t.s.Add("", fmt.Sprintf(t.h.plan, wolves[0], victim, t.h.edges[edge], day, focus, notes), wolves...)
 }
 

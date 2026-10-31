@@ -214,13 +214,14 @@ func TestCheckAsksOnlyWhatTheFormCanGetWrong(t *testing.T) {
 	assert.NoError(t, Check(vote, brain.Action{Target: "Karen"}))
 	assert.Error(t, Check(vote, brain.Action{Target: "Eileen"}))
 
-	plan := brain.Turn{Lang: game.English, Kind: brain.WolfPlan, Round: 1, Tactic: game.Hook, Pack: []string{"Eileen", "Karen"}, Candidates: []string{"Gym Bro"}}
+	plan := brain.Turn{Lang: game.English, Kind: brain.WolfPlan, Round: 1, Pack: []string{"Eileen", "Karen"}, Candidates: []string{"Gym Bro"}}
 	assert.NoError(t, Check(plan, brain.Action{Target: "Gym Bro", Speech: "Karen claims", Fakers: []string{"Karen"}, Hook: "Eileen"}))
 	assert.Error(t, Check(plan, brain.Action{Target: "Gym Bro", Speech: "Gym Bro claims", Fakers: []string{"Gym Bro"}}), "only a packmate fakes the seer")
 	assert.Error(t, Check(plan, brain.Action{Target: "Gym Bro", Speech: "Karen does both", Fakers: []string{"Karen"}, Hook: "Karen"}), "the hook is not the faker")
 	assert.NoError(t, Check(plan, brain.Action{Target: "Gym Bro", Speech: "we both claim", Fakers: []string{"Karen", "Eileen"}}), "a person may send both wolves")
 	assert.Error(t, Check(plan, brain.Action{Target: "Gym Bro", Speech: "Karen twice", Fakers: []string{"Karen", "Karen"}}), "a faker is named once")
 	assert.NoError(t, Check(plan, brain.Action{Target: "Gym Bro", Speech: "Karen claims", Fakers: []string{"Karen"}, Hook: "Eileen", Edge: game.God}))
+	assert.NoError(t, Check(plan, brain.Action{Target: "Gym Bro", Speech: "nobody claims", Hook: game.Nobody}), "the pack may fake nothing and play no hook")
 	assert.Error(t, Check(plan, brain.Action{Target: "Gym Bro", Speech: "Karen claims", Fakers: []string{"Karen"}, Hook: "Eileen", Edge: "seer"}), "the edge is one of the two sides")
 }
 

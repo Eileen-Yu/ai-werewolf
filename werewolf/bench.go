@@ -82,7 +82,7 @@ func threeSeers() threeSeerGame {
 	for i := range cast {
 		cast[i].Role, cast[i].Alive = seats[i].role, true
 	}
-	s := &game.State{Lang: game.Chinese, Round: 1, Phase: game.Night, Stage: game.StageNight, Players: cast, Tactic: game.Counterclaim}
+	s := &game.State{Lang: game.Chinese, Round: 1, Phase: game.Night, Stage: game.StageNight, Players: cast}
 	t := &table{s: s, h: hostFor(game.Chinese)}
 	out := threeSeerGame{wolves: s.Living(game.Werewolf)}
 
@@ -91,7 +91,6 @@ func threeSeers() threeSeerGame {
 		s.Add("", fmt.Sprintf(t.h.yourRole, t.say(string(p.Role))), p.Name)
 	}
 	s.Add("", fmt.Sprintf(t.h.pack, t.list(out.wolves)), out.wolves...)
-	s.Add("", fmt.Sprintf(t.h.tactic, t.h.tactics[s.Tactic]), out.wolves...)
 	s.Add("", fmt.Sprintf(t.h.nightFalls, s.Lang.When(1, game.Night)))
 	s.Add("", fmt.Sprintf(t.h.inspected, "龙傲天", t.say(game.Good)), "皇后")
 

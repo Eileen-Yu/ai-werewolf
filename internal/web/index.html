@@ -1019,9 +1019,9 @@ function showTurn(p, t, w) {
   else if (k === "withdraw") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${x === "pass" ? t.withdraw : t.stay}</option>`).join("")}</select>`;
   else if (k === "badge") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${esc(x === "pass" ? t.tearBadge : w(x))}</option>`).join("")}</select>`;
   else if (choice) h += `<label>${t.target}</label><select name="target">${opts(turn.candidates || [])}</select>`;
-  if (k === "wolf_plan") h += `<label>${t.faker}</label><select name="faker">${opts([...(turn.pack || []), ...(turn.round > 1 ? ["nobody"] : [])])}</select>`;
+  if (k === "wolf_plan") h += `<label>${t.faker}</label><select name="faker">${opts([...(turn.pack || []), "nobody"])}</select>`;
   if (k === "wolf_plan" && (turn.pack || []).length > 1) h += `<label>${t.faker2}</label><select name="faker2">${opts(turn.pack || [], true)}</select>`;
-  if (k === "wolf_plan" && turn.tactic === "hook") h += `<label>${t.hook}</label><select name="hook">${opts([...(turn.pack || []), ...(turn.round > 1 ? ["nobody"] : [])])}</select>`;
+  if (k === "wolf_plan" && (turn.pack || []).length > 1) h += `<label>${t.hook}</label><select name="hook">${opts([...(turn.pack || []), "nobody"])}</select>`;
   if (k === "wolf_plan") h += `<label>${t.focus}</label><select name="focus">${opts(turn.suspects || [], true)}</select>`;
   if (k === "wolf_plan") h += `<label>${t.edge}</label><select name="edge">${opts(["power role", "villager"], true)}</select>`;
   if (declares) {

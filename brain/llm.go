@@ -213,7 +213,7 @@ func prompt(t Turn) (system, user string) {
 	}
 	strategy := tx.strategies[t.Me.Role]
 	if t.Me.Role == game.Werewolf {
-		strategy += tx.tactics[t.Tactic] + tx.adapt
+		strategy += tx.packPlays
 	} else {
 		strategy += tx.goodVoting
 	}
@@ -357,7 +357,7 @@ func prompt(t Turn) (system, user string) {
 		least, most := t.FakerCount()
 		fmt.Fprintf(&b, tx.fakersOnly, l.List(t.Pack), least, most)
 		if t.NamesHook() {
-			fmt.Fprintf(&b, tx.hookOnly, l.List(l.SayAll(t.PlanNames())))
+			fmt.Fprintf(&b, tx.hookOnly, l.List(l.SayAll(t.HookNames(nil))))
 		}
 		fmt.Fprintf(&b, tx.focusOnly, l.List(l.SayAll(t.Suspects)))
 		fmt.Fprintf(&b, tx.edgeOnly, l.List(l.SayAll(game.Edges)))
