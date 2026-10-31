@@ -44,7 +44,13 @@ func (Random) Act(_ context.Context, t Turn) (Action, error) {
 		return Action{Target: pick(t.Candidates)}, nil
 	}
 	suspect := pick(spare(t, slices.DeleteFunc(slices.Clone(t.Suspects), func(s string) bool { return s == game.Nobody })))
-	return Action{Speech: fmt.Sprintf(pick(tx.speechLines), suspect), Suspect: suspect}, nil
+	a := Action{Speech: fmt.Sprintf(pick(tx.speechLines), suspect), Suspect: suspect}
+	// A faker claims seer once, so the claim is on the record as the plan has it.
+	claimed := slices.ContainsFunc(t.Transcript, func(e game.Event) bool { return e.Speaker == t.Me.Name && e.Claim != nil })
+	if t.Kind.Declares() && t.MustFakeSeer() && !claimed && suspect != "" {
+		a.Claim = &game.Claim{Role: game.Seer, Target: suspect, Result: pick([]string{game.Good, string(game.Werewolf)})}
+	}
+	return a, nil
 }
 
 // spare keeps a random wolf off its teammates: sacrificing one is a judgement

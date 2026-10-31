@@ -580,6 +580,10 @@ type State struct {
 	Ballots []Ballot `json:"ballots,omitempty"`
 	// Election is how the sheriff election went, once it is over.
 	Election *Election `json:"election,omitempty"`
+	// Exiles is who was voted out, a day at a time.
+	Exiles []Exile `json:"exiles,omitempty"`
+	// Saves is the witch's answer each night she was offered the antidote.
+	Saves []Save `json:"saves,omitempty"`
 	// Sheriff holds the badge: elected on the first day, passed on or torn
 	// up when they go. "" when nobody holds it.
 	Sheriff string `json:"sheriff,omitempty"`
@@ -715,6 +719,19 @@ type Ballot struct {
 
 // Election is how the sheriff election ended. Its ballot, when it came to a
 // vote, is among the State's Ballots.
+// Exile is who the day's vote sent out.
+type Exile struct {
+	Round int    `json:"round"`
+	Name  string `json:"name"`
+}
+
+// Save is whether the witch, offered the antidote, saved the night's victim.
+type Save struct {
+	Round  int    `json:"round"`
+	Victim string `json:"victim"`
+	Saved  bool   `json:"saved"`
+}
+
 type Election struct {
 	Round int `json:"round"`
 	// Runners is everyone who ran, Withdrew those of them who withdrew.

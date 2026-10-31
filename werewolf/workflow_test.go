@@ -297,8 +297,10 @@ func TestTheHostNeverSaysHowAnyoneDied(t *testing.T) {
 				if e.Speaker != "" || len(e.Audience) > 0 || strings.HasPrefix(e.Text, "欢迎") || e.Stage == game.StageEnd {
 					continue
 				}
+				// The stances repeat what a player claimed in public, which gives nothing away.
+				text := strings.ReplaceAll(e.Text, "声称预言家", "")
 				for _, c := range causes {
-					assert.NotContains(t, e.Text, c, "a public host line gives away %q", c)
+					assert.NotContains(t, text, c, "a public host line gives away %q", c)
 				}
 			}
 			for _, s := range turn.Seats {

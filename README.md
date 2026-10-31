@@ -269,6 +269,10 @@ diagrid workflow start GameWorkflow --project werewolf --id werewolf --instance-
 | | `-n <count>` | Times to ask each decision. Default `3` |
 | | `-only <names>` | Comma-separated decisions to ask: `sheriff-vote`, `day2-speech`, `day2-vote`. Default: all |
 | | `-out <file>` | Also write every answer as JSON |
+| `werewolf stats` | `-n <count>` | Play many games on the running gm, with its brain, and count how they went: how often the wolves claim seer and what they report, whether a wolf wins the badge, whether Day 1 exiles a wolf, whether the witch saves on Night 1, and the wolves' win rate for each Day 1 play. Default `50` |
+| | `-parallel <count>` | Games played at once. Default `4` |
+| | `-engine <address>`, `-lang zh\|en` | As for `start` |
+| | `-out <file>` | Also write every game's counts as JSON |
 
 ### The model
 

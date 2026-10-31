@@ -7,6 +7,9 @@
 //	werewolf bench    ask the LLM brain to make fixed decisions from a real
 //	                  game again, for comparing one version of the prompts
 //	                  with another
+//	werewolf stats    play many games on a running gm and count how the
+//	                  players tend to play, such as how often the wolves
+//	                  fake the seer and how often the witch saves on Night 1
 //
 // gm and start talk to Dapr (local daprd or Catalyst, via the usual
 // DAPR_GRPC_ENDPOINT / DAPR_API_TOKEN variables) unless -engine points them
@@ -42,7 +45,7 @@ import (
 	"github.com/Eileen-Yu/ai-werewolf/werewolf"
 )
 
-const usage = "usage: werewolf engine|gm|start|bench [flags]"
+const usage = "usage: werewolf engine|gm|start|bench|stats [flags]"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -61,6 +64,8 @@ func main() {
 		err = runStart(ctx, args)
 	case "bench":
 		err = runBench(ctx, args)
+	case "stats":
+		err = runStats(ctx, args)
 	default:
 		err = errors.New(usage)
 	}
@@ -179,6 +184,73 @@ func runStart(ctx context.Context, args []string) error {
 	}
 	fmt.Println(res.Summary(lang))
 	return nil
+}
+
+// runStats plays n games with no pause between phases, a few at a time, on
+// whatever gm is running, and prints what they add up to.
+func runStats(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("stats", flag.ExitOnError)
+	engineAddr := fs.String("engine", "", "local engine address; empty means Dapr")
+	n := fs.Int("n", 50, "games to play")
+	parallel := fs.Int("parallel", 4, "games played at once")
+	langName := fs.String("lang", "zh", "language the games are played in: zh or en")
+	out := fs.String("out", "", "file to write every game's stats to as JSON")
+	_ = fs.Parse(args)
+	lang, err := game.ParseLang(*langName)
+	if err != nil {
+		return err
+	}
+	conn, _, closeConn, err := connect(ctx, *engineAddr)
+	if err != nil {
+		return err
+	}
+	defer closeConn()
+	client := workflow.NewClient(conn)
+
+	prefix := fmt.Sprintf("stats-%d", time.Now().Unix())
+	results := make([]*werewolf.Stats, *n)
+	var wg sync.WaitGroup
+	limit := make(chan struct{}, max(1, *parallel))
+	for i := range results {
+		wg.Go(func() {
+			limit <- struct{}{}
+			defer func() { <-limit }()
+			id := fmt.Sprintf("%s-%d", prefix, i)
+			if _, err := client.ScheduleWorkflow(ctx, "GameWorkflow", workflow.WithInstanceID(id), workflow.WithInput(werewolf.Game{Lang: lang})); err != nil {
+				log.Printf("%s: start: %v", id, err)
+				return
+			}
+			meta, err := client.WaitForWorkflowCompletion(ctx, id)
+			if err != nil {
+				log.Printf("%s: %v", id, err)
+				return
+			}
+			res, err := werewolf.ReadResult(meta)
+			if err != nil {
+				log.Printf("%s: %v", id, err)
+				return
+			}
+			results[i] = &res.Stats
+			log.Printf("%s: %s, %s won", id, res.Stats.Strategy(), res.Winner)
+		})
+	}
+	wg.Wait()
+
+	var games []werewolf.Stats
+	for _, r := range results {
+		if r != nil {
+			games = append(games, *r)
+		}
+	}
+	werewolf.WriteTally(os.Stdout, games, *n-len(games))
+	if *out == "" {
+		return nil
+	}
+	data, err := json.MarshalIndent(games, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(*out, data, 0o644)
 }
 
 // connect returns the gRPC connection workflows run over and, when that is

@@ -52,6 +52,7 @@ type Result struct {
 	Rounds  int           `json:"rounds"`
 	Players []game.Player `json:"players"`
 	MVP     brain.MVP     `json:"mvp"`
+	Stats   Stats         `json:"stats"`
 }
 
 // Summary is the result in a line, for the person who started the game.
@@ -154,7 +155,7 @@ func GameWorkflow(ctx *workflow.WorkflowContext) (any, error) {
 		if err := t.aftermath(); err != nil {
 			return nil, fmt.Errorf("aftermath: %w", err)
 		}
-		return Result{Winner: winner, Rounds: g.State.Round, Players: g.State.Players, MVP: mvp}, nil
+		return Result{Winner: winner, Rounds: g.State.Round, Players: g.State.Players, MVP: mvp, Stats: StatsOf(&g.State)}, nil
 	}
 
 	g.State.Round++
@@ -370,6 +371,7 @@ func (t *table) witchActs(victim string) (saved bool, poisoned string, err error
 		if err != nil {
 			return false, "", err
 		}
+		s.Saves = append(s.Saves, game.Save{Round: s.Round, Victim: victim, Saved: pick == victim})
 		if pick == victim {
 			s.AntidoteUsed = true
 			t.add("", fmt.Sprintf(t.h.saved, victim), w)
@@ -675,6 +677,7 @@ func (t *table) day() error {
 		return t.pause()
 	}
 	s.Remove(out, t.h.votedOut)
+	s.Exiles = append(s.Exiles, game.Exile{Round: s.Round, Name: out})
 	t.announce(game.KindDeath, fmt.Sprintf(t.h.exiled, out))
 	if _, err := t.speak(t.turn(brain.LastWords, out, nil)); err != nil {
 		return err
