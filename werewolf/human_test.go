@@ -327,3 +327,47 @@ func TestTheSummaryOfASpeechIsShownOnlyOnAPublicAISpeech(t *testing.T) {
 	}
 	assert.Positive(t, summarized, "AI speeches are shown with their summary")
 }
+
+// slowPrep is summarizer with every daytime Prepare held until released, as
+// when the next speaker's notes take longer than this speaker's speech.
+type slowPrep struct{ released chan struct{} }
+
+func (b slowPrep) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
+	if t.Kind == brain.Prepare && t.Phase == game.Day {
+		select {
+		case <-b.released:
+		case <-ctx.Done():
+			return brain.Action{}, ctx.Err()
+		}
+	}
+	return summarizer{}.Act(ctx, t)
+}
+
+// The page draws a line once, so a speech must reach it with its summary,
+// even when the game then waits on the next speaker's preparation.
+func TestASpeechReachesThePageWithItsSummary(t *testing.T) {
+	b := slowPrep{released: make(chan struct{})}
+	SetBrain(b)
+	client := startEngine(t)
+	startWorker(t, client)
+	_, err := client.ScheduleWorkflow(t.Context(), "GameWorkflow", workflow.WithInstanceID("slow-prep"), workflow.WithInput(Game{Lang: game.English}))
+	require.NoError(t, err)
+	t.Cleanup(func() { close(b.released) })
+
+	var speech Line
+	require.Eventually(t, func() bool {
+		meta, err := client.FetchWorkflowMetadata(t.Context(), "slow-prep")
+		require.NoError(t, err)
+		v, ok, err := ReadView(meta, "")
+		require.NoError(t, err)
+		if !ok {
+			return false
+		}
+		i := slices.IndexFunc(v.Log, func(l Line) bool { return l.Kind == "speech" })
+		if i >= 0 {
+			speech = v.Log[i]
+		}
+		return i >= 0
+	}, 30*time.Second, 50*time.Millisecond)
+	assert.Equal(t, "summary of "+speech.Speaker, speech.Summary, "the game is waiting on the next speaker and the page has drawn %q", speech.Text)
+}

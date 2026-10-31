@@ -198,7 +198,7 @@ The page tells apart what it can know: the AI the table waits on is thinking, th
 
 **Decision.** Every public speech by an AI (a day speech, a campaign or PK speech, or last words), however short, gets a one-line summary, written by a second, separate LLM call that is given only the speaker's name and the speech (`brain.summaryPrompt`). It cannot give away a secret, because it is never told one. The summary rides on the `Action` and the event, the page shows it under the speech marked as a summary rather than the character's words, open on the latest three speeches and on the one being read aloud and folded to a line on older ones, and no prompt ever shows it (`Event.Said` leaves it out), so players read each other's words, not a recap. A person's move carries none; a wolf chat line, private, keeps none.
 
-**Tradeoff.** One more small LLM call per speech, made in the same activity, so the speech lands a little later. A failed call is asked once more; only when both fail does the speech go without a summary. A speech still invalid after every re-ask is played as it stands and is summarized like any other.
+**Tradeoff.** One more small LLM call per speech, made in the same activity, so the speech lands a little later. A failed call is asked once more; only when both fail does the speech go without a summary. A speech still invalid after every re-ask is played as it stands and is summarized like any other. The speech reaches the page with its summary already on it: the page draws a line once, and the game often waits on the next speaker's preparation right after a speech, so a summary added a moment later would never be shown.
 
 ### Revealing a vote
 

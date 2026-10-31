@@ -841,13 +841,16 @@ func (t *table) said(turn brain.Turn, m move, audience ...string) (brain.Action,
 	}
 	t.remember(turn.Me.Name, a)
 	if turn.Kind.Declares() {
-		t.narrate(t.s.Declare(turn.Me.Name, a.Speech, a.Suspect, a.Claim))
+		t.s.Declare(turn.Me.Name, a.Speech, a.Suspect, a.Claim)
 	} else {
-		t.add(turn.Me.Name, a.Speech, audience...)
+		t.s.Add(turn.Me.Name, a.Speech, audience...)
 	}
-	if a.Summary != "" && len(audience) == 0 {
-		t.s.Log[len(t.s.Log)-1].Summary = a.Summary
+	e := &t.s.Log[len(t.s.Log)-1]
+	if len(audience) == 0 {
+		e.Summary = a.Summary
 	}
+	// Narrated only now, so the page, which draws a line once, gets the summary with it.
+	t.narrate(*e)
 	return a, nil
 }
 
