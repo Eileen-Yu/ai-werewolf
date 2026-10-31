@@ -227,9 +227,6 @@ func (t *table) night() (nightDeaths, error) {
 			d.dead = append(d.dead, p.Name)
 		}
 	}
-	if victim != "" && saved {
-		t.add("", fmt.Sprintf(t.h.survived, victim), s.Living(game.Werewolf)...)
-	}
 	s.Phase, s.Stage = game.Day, game.StageDawn
 	return d, nil
 }

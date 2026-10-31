@@ -40,7 +40,7 @@ A game is one workflow instance, and each round, night then day, is one executio
 A view has seven parts:
 
 - **Seats and status**: who is alive and who holds the badge. A dead player only shows when they died, or that they were voted out: "died on Night 2", "voted out on Day 2". Whether someone was killed by the wolves, poisoned, saved or shot is never announced; only the player who used the power is told.
-- **Your secrets**: your role, your fellow wolves, the wolves' night talk and plan, that the wolves' victim survived (only the witch can have saved them, so the wolves know not to accuse that player), your check results, and what the witch knows about tonight's victim and her potions. These are the only facts that are certain.
+- **Your secrets**: your role, your fellow wolves, the wolves' night talk and plan, your check results, and what the witch knows about tonight's victim and her potions. These are the only facts that are certain.
 - **Your notes**: the player's own memory (see below).
 - **Your recent private thoughts**: the `thinking` from the last 3 moves. Older reasoning should already be in the notes.
 - **Claims on the table**: claims taken from public speech, each marked unverified. If Mia claims she checked Ruby and Ruby is good, other players get only "Mia claims: seer, Ruby: good (unverified)". This is where the wolves have room to deceive.
@@ -236,7 +236,7 @@ go test ./...
 
 - **Crash recovery**: the game master worker is killed mid-game and a new one takes over; the game must still finish.
 - **Secrets stay secret**: in random games where the witch saves and poisons and the hunter shoots, no public host line may mention a kill, a potion, a shot or a power role, and every seat shows only when its player died or that they were voted out. The hunter always shoots, only by day, and only the hunter is told who he shot.
-- **Night order**: the seer is asked while the wolves are still plotting, and the pack's first plan only gets through if the two run at once. A witch scripted to save the victim gives a night with no death, and only the wolves are told their victim survived. A pack that kills its own plan-writer, saved by the witch, sees him speak on Day 1.
+- **Night order**: the seer is asked while the wolves are still plotting, and the pack's first plan only gets through if the two run at once. A witch scripted to save the victim gives a night with no death, announced only once the sheriff election is over, and nobody, the wolves included, is told the victim survived: the wolves know only who they chose, and read the rest from the peaceful night like everyone else. A pack that kills its own plan-writer, saved by the witch, sees him speak on Day 1.
 - **The sheriff**: everyone is asked to run before the night's deaths are announced, those who died that night included, the seer and the wolf the plan sends always run, only candidates campaign, a candidate who withdraws neither stands nor votes, a lone candidate wins without a vote, the sheriff speaks last, and a sheriff who is out passes the badge to someone alive or tears it up.
 - **Days**: everyone speaks once and the vote follows straight on, with nothing in between.
 - **PK**: `werewolf/pk_test.go` ties the first day's vote. In one game the PK's votes go one way: only the tied speak again, only the others vote, only between the tied, and that vote exiles. In another every PK splits evenly: there are exactly `MaxPK` of them and nobody goes.

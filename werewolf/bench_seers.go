@@ -207,7 +207,6 @@ func twoFakersDay1() (*table, []string) {
 	s.Election = &game.Election{Round: 1, Runners: runners, Outcome: game.Voted, Sheriff: s.Sheriff}
 	s.Announce(game.KindResult, fmt.Sprintf(t.h.elected, s.Sheriff))
 	s.Announce(game.KindResult, t.h.peacefulAfterElection)
-	s.Add("", fmt.Sprintf(t.h.survived, "卡皮巴拉"), wolves...)
 
 	s.Stage = game.StageDay
 	day1 := []benchSpeech{

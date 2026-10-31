@@ -59,8 +59,8 @@ func TestWitchSavingTheVictimMakesAPeacefulNight(t *testing.T) {
 	assert.Contains(t, b.firstDawn, chineseHost.peacefulAfterElection)
 	assert.Equal(t, 1, b.kinds[brain.Save])
 	assert.Zero(t, b.kinds[brain.Poison], "the witch who saved has no second potion that night")
-	assert.Positive(t, b.wolvesTold, "the wolves were not told their victim survived")
-	assert.Zero(t, b.othersTold, "someone other than a wolf was told who the wolves killed")
+	assert.Zero(t, b.told, "someone, a wolf included, was told the victim survived rather than reading it from the peaceful night")
+	assert.Zero(t, b.early, "the night's outcome was out before the sheriff election ended")
 }
 
 func TestAWolfWhoKillsHimselfAndIsSavedLivesOn(t *testing.T) {
@@ -73,7 +73,7 @@ func TestAWolfWhoKillsHimselfAndIsSavedLivesOn(t *testing.T) {
 	require.NotEmpty(t, b.victim, "the pack never planned a kill")
 	assert.Equal(t, b.victim, b.saved, "the witch was told the wolf was the victim and saved him")
 	assert.True(t, b.spokeDay1, "the wolf who killed himself and was saved spoke on Day 1")
-	assert.True(t, b.toldSurvived, "the pack was told its victim survived")
+	assert.False(t, b.toldSurvived, "the pack reads its victim's survival from the peaceful night; nobody tells it")
 }
 
 // selfKillingPack plays randomly except that on the first night the pack
@@ -240,11 +240,11 @@ func (b *selfSavingWitch) Act(ctx context.Context, t brain.Turn) (brain.Action, 
 // savingWitch plays randomly except that the witch always saves and never
 // poisons. It records what the first day's first speaker heard at dawn.
 type savingWitch struct {
-	mu         sync.Mutex
-	kinds      map[brain.TurnKind]int
-	firstDawn  string
-	wolvesTold int // Day 1 turns where a wolf knows the night's victim survived
-	othersTold int
+	mu        sync.Mutex
+	kinds     map[brain.TurnKind]int
+	firstDawn string
+	told      int // Day 1 turns told the night's victim survived
+	early     int // election turns that already see how the night went
 }
 
 func (b *savingWitch) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
@@ -263,11 +263,11 @@ func (b *savingWitch) Act(ctx context.Context, t brain.Turn) (brain.Action, erro
 			}
 		}
 		if t.Phase == game.Day && slices.ContainsFunc(t.Transcript, func(e game.Event) bool { return strings.Contains(e.Text, "没有死") }) {
-			if t.Me.Role == game.Werewolf {
-				b.wolvesTold++
-			} else {
-				b.othersTold++
-			}
+			b.told++
+		}
+		election := t.Kind == brain.Run || t.Kind == brain.Campaign || t.Kind == brain.Withdraw || t.Kind == brain.SheriffVote
+		if election && slices.ContainsFunc(t.Transcript, func(e game.Event) bool { return e.Text == chineseHost.peacefulAfterElection }) {
+			b.early++
 		}
 	}
 	switch t.Kind {
