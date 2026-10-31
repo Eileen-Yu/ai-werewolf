@@ -26,6 +26,7 @@ type text struct {
 	badTarget, emptySpeech, badSuspect, badRole, badClaimTarget, badResult string
 	noNotes                                                                string
 	badFakers, badHook, badFocus, focusIsVictim, mustFake, quoted, notYet  string
+	besideFaker                                                            string
 	leftSeer, changedCheck                                                 string
 	badBelief, badPit, selfInPit, bigPit, badEdge                          string
 	// quoteCues are ways of quoting what someone said, which cannot follow
@@ -287,6 +288,7 @@ var chineseText = text{
 	leftSeer:       "你之前已经跳了预言家，不能改口成%s：预言家的身份要坚持到底",
 	changedCheck:   "你之前报过%s是%s，现在不能改成%s：前后矛盾一眼就假",
 	focusIsVictim:  "%s今晚就会被杀，明天不可能再投票放逐他：focus 要换一个人",
+	besideFaker:    "%s就坐在悍跳的%s旁边：第1夜刀悍跳狼的邻座，好人会把死者和悍跳连起来盘，悍跳更容易被识破。target 换一个不挨着悍跳的人，或者自刀",
 	mustFake:       "狼队计划要你今天悍跳预言家：claim.role 必须是预言家，并报一个查验结果",
 	quoted:         "%s还没有公开发过言，你不能说\"%s%s\"",
 	notYet:         "%s今天还没发言，你不能说\"%s%s\"",
@@ -605,6 +607,7 @@ Write everything in English.`,
 	leftSeer:       "you have already claimed seer, so you cannot now claim %s: a seer claim stands to the end",
 	changedCheck:   "you already reported %s as %s, so you cannot now say %s: going back on a check gives you away",
 	focusIsVictim:  "%s will be killed tonight and cannot be voted out tomorrow: pick someone else as focus",
+	besideFaker:    "%s sits right next to %s, who fakes the seer: kill a faker's neighbour on Night 1 and the good side reads the death and the claim together, so the claim is seen through sooner. Pick a target who does not sit next to a faker, or self-kill",
 	mustFake:       "the pack's plan has you claim seer today: claim.role must be seer, with a check result",
 	quoted:         "%s has not said anything in public yet; you cannot write \"%s%s\"",
 	notYet:         "%s has not spoken today yet; you cannot write \"%s%s\"",

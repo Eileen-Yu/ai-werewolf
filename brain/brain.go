@@ -243,7 +243,26 @@ func (t Turn) planProblems(a Action) []string {
 	if !slices.Contains(game.Edges, a.Edge) {
 		problems = append(problems, fmt.Sprintf(tx.badEdge, l.List(l.SayAll(game.Edges)), a.Edge))
 	}
+	if faker := t.fakerBeside(a); faker != "" {
+		problems = append(problems, fmt.Sprintf(tx.besideFaker, a.Target, faker))
+	}
 	return problems
+}
+
+// fakerBeside is, on Night 1, the faker a good victim sits next to, the
+// table going round so the last seat sits next to the first; "" if none.
+func (t Turn) fakerBeside(a Action) string {
+	n := len(t.Seats)
+	i := slices.IndexFunc(t.Seats, func(s Seat) bool { return s.Name == a.Target })
+	if t.Round != 1 || i < 0 || n < 3 || slices.Contains(t.Pack, a.Target) {
+		return ""
+	}
+	for _, j := range []int{(i + n - 1) % n, (i + 1) % n} {
+		if name := t.Seats[j].Name; slices.Contains(a.Fakers, name) {
+			return name
+		}
+	}
+	return ""
 }
 
 // PitProblems checks a good player's guesses at the pack: each names only

@@ -170,7 +170,7 @@ func TestTheSheriffIsMarkedAndToldToCallTheVote(t *testing.T) {
 }
 
 func TestPromptForAnOptionalPowerOffersPass(t *testing.T) {
-	turn := Turn{Kind: Save, Round: 1, Phase: game.Night, Me: game.Player{Name: "阿芳", Role: game.Witch}, Candidates: []string{"小红", game.Pass}}
+	turn := Turn{Kind: Save, Round: 2, Phase: game.Night, Me: game.Player{Name: "阿芳", Role: game.Witch}, Candidates: []string{"小红", game.Pass}}
 
 	system, user := prompt(turn)
 
@@ -243,7 +243,7 @@ func TestTheWolfPlanAsksForWhatThisGamesTacticNeeds(t *testing.T) {
 		turn.Tactic = tactic
 		system, user := prompt(turn)
 		assert.Contains(t, user, want[0], tactic)
-		assert.Contains(t, user, "target 只能是这些名字之一：老王、小红。")
+		assert.Regexp(t, "target 只能是这些名字之一：(老王、小红|小红、老王)。", user)
 		assert.Contains(t, user, "fakers 只能从阿杰、小宇里选，"+want[1]+"。", "every pack fakes the seer on the first night")
 		assert.Contains(t, user, "能采纳就采纳", "the plan answers what teammates proposed")
 		assert.Contains(t, system, chineseText.tactics[tactic], "a wolf is told this game's play")
@@ -839,4 +839,56 @@ func TestTheAftermathTellsWhatWasKnownFromWhatWasLearned(t *testing.T) {
 	_, user = prompt(turn)
 	assert.Contains(t, user, "keep four things apart")
 	assert.Contains(t, user, "never make up their motives")
+}
+
+func TestNightOneListsTheGoodPlayersInNoParticularOrder(t *testing.T) {
+	good := []string{"老王", "小红", "美玲", "小林", "大刘", "阿芳"}
+	seats := []Seat{{Name: "阿杰"}, {Name: "小宇"}}
+	for _, name := range good {
+		seats = append(seats, Seat{Name: name})
+	}
+	turn := Turn{
+		Kind: WolfPlan, Round: 1, Phase: game.Night, Me: game.Player{Name: "阿杰", Role: game.Werewolf},
+		Seats: seats, Pack: []string{"阿杰", "小宇"}, Wolves: []string{"阿杰", "小宇"},
+		Candidates: append([]string{"阿杰", "小宇"}, good...), Suspects: good,
+	}
+	inSeats := "还不确定的：" + strings.Join(good, "、")
+	targetInSeats := "target 只能是这些名字之一：" + strings.Join(turn.Candidates, "、")
+	shuffled := false
+	for range 20 {
+		_, user := prompt(turn)
+		if !strings.Contains(user, inSeats) && !strings.Contains(user, targetInSeats) {
+			shuffled = true
+			break
+		}
+	}
+	assert.True(t, shuffled, "with nothing known on Night 1, seat order would make the first seat the victim")
+
+	turn.Round = 2
+	_, user := prompt(turn)
+	assert.Contains(t, user, inSeats, "after Night 1 the players are told apart by what they did")
+	assert.Contains(t, user, targetInSeats)
+}
+
+func TestANightOneKillSkipsTheFakersNeighbours(t *testing.T) {
+	plan := Turn{
+		Kind: WolfPlan, Round: 1, Phase: game.Night, Me: game.Player{Name: "阿杰", Role: game.Werewolf},
+		Seats:      []Seat{{Name: "老王"}, {Name: "阿杰"}, {Name: "小红"}, {Name: "美玲"}, {Name: "小宇"}, {Name: "小林"}},
+		Candidates: []string{"老王", "阿杰", "小红", "美玲", "小宇", "小林"}, Suspects: []string{"老王", "小红", "美玲", "小林"},
+		Pack: []string{"阿杰", "小宇"},
+	}
+	act := func(victim string) Action {
+		return Action{Target: victim, Fakers: []string{"阿杰"}, Edge: game.God, Focus: "美玲", Speech: "阿杰悍跳"}
+	}
+
+	assert.ErrorContains(t, plan.Check(act("老王")), "老王就坐在悍跳的阿杰旁边")
+	assert.ErrorContains(t, plan.Check(act("小红")), "小红就坐在悍跳的阿杰旁边")
+	assert.NoError(t, plan.Check(act("小林")), "小林sits next to 小宇, who does not fake the seer")
+	assert.NoError(t, plan.Check(act("阿杰")), "a faker may self-kill")
+
+	plan.Seats = []Seat{{Name: "阿杰"}, {Name: "老王"}, {Name: "小红"}, {Name: "美玲"}, {Name: "小宇"}, {Name: "小林"}}
+	assert.ErrorContains(t, plan.Check(act("小林")), "小林就坐在悍跳的阿杰旁边", "the last seat sits next to the first")
+
+	plan.Round = 2
+	assert.NoError(t, plan.Check(act("老王")), "later nights the kill follows the game")
 }

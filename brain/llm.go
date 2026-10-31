@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand/v2"
 	"regexp"
 	"slices"
 	"strings"
@@ -349,7 +350,7 @@ func prompt(t Turn) (system, user string) {
 	}
 	b.WriteString("\n" + tx.onlyJSON + "{" + strings.Join(fields, ", ") + "}\n")
 	if t.Kind.IsChoice() {
-		fmt.Fprintf(&b, tx.targetOnly, l.List(l.SayAll(t.Candidates)))
+		fmt.Fprintf(&b, tx.targetOnly, l.List(l.SayAll(unordered(t, t.Candidates))))
 	}
 	if t.Kind == WolfPlan {
 		least, most := t.FakerCount()
@@ -427,8 +428,20 @@ func edges(t Turn) string {
 			}
 		}
 	}
+	good, unsure = unordered(t, good), unordered(t, unsure)
 	return fmt.Sprintf(tx.edges, l.List(t.Pack), len(t.Pack), orNobody(l, good), len(good), orNobody(l, gone),
 		orNobody(l, gods), orNobody(l, villagers), orNobody(l, unsure), max(0, len(good)-len(t.Pack)))
+}
+
+// unordered shuffles names on Night 1, when nothing tells the players apart
+// and a model handed them in seat order picks the first.
+func unordered(t Turn, names []string) []string {
+	if t.Round != 1 || t.Phase != game.Night {
+		return names
+	}
+	names = slices.Clone(names)
+	rand.Shuffle(len(names), func(i, j int) { names[i], names[j] = names[j], names[i] })
+	return names
 }
 
 func speaker(tx *text, e game.Event, me string) string {
