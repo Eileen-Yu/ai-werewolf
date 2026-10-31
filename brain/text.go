@@ -59,7 +59,7 @@ type text struct {
 	twoReadings string
 	// ballots is the vote record: every vote, then each player's votes in turn.
 	ballots, electionBallot, exileBallot, electionShort, votedFor, abstainedBy string
-	pkBallot, pkShort                                                          string
+	pkBallot, pkShort, electionPKBallot, electionPKShort                       string
 	abstainStep, sheriffVoter, voteStep, ballotSep, stepSep, ballotLine        string
 	sheriffMark, sheriffLine                                                   string
 	line                                                                       string
@@ -122,7 +122,7 @@ var chineseText = text{
 - 村民：没有特殊能力。
 流程：天亮后只公布昨晚谁死了（第1天要等警长竞选结束才公布），不公布死因（可能被狼人杀，也可能被女巫毒死；被救的人不会死）。猎人开枪也不公布，主持人只会说被带走的人死亡了。
 白天按顺序每人发言一次，有警长时警长最后发言归票，发完就直接投票放逐一人，没有第二轮发言。平票就PK：平票的人按发言顺序再各发言一次，其他人听完后只能在他们中间投票，他们自己不投；再平票就在新的平票者中再PK，最多3轮，第3轮还平、所有人弃票或者没有人能投票，今天就无人出局。被放逐的人有遗言。
-警长：第1天天亮后先竞选警长，竞选结束后才公布第1夜的死讯，所以昨晚死的人也照常参加竞选，当选后出局就移交警徽。想当的人上警，按座位顺序发表竞选发言，没上警的人投票选警长，得票最多的当选；平票、没人上警或者所有人都上警，则没有警长。警长放逐投票算1.5票，每天最后一个发言，可以归票。警长出局时可以把警徽移交给一个活着的人，也可以撕掉警徽，从此没有警长。
+警长：第1天天亮后先竞选警长，竞选结束后才公布第1夜的死讯，所以昨晚死的人也照常参加竞选，当选后出局就移交警徽。想当的人上警，按座位顺序发表竞选发言，没上警的人投票选警长，得票最多的当选。平票就PK：平票的人按座位顺序再各发言一次，没上警的人再在他们中间投票，上过警的人（包括退水的）始终不投；再平就在新的平票者中再PK，最多3轮。第3轮还平、所有人都弃票、没人上警或者所有人都上警，则没有警长。警长放逐投票算1.5票，每天最后一个发言，可以归票。警长出局时可以把警徽移交给一个活着的人，也可以撕掉警徽，从此没有警长。
 胜负：狼人全部出局则好人胜利；所有村民出局，或者预言家、女巫、猎人全部出局，或者活着的狼人不少于其他活着的人（狼人从此控制每一次投票），则狼人胜利。
 
 你是%s，身份是%s，性格：%s。
@@ -264,12 +264,13 @@ var chineseText = text{
 			"警长的1.5票和归票权很有用。上警不是神职专属：想带队、想抢话语权、想在台上看清谁在说谎的好人也可以上警。但上警的人越多，警下能投票的人越少。预言家一定上警，靠竞选发言报查验、拿警徽带队。" +
 			"警上不能只有预言家和悍跳的狼：那样好人只能在两个预言家里二选一，警徽很容易落到狼手里。有身份的好人（猎人、女巫）一般要上警，在台上当面检验预言家，但不报自己的身份；想带队的村民也上。" +
 			"悍跳的狼一定上警，在竞选发言里和预言家正面对跳。其他狼按局势和性格决定：警上多一只狼可以帮着站边或搅局，但警下也要留狼的票。上警的人不能投票选警长。",
-		Campaign: "你上警了，这是你的竞选发言：说清楚为什么大家该把警徽给你：预言家报身份和查验；其他人一般不报身份，说你会怎么带队找狼。不超过80字。",
+		Campaign: "你上警了，这是你的竞选发言：说清楚为什么大家该把警徽给你：预言家报身份和查验；其他人一般不报身份，说你会怎么带队找狼。如果主持人刚宣布了警长PK，你在PK台上：这是你的PK发言，针对刚才的票型和同台的对手，说清楚为什么这一轮该投你，别把竞选发言重说一遍。不超过80字。",
 		Withdraw: "竞选发言都结束了，正式投票前你可以退水：选你自己的名字表示继续竞选，选\"放弃\"表示退水。所有还在竞选的人同时决定。" +
 			"退水的人不能当警长，也不能投票选警长。看清楚其他人的竞选发言：如果你信任的人更适合拿警徽，或者你的发言被打穿了，可以退水；还想要警徽就留下。" +
 			"跳了预言家的人退水，大家会觉得他是假的，所以悍跳的狼不要退水。",
 		SheriffVote: "投票选警长：从上警的人里选一个。比较他们的竞选发言，谁报的信息更可信、谁当警长对好人更有利，就投谁。谁都信不过可以选\"放弃\"弃票。" +
-			"几个人都跳预言家时，不要投先跳的那个，也不要投说得最硬的那个，要投比较下来更像真的那个：第1夜验人的理由、查杀落在谁身上、警徽流合不合理。",
+			"几个人都跳预言家时，不要投先跳的那个，也不要投说得最硬的那个，要投比较下来更像真的那个：第1夜验人的理由、查杀落在谁身上、警徽流合不合理。" +
+			"平票就由平票的人再各发言一次，你再在他们中间投一次，最多3轮PK，第3轮还平就没有警长，好人失去归票的人。",
 		Badge: "你是警长，现在出局了。选一个活着的人表示把警徽移交给他，选\"放弃\"表示撕掉警徽、从此没有警长。" +
 			"警徽应该交给你最信任的好人；没有把握、怕交到狼人手里，就撕掉。" +
 			"跳过预言家的人，不管真假，都按自己报过的警徽流交：最近一晚验的人是好人就交给他，是狼就交给警徽流里的下一个。不按警徽流交，等于自己承认是假的。",
@@ -346,22 +347,24 @@ var chineseText = text{
 	summaryFrom: 60,
 	nobodySpoke: "到现在为止还没有任何人公开发过言，也没有任何公开信息，谁是什么身份完全不知道。" +
 		"不能评价任何人的发言或观点，也不要编\"他像预言家\"这类没有依据的理由；需要选人时只能靠猜，就直说是猜的。\n",
-	silent:         "还没有公开发过言的人：%s。你不能评价他们说过什么。\n",
-	shootAlive:     "只能带走还活着的人。已经出局的人（%s）不能再被带走，选他们是无效的。\n",
-	ballots:        "\n【票型】每一次投票谁投了谁，所有人都看得到。看票比听发言更重要\n",
-	electionBallot: "%s警长投票",
-	exileBallot:    "%s放逐投票",
-	electionShort:  "警长票",
-	pkBallot:       "%s第%d轮PK投票",
-	pkShort:        "%sPK%d",
-	votedFor:       "投%s的：%s",
-	abstainedBy:    "弃票：%s",
-	abstainStep:    "%s弃票",
-	sheriffVoter:   "%s（警长，1.5票）",
-	voteStep:       "%s投%s",
-	ballotSep:      "；",
-	stepSep:        "，",
-	ballotLine:     "- %s：%s\n",
+	silent:           "还没有公开发过言的人：%s。你不能评价他们说过什么。\n",
+	shootAlive:       "只能带走还活着的人。已经出局的人（%s）不能再被带走，选他们是无效的。\n",
+	ballots:          "\n【票型】每一次投票谁投了谁，所有人都看得到。看票比听发言更重要\n",
+	electionBallot:   "%s警长投票",
+	exileBallot:      "%s放逐投票",
+	electionShort:    "警长票",
+	pkBallot:         "%s第%d轮PK投票",
+	pkShort:          "%sPK%d",
+	electionPKBallot: "%s第%d轮警长PK投票",
+	electionPKShort:  "警长PK%d",
+	votedFor:         "投%s的：%s",
+	abstainedBy:      "弃票：%s",
+	abstainStep:      "%s弃票",
+	sheriffVoter:     "%s（警长，1.5票）",
+	voteStep:         "%s投%s",
+	ballotSep:        "；",
+	stepSep:          "，",
+	ballotLine:       "- %s：%s\n",
 	twoReadings: "【怀疑前想两面】你要怀疑、投票或者对某个人用技能之前，先给他的行为想两种解释：" +
 		"如果他是狼，他的这些行为说明其他人是什么身份，谁像他的同伴、谁是他在打的好人，这和场上其他事情对得上吗？" +
 		"如果他是好人，同样的行为你会怎么解释？" +
@@ -437,7 +440,7 @@ Roles:
 - Villager: no power.
 Flow: at dawn only who died is announced (on Day 1, only once the sheriff election is over), never how (killed by werewolves or poisoned by the witch; a saved player does not die). A hunter's shot is not announced either: the host only says the player shot has died.
 By day everyone speaks once in order, the sheriff, if there is one, last, calling the vote, and then everyone votes one person out, with no second round of speeches. A tie goes to a PK: the tied players speak again in speaking order, then everyone else votes between them, and they do not vote themselves. A PK that ties again goes to another PK between the newly tied, at most 3; if the third ties, everyone abstains, or nobody is left to vote, nobody goes today. The exiled player gets last words.
-Sheriff: on Day 1, before the day's speeches, there is a sheriff election, and Night 1's deaths are announced only once it is over: whoever died that night takes part like anyone, and passes the badge on if elected. Whoever wants the badge runs and gives a campaign speech in seat order; everyone not running votes, and the most votes wins. A tie, nobody running, or everyone running means no sheriff. The sheriff's vote to exile counts one and a half, the sheriff speaks last each day and may call the vote. A sheriff who goes out may pass the badge to someone alive, or tear it up, and then there is no sheriff.
+Sheriff: on Day 1, before the day's speeches, there is a sheriff election, and Night 1's deaths are announced only once it is over: whoever died that night takes part like anyone, and passes the badge on if elected. Whoever wants the badge runs and gives a campaign speech in seat order; everyone not running votes, and the most votes wins. A tie goes to a PK: the tied candidates speak again in seat order and those who never ran vote again between them, candidates, even ones who withdrew, never voting; another tie means another PK between the newly tied, at most 3. A third tie, everyone abstaining, nobody running, or everyone running means no sheriff. The sheriff's vote to exile counts one and a half, the sheriff speaks last each day and may call the vote. A sheriff who goes out may pass the badge to someone alive, or tear it up, and then there is no sheriff.
 Winning: the good side wins when every werewolf is out; the werewolves win when every villager is out, when the seer, witch and hunter are all out, or when the living werewolves are at least as many as everyone else alive (from then on they control every vote).
 
 You are %s. Your role is %s. Your personality: %s.
@@ -580,12 +583,13 @@ Write everything in English.`,
 			"The sheriff's one and a half votes and the right to call the vote are worth a lot. Running is not just for power roles: a good player who wants to lead, to be heard, or to watch the liars up close may run too. But the more who run, the fewer are left to vote. The seer always runs, reporting their checks in the campaign to take the badge and lead. " +
 			"The race must not be just the seer and the fake: then good players can only pick one of two seers, and the badge easily lands with a werewolf. Good players with a power role, the hunter or the witch, usually run, to test the seers face to face, without claiming their own role; so do villagers who want to lead. " +
 			"The wolf faking the seer always runs, taking the seer on head to head in the campaign. The other wolves decide by the game and their character: one more wolf in the race can back the faker or stir things up, but the pack needs votes from the floor too. Those who run do not vote for sheriff.",
-		Campaign: "You are running for sheriff. This is your campaign speech: say why the table should give you the badge: the seer gives their role and checks; anyone else usually claims no role, and says how they will lead the hunt. At most 40 words.",
+		Campaign: "You are running for sheriff. This is your campaign speech: say why the table should give you the badge: the seer gives their role and checks; anyone else usually claims no role, and says how they will lead the hunt. If the host has just announced a sheriff PK and you are in it, this is your PK speech: answer the vote that tied and the others in the PK, and say why this round should go to you, rather than repeating your campaign speech. At most 40 words.",
 		Withdraw: "The campaign speeches are over. Before the vote you may withdraw: pick your own name to stay in the race, or \"pass\" to withdraw. Everyone still running decides at once. " +
 			"Whoever withdraws cannot be sheriff and cannot vote for sheriff either. Weigh the other campaigns: if someone you trust is better placed to take the badge, or your own campaign was taken apart, you may withdraw; if you still want the badge, stay. " +
 			"Someone who claimed seer and then withdraws looks fake, so a wolf faking the seer never withdraws.",
 		SheriffVote: "Vote for sheriff: pick one of those running. Compare their campaign speeches: whose information is more believable, and who as sheriff helps the good side more. If you trust none of them, pick \"pass\" to abstain. " +
-			"When several claim seer, vote neither for the first to claim nor for the one who sounds surest, but for the one who looks real once compared: their reason for the Night 1 check, who their werewolf report lands on, whether their badge flow makes sense.",
+			"When several claim seer, vote neither for the first to claim nor for the one who sounds surest, but for the one who looks real once compared: their reason for the Night 1 check, who their werewolf report lands on, whether their badge flow makes sense. " +
+			"A tie sends the tied candidates to a PK: they speak again and you vote again between them, at most 3 PKs; if the third ties too there is no sheriff, and the good side loses whoever would call the vote.",
 		Badge: "You are the sheriff and you are out. Pick someone alive to pass the badge to, or \"pass\" to tear it up so there is no sheriff any more. " +
 			"Give it to the good player you trust most; if you are unsure and it might reach a werewolf, tear it up. " +
 			"Whoever claimed seer, real or fake, passes it by the badge flow they gave: to the latest night's check if they are good, to the next in the flow if a werewolf. Passing it any other way is as good as admitting the claim was fake.",
@@ -662,22 +666,24 @@ Write everything in English.`,
 	summaryFrom: 180,
 	nobodySpoke: "Nobody has said anything in public yet and there is no public information at all; nobody knows anyone's role. " +
 		"Do not comment on anyone's speech or views, and do not invent reasons like \"he seems like the seer\"; if you have to pick someone, it is a guess, so say so.\n",
-	silent:         "Players who have not said anything in public yet: %s. You cannot comment on what they said.\n",
-	shootAlive:     "You can only shoot someone still alive. Players already out (%s) cannot be shot; picking one of them is invalid.\n",
-	ballots:        "\n[Votes] Who voted for whom in every vote, as everyone saw. The votes matter more than the speeches\n",
-	electionBallot: "%s sheriff vote",
-	exileBallot:    "%s vote",
-	electionShort:  "sheriff vote",
-	pkBallot:       "%s PK vote %d",
-	pkShort:        "%s PK %d",
-	votedFor:       "for %s: %s",
-	abstainedBy:    "abstained: %s",
-	abstainStep:    "%s: abstained",
-	sheriffVoter:   "%s (sheriff, 1.5 votes)",
-	voteStep:       "%s: %s",
-	ballotSep:      "; ",
-	stepSep:        ", ",
-	ballotLine:     "- %s: %s\n",
+	silent:           "Players who have not said anything in public yet: %s. You cannot comment on what they said.\n",
+	shootAlive:       "You can only shoot someone still alive. Players already out (%s) cannot be shot; picking one of them is invalid.\n",
+	ballots:          "\n[Votes] Who voted for whom in every vote, as everyone saw. The votes matter more than the speeches\n",
+	electionBallot:   "%s sheriff vote",
+	exileBallot:      "%s vote",
+	electionShort:    "sheriff vote",
+	pkBallot:         "%s PK vote %d",
+	pkShort:          "%s PK %d",
+	electionPKBallot: "%s sheriff PK vote %d",
+	electionPKShort:  "sheriff PK %d",
+	votedFor:         "for %s: %s",
+	abstainedBy:      "abstained: %s",
+	abstainStep:      "%s: abstained",
+	sheriffVoter:     "%s (sheriff, 1.5 votes)",
+	voteStep:         "%s: %s",
+	ballotSep:        "; ",
+	stepSep:          ", ",
+	ballotLine:       "- %s: %s\n",
 	twoReadings: "[Read it both ways] Before you suspect, vote for or use a power on someone, explain their behaviour two ways. " +
 		"If they are a werewolf, what does their behaviour imply about the others: who looks like their teammate, which good player are they going after, and does that fit everything else at the table? " +
 		"If they are good, how would you explain the same behaviour? " +

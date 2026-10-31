@@ -472,9 +472,9 @@ func (t *table) passBadge(dead ...string) error {
 // election runs the first day's sheriff election, before the night's deaths
 // are announced. Everyone decides at once whether to run; those running give a campaign
 // speech in seat order, then decide at once whether to withdraw, and those who
-// never ran vote. A candidate who withdraws loses their vote too. Nobody
-// running, nobody left to vote, everyone withdrawing, or a tie leaves the game
-// without a sheriff.
+// never ran vote, a tie going to a PK. A candidate who withdraws loses their
+// vote too. Nobody running, nobody left to vote, everyone withdrawing,
+// everyone abstaining or MaxPK tied PKs leave the game without a sheriff.
 func (t *table) election() error {
 	s := t.s
 	alive := s.Living()
@@ -500,8 +500,11 @@ func (t *table) election() error {
 		}
 	}
 	voters := game.Without(alive, runners...)
-	// The election goes on the record, and so on the page, only once it is
-	// over, in the same step as the announcement of how it ended.
+	// An election that never comes to a vote goes on the record, and so on
+	// the page, only once it is over, in the same step as the announcement of
+	// how it ended. One that does goes on it before the first vote, so each
+	// of its ballots shows who ran and who withdrew; the page shows nothing
+	// of it until a ballot is in.
 	e := &game.Election{Round: s.Round, Runners: runners}
 	end := func(o game.Outcome) { e.Outcome, s.Election = o, e }
 	switch {
@@ -534,20 +537,12 @@ func (t *table) election() error {
 		end(game.Unopposed)
 		t.announce(game.KindResult, fmt.Sprintf(t.h.unopposed, sheriff))
 	} else {
-		votes, err := t.chooseAll(brain.SheriffVote, voters, func(string) []string { return append(slices.Clone(standing), game.Pass) })
+		end(game.Voted)
+		won, err := t.sheriffVote(standing, voters)
 		if err != nil {
 			return err
 		}
-		s.Ballots = append(s.Ballots, game.Ballot{Round: s.Round, Votes: votes, Election: true})
-		end(game.Voted)
-		t.announce(game.KindVote, fmt.Sprintf(t.h.sheriffVotes, t.tallyLine(votes)))
-		won, ok := game.Tally(votes, "")
-		if !ok {
-			line := t.h.sheriffTie
-			if abstained(votes) {
-				line = t.h.sheriffAbstained
-			}
-			t.announce(game.KindResult, line)
+		if won == "" {
 			return t.pause()
 		}
 		sheriff = won
@@ -555,6 +550,47 @@ func (t *table) election() error {
 	s.Sheriff, e.Sheriff = sheriff, sheriff
 	t.announce(game.KindResult, fmt.Sprintf(t.h.elected, sheriff))
 	return t.pause()
+}
+
+// sheriffVote has those who never ran vote between the candidates standing,
+// and returns who is elected, or "" for nobody. A tie goes to a PK, as a vote
+// to exile does: the tied candidates speak again in seat order, and the same
+// voters vote between them; candidates, even ones who withdrew, still do not.
+// A PK that ties goes to another between the newly tied, until one decides it
+// or MaxPK have tied.
+func (t *table) sheriffVote(standing, voters []string) (string, error) {
+	s := t.s
+	for pk := 0; ; pk++ {
+		if pk > 0 {
+			t.add("", fmt.Sprintf(t.h.sheriffPK, pk, t.list(standing)))
+			if _, err := t.goRound(brain.Campaign, standing, nil); err != nil {
+				return "", err
+			}
+		}
+		votes, err := t.chooseAll(brain.SheriffVote, voters, func(string) []string { return append(slices.Clone(standing), game.Pass) })
+		if err != nil {
+			return "", err
+		}
+		s.Ballots = append(s.Ballots, game.Ballot{Round: s.Round, Votes: votes, Election: true, PK: pk})
+		if pk == 0 {
+			t.announce(game.KindVote, fmt.Sprintf(t.h.sheriffVotes, t.tallyLine(votes)))
+		} else {
+			t.announce(game.KindVote, fmt.Sprintf(t.h.sheriffPKVotes, pk, t.tallyLine(votes)))
+		}
+		if won, ok := game.Tally(votes, ""); ok {
+			return won, nil
+		}
+		if abstained(votes) {
+			t.announce(game.KindResult, t.h.sheriffAbstained)
+			return "", nil
+		}
+		if pk == MaxPK {
+			t.announce(game.KindResult, fmt.Sprintf(t.h.sheriffTie, MaxPK))
+			return "", nil
+		}
+		leaders := game.Leaders(game.Totals(votes, ""))
+		standing = slices.DeleteFunc(slices.Clone(standing), func(n string) bool { return !slices.Contains(leaders, n) })
+	}
 }
 
 // withdraw asks every candidate but the seer, who always stays in, whether to

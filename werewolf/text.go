@@ -20,7 +20,8 @@ type host struct {
 	// The sheriff: the election, the badge's weight in a vote, and passing it on.
 	election, noRunners, allRun, runners, campaign, sheriffVotes string
 	withdrew, allWithdrew, unopposed                             string
-	sheriffTie, sheriffAbstained, elected, sheriffVote           string
+	sheriffPK, sheriffPKVotes, sheriffTie, sheriffAbstained      string
+	elected, sheriffVote                                         string
 	badgePassed, badgeTorn                                       string
 	peacefulAfterElection, deadAfterElection                     string
 
@@ -97,7 +98,9 @@ var chineseHost = host{
 	allWithdrew:      "上警的人都退水了，本局没有警长。",
 	unopposed:        "警上只剩%s一人，不用投票，直接当选。",
 	sheriffVotes:     "警长投票结果：%s",
-	sheriffTie:       "警长投票平票，警徽流失，本局没有警长。",
+	sheriffPK:        "警长投票平票：%[2]s进入第%[1]d轮警长PK。他们按座位顺序再各发言一次，然后没上过警的人只能在他们中间投票，上过警的人（包括退水的）仍然不投票。",
+	sheriffPKVotes:   "第%d轮警长PK投票结果：%s",
+	sheriffTie:       "第%d轮警长PK仍然平票，警徽流失，本局没有警长。",
 	sheriffAbstained: "所有人都弃票，警徽流失，本局没有警长。",
 	elected:          "%s当选警长！",
 	sheriffVote:      "%s（警长）",
@@ -179,7 +182,9 @@ var englishHost = host{
 	allWithdrew:      "Every candidate withdrew, so there is no sheriff this game.",
 	unopposed:        "%s is the only candidate left, so there is no vote.",
 	sheriffVotes:     "Sheriff votes: %s",
-	sheriffTie:       "The sheriff vote is a tie, so the badge is lost and there is no sheriff this game.",
+	sheriffPK:        "The sheriff vote is a tie: %[2]s go to sheriff PK %[1]d. They speak again in seat order, then those who never ran vote between them; candidates, even ones who withdrew, still do not vote.",
+	sheriffPKVotes:   "Sheriff PK %d votes: %s",
+	sheriffTie:       "Sheriff PK %d tied too, so the badge is lost and there is no sheriff this game.",
 	sheriffAbstained: "Everyone abstained, so the badge is lost and there is no sheriff this game.",
 	elected:          "%s is elected sheriff!",
 	sheriffVote:      "%s (sheriff)",

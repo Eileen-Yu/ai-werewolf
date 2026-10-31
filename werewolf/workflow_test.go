@@ -743,9 +743,15 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 				left = game.Without(runners, b.withdrew...)
 				withdrawn = withdrawn || len(b.withdrew) > 0
 			case brain.SheriffVote:
-				assert.False(t, slices.ContainsFunc(turn.Ballots, func(b game.Ballot) bool { return b.Election }), "the sheriff votes are not on the record while they are cast")
 				assert.NotContains(t, runners, turn.Me.Name, "a candidate, even one who withdrew, does not vote for sheriff")
-				assert.Equal(t, append(slices.Clone(left), game.Pass), turn.Candidates, "only those still running stand, and a voter may abstain")
+				if i := slices.IndexFunc(turn.Ballots, func(b game.Ballot) bool { return b.Election }); i < 0 {
+					assert.Equal(t, append(slices.Clone(left), game.Pass), turn.Candidates, "only those still running stand, and a voter may abstain")
+				} else {
+					last := turn.Ballots[len(turn.Ballots)-1]
+					_, decided := game.Tally(last.Votes, "")
+					assert.True(t, last.Election && !decided, "a sheriff PK follows a tied sheriff vote, and is not on the record while it is cast")
+					assert.Subset(t, left, turn.Candidates[:len(turn.Candidates)-1], "a sheriff PK stands only candidates still running")
+				}
 			case brain.Speech:
 				if turn.Round == 1 {
 					lastDay1Speaker, day1Sheriff = turn.Me.Name, sheriff

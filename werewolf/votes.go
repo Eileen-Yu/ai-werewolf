@@ -23,8 +23,8 @@ type VoteResult struct {
 	Sheriff string       `json:"sheriff,omitempty"`
 	Votes   []BallotVote `json:"votes,omitempty"`
 	Totals  []game.Total `json:"totals,omitempty"`
-	// Candidates is who stood in an election or a PK, Withdrew who ran and
-	// withdrew.
+	// Candidates is who stood in an election or a PK, Withdrew who ran for
+	// sheriff and withdrew.
 	Candidates []string `json:"candidates,omitempty"`
 	Withdrew   []string `json:"withdrew,omitempty"`
 	// Outcome is "exiled", "elected", "tie", "pk" for a tie that goes to a
@@ -39,7 +39,7 @@ type VoteResult struct {
 // BallotVote is one voter's vote. An empty Target is an abstention. Before is
 // what the voter did in the vote this one follows, "" for an abstention, and
 // nil when there was none or they did not vote in it: for a day's vote, the
-// day's vote before it; for a PK, the vote that tied.
+// day's vote before it; for a PK, to exile or for sheriff, the vote that tied.
 type BallotVote struct {
 	Voter  string  `json:"voter"`
 	Target string  `json:"target,omitempty"`
@@ -65,7 +65,7 @@ func voteResults(s *game.State) []VoteResult {
 		}
 		for _, v := range b.Votes {
 			bv := BallotVote{Voter: v.Voter, Target: v.Target, Weight: game.VoteWeight(v.Voter, b.Sheriff)}
-			if before != nil && !b.Election {
+			if before != nil && (!b.Election || b.PK > 0) {
 				if j := slices.IndexFunc(before.Votes, func(p game.Vote) bool { return p.Voter == v.Voter }); j >= 0 {
 					bv.Before = &before.Votes[j].Target
 				}
@@ -79,14 +79,16 @@ func voteResults(s *game.State) []VoteResult {
 			r.Outcome, r.Winner = "exiled", winner
 		case len(r.Totals) == 0:
 			r.Outcome = "abstained"
-		case !b.Election && goesToPK(s, i):
+		case goesToPK(s, i):
 			r.Outcome, r.Tied = "pk", game.Leaders(r.Totals)
 		default:
 			r.Outcome, r.Tied = "tie", game.Leaders(r.Totals)
 		}
 		if b.Election {
 			r.Key = fmt.Sprintf("%d-election", b.Round)
-			if e := s.Election; e != nil && e.Round == b.Round {
+			if b.PK > 0 {
+				r.Key = fmt.Sprintf("%d-election-pk%d", b.Round, b.PK)
+			} else if e := s.Election; e != nil && e.Round == b.Round {
 				r.Candidates, r.Withdrew = game.Without(e.Runners, e.Withdrew...), e.Withdrew
 			}
 		} else {
@@ -96,8 +98,8 @@ func voteResults(s *game.State) []VoteResult {
 			} else {
 				previous = b
 			}
-			tied = b
 		}
+		tied = b
 		out = append(out, r)
 	}
 	if e := s.Election; e != nil && e.Outcome != game.Voted {
@@ -117,15 +119,19 @@ func voteResults(s *game.State) []VoteResult {
 
 // goesToPK reports whether the tied vote Ballots[i] went, or is going, to a
 // PK. One that did is followed by it; the latest vote goes to one while the
-// day is still on, unless it was the last PK allowed or everyone alive tied.
+// day, or for a sheriff vote the election, is still on, unless it was the
+// last PK allowed or, to exile, everyone alive tied.
 func goesToPK(s *game.State, i int) bool {
 	b := s.Ballots[i]
 	if i+1 < len(s.Ballots) {
 		next := s.Ballots[i+1]
-		return next.Round == b.Round && next.PK == b.PK+1
+		return next.Round == b.Round && next.Election == b.Election && next.PK == b.PK+1
 	}
 	if b.Round != s.Round || s.Phase != game.Day || b.PK >= MaxPK {
 		return false
+	}
+	if b.Election {
+		return s.Stage == game.StageElection
 	}
 	return len(game.Without(s.Living(), game.Leaders(game.Totals(b.Votes, b.Sheriff))...)) > 0
 }

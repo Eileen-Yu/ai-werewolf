@@ -142,14 +142,16 @@ func TestThePromptListsEveryVoteByVoteAndByPlayer(t *testing.T) {
 		Seats: []Seat{{Name: "小红"}, {Name: "老王"}, {Name: "阿杰"}},
 		Ballots: []game.Ballot{
 			{Round: 1, Election: true, Votes: []game.Vote{{Voter: "老王", Target: "阿杰"}, {Voter: "小红", Target: ""}}},
+			{Round: 1, Election: true, PK: 1, Votes: []game.Vote{{Voter: "老王", Target: "阿杰"}, {Voter: "小红", Target: "阿杰"}}},
 			{Round: 1, Sheriff: "阿杰", Votes: []game.Vote{{Voter: "小红", Target: "老王"}, {Voter: "老王", Target: "小红"}, {Voter: "阿杰", Target: "老王"}}},
 		},
 	}
 	_, user := prompt(turn)
 	assert.Contains(t, user, "- 第1天警长投票：投阿杰的：老王；弃票：小红\n")
+	assert.Contains(t, user, "- 第1天第1轮警长PK投票：投阿杰的：老王、小红\n")
 	assert.Contains(t, user, "- 第1天放逐投票：投老王的：小红、阿杰（警长，1.5票）；投小红的：老王\n")
-	assert.Contains(t, user, "- 小红：警长票弃票，第1天投老王\n")
-	assert.Contains(t, user, "- 老王：警长票投阿杰，第1天投小红\n")
+	assert.Contains(t, user, "- 小红：警长票弃票，警长PK1投阿杰，第1天投老王\n")
+	assert.Contains(t, user, "- 老王：警长票投阿杰，警长PK1投阿杰，第1天投小红\n")
 	assert.Less(t, strings.Index(user, "【票型】"), strings.Index(user, "【公开记录】"), "the votes come before the speeches")
 }
 

@@ -353,7 +353,7 @@ const UI = {
       live: { vote: "🗳️ 放逐投票进行中", sheriff_vote: "🗳️ 警长投票进行中", run: "🎖️ 警长竞选进行中：大家在决定要不要上警", withdraw: "🎖️ 警长竞选进行中：候选人在考虑退水",
         campaign: "🎖️ 警长竞选进行中：竞选发言", pk_speech: "⚔️ PK 进行中：平票的人再发言", pk_vote: "🗳️ PK 投票进行中" },
       liveNote: "所有人投完之后才公布结果", title: (w, k) => `${w} · ${{ election: "警长投票", race: "警长竞选", exile: "放逐投票" }[k]}`,
-      pkTitle: (w, n) => `${w} · 第${n}轮 PK 投票`, pkNoVote: "PK 台上的人不投票",
+      pkTitle: (w, n) => `${w} · 第${n}轮 PK 投票`, electionPkTitle: (w, n) => `${w} · 第${n}轮警长 PK 投票`, pkNoVote: "PK 台上的人不投票",
       count: n => `${n}票`, candidates: xs => `候选人：${xs}`, noVote: "上警的人不投票", withdrew: xs => `退水：${xs}`,
       switched: x => `改票 · 上轮投${x}`, nowAbstains: x => `改为弃票 · 上轮投${x}`, wasAbstaining: "上轮弃票",
       skip: "跳过动画", close: "关闭",
@@ -384,7 +384,7 @@ const UI = {
 <li>猎人出局时可以开枪带走一个人，只能在白天开枪；被女巫毒死的不能开枪。开枪也不会公布，主持人只说又有谁死了。</li></ul>
 <h4>警长（第1天）</h4><ul>
 <li>想当警长的上警。上警的人轮流竞选发言，发言完可以退水。</li>
-<li>没上警的人投票选警长；上警的人（包括退水的）不能投。只剩一个候选人时直接当选；平票、没人上警或都退水，就没有警长。</li>
+<li>没上警的人投票选警长；上警的人（包括退水的）不能投。只剩一个候选人时直接当选。平票就由平票的人按座位顺序再各发言一次，没上警的人再在他们中间投票，上过警的人仍然不投；再平就再 PK，最多3轮。第3轮还平、都弃票、没人上警或都退水，就没有警长。</li>
 <li>警长每天最后发言、可以归票，放逐票算1.5票。警长出局时可以把警徽交给活着的人，或者撕掉。</li></ul>
 <h4>白天</h4><ul>
 <li>每人发言一次，警长最后发言归票，说完直接投票放逐一人。可以弃票；都弃票就没人出局。</li>
@@ -430,7 +430,7 @@ const UI = {
         withdraw: "🎖️ Sheriff election: the candidates are deciding whether to withdraw", campaign: "🎖️ Sheriff election: campaign speeches",
         pk_speech: "⚔️ PK: the tied players speak again", pk_vote: "🗳️ PK vote in progress" },
       liveNote: "The result is shown once every vote is in", title: (w, k) => `${w} · ${{ election: "Sheriff vote", race: "Sheriff election", exile: "Vote" }[k]}`,
-      pkTitle: (w, n) => `${w} · PK vote ${n}`, pkNoVote: "Those in the PK do not vote",
+      pkTitle: (w, n) => `${w} · PK vote ${n}`, electionPkTitle: (w, n) => `${w} · Sheriff PK vote ${n}`, pkNoVote: "Those in the PK do not vote",
       count: n => `${n} vote${n === 1 ? "" : "s"}`, candidates: xs => `Candidates: ${xs}`, noVote: "Candidates do not vote", withdrew: xs => `Withdrew: ${xs}`,
       switched: x => `switched · voted ${x} last time`, nowAbstains: x => `now abstains · voted ${x} last time`, wasAbstaining: "abstained last time",
       skip: "Skip animation", close: "Close",
@@ -462,7 +462,7 @@ const UI = {
 <li>A hunter who is out may shoot one player, by day only, unless the witch poisoned him. The shot is not announced either: the host only says who else has died.</li></ul>
 <h4>Sheriff (Day 1)</h4><ul>
 <li>Whoever wants the badge runs. Candidates give a campaign speech and may then withdraw.</li>
-<li>Those who never ran vote; candidates, even ones who withdrew, do not. A lone candidate wins without a vote; a tie, nobody running or everyone withdrawing means no sheriff.</li>
+<li>Those who never ran vote; candidates, even ones who withdrew, do not. A lone candidate wins without a vote. A tie goes to a PK: the tied candidates speak again in seat order and those who never ran vote again between them, candidates still not voting; another tie means another PK, at most 3. A third tie, everyone abstaining, nobody running or everyone withdrawing means no sheriff.</li>
 <li>The sheriff speaks last each day, may call the vote, and their vote counts 1.5. A sheriff who is out passes the badge to a living player or tears it up.</li></ul>
 <h4>Day</h4><ul>
 <li>Everyone speaks once, the sheriff last to call the vote, and then everyone votes someone out. You may abstain; if everyone does, nobody goes.</li>
@@ -903,7 +903,7 @@ function renderVotes(v, t) {
   }
 }
 
-function voteTitle(r, t) { return r.pk ? t.vote.pkTitle(r.when, r.pk) : t.vote.title(r.when, !r.election ? "exile" : r.votes ? "election" : "race"); }
+function voteTitle(r, t) { return r.pk ? (r.election ? t.vote.electionPkTitle : t.vote.pkTitle)(r.when, r.pk) : t.vote.title(r.when, !r.election ? "exile" : r.votes ? "election" : "race"); }
 function nameList(xs, t) { return new Intl.ListFormat(t.vote.locale, { type: "conjunction" }).format(xs); }
 function voteCount(n) { return Number.isInteger(n) ? String(n) : n.toFixed(1); }
 
@@ -948,7 +948,7 @@ function voteHTML(r, t, hidden) {
       `<div class="vr-voters">${mine.map(([v, i]) => chip(v, i)).join("")}</div></div>`;
   };
   const notes = [];
-  if (r.candidates && r.candidates.length) notes.push(t.vote.candidates(nameList(r.candidates, t)) + (r.votes ? " · " + (r.pk ? t.vote.pkNoVote : t.vote.noVote) : ""));
+  if (r.candidates && r.candidates.length) notes.push(t.vote.candidates(nameList(r.candidates, t)) + (r.votes ? " · " + (r.pk && !r.election ? t.vote.pkNoVote : t.vote.noVote) : ""));
   if (r.withdrew && r.withdrew.length) notes.push(t.vote.withdrew(nameList(r.withdrew, t)));
   const abstained = votes.some(v => !v.target);
   return notes.map(n => `<div class="vr-note">${esc(n)}</div>`).join("") +

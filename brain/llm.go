@@ -534,6 +534,8 @@ func ballots(t Turn, tx *text) string {
 		when := l.When(ballot.Round, game.Day)
 		label, short := fmt.Sprintf(tx.exileBallot, when), when
 		switch {
+		case ballot.Election && ballot.PK > 0:
+			label, short = fmt.Sprintf(tx.electionPKBallot, when, ballot.PK), fmt.Sprintf(tx.electionPKShort, ballot.PK)
 		case ballot.Election:
 			label, short = fmt.Sprintf(tx.electionBallot, when), tx.electionShort
 		case ballot.PK > 0:

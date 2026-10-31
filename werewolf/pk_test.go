@@ -164,7 +164,7 @@ func TestAPKThatKeepsTyingSendsNobodyOut(t *testing.T) {
 	require.NotNil(t, day2, "the game ended before the second day")
 	var pks []int
 	for _, ballot := range day2.Ballots {
-		if ballot.Round == 1 && ballot.PK > 0 {
+		if ballot.Round == 1 && ballot.PK > 0 && !ballot.Election {
 			pks = append(pks, ballot.PK)
 		}
 	}

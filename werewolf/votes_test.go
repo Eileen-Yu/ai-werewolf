@@ -99,6 +99,40 @@ func TestVoteResultsShowAnElectionTie(t *testing.T) {
 	assert.Equal(t, []string{"Ann", "Bob"}, r[0].Tied)
 }
 
+func TestVoteResultsShowASheriffPK(t *testing.T) {
+	s := &game.State{
+		Round: 1, Phase: game.Day, Stage: game.StageElection,
+		Ballots: []game.Ballot{
+			{Round: 1, Election: true, Votes: []game.Vote{vote("Eve", "Ann"), vote("Fay", "Bob"), vote("Gus", "Cat")}},
+			{Round: 1, Election: true, PK: 1, Votes: []game.Vote{vote("Eve", "Bob"), vote("Fay", "Bob"), vote("Gus", "Ann")}},
+		},
+		Election: &game.Election{Round: 1, Runners: []string{"Ann", "Bob", "Cat"}, Outcome: game.Voted, Sheriff: "Bob"},
+	}
+	r := voteResults(s)
+	require.Len(t, r, 2)
+	assert.Equal(t, "1-election", r[0].Key)
+	assert.Equal(t, "pk", r[0].Outcome, "a tied sheriff vote goes to a PK")
+	assert.Equal(t, []string{"Ann", "Bob", "Cat"}, r[0].Candidates)
+	assert.Equal(t, "1-election-pk1", r[1].Key)
+	assert.True(t, r[1].Election)
+	assert.Equal(t, 1, r[1].PK)
+	assert.Equal(t, "elected", r[1].Outcome)
+	assert.Equal(t, "Bob", r[1].Winner)
+	assert.Equal(t, []string{"Ann", "Bob", "Cat"}, r[1].Candidates, "everyone tied is in the PK")
+	require.NotNil(t, r[1].Votes[0].Before)
+	assert.Equal(t, "Ann", *r[1].Votes[0].Before, "a PK vote is compared with the vote that tied")
+
+	s.Ballots = s.Ballots[:1]
+	assert.Equal(t, "pk", voteResults(s)[0].Outcome, "the latest tie goes to a PK while the election is on")
+	for pk := 1; pk <= MaxPK; pk++ {
+		s.Ballots = append(s.Ballots, game.Ballot{Round: 1, Election: true, PK: pk, Votes: []game.Vote{vote("Eve", "Ann"), vote("Fay", "Bob")}})
+	}
+	r = voteResults(s)
+	require.Len(t, r, MaxPK+1)
+	assert.Equal(t, "pk", r[MaxPK-1].Outcome)
+	assert.Equal(t, "tie", r[MaxPK].Outcome, "the last PK allowed goes to no other")
+}
+
 func TestVoteResultsShowAnElectionThatNeverCameToAVote(t *testing.T) {
 	for _, tt := range []struct {
 		election   game.Election
