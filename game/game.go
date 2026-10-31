@@ -423,7 +423,7 @@ type Event struct {
 	Stage Stage `json:"stage,omitempty"`
 	// Kind marks a host announcement the page shows apart from the others.
 	Kind Kind `json:"kind,omitempty"`
-	// Summary is a line on a long public speech, for the page only; no
+	// Summary is a line on a public speech, for the page only; no
 	// player's prompt ever shows it.
 	Summary string `json:"summary,omitempty"`
 }

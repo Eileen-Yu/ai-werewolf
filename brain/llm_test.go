@@ -660,15 +660,18 @@ func TestASummaryIsAskedFromTheSpeechAlone(t *testing.T) {
 		assert.NotContains(t, system+user, secret)
 	}
 
-	_, _, ok = summaryPrompt(turn, "我是好人。")
-	assert.False(t, ok, "a short speech needs no summary")
+	_, user, ok = summaryPrompt(turn, "我是好人。")
+	assert.True(t, ok, "a short speech gets a summary too")
+	assert.Equal(t, "老王的发言：我是好人。", user)
+	_, _, ok = summaryPrompt(turn, "  ")
+	assert.False(t, ok, "an empty speech gets no summary")
 	for _, k := range []TurnKind{WolfChat, WolfPlan, Aftermath, Vote} {
 		turn.Kind = k
 		_, _, ok = summaryPrompt(turn, long)
 		assert.False(t, ok, "%s gets no summary", k)
 	}
 	turn.Kind, turn.Lang = LastWords, game.English
-	system, _, ok = summaryPrompt(turn, strings.Repeat("I am the seer and Ruby is a werewolf. ", 6))
+	system, _, ok = summaryPrompt(turn, "I am the seer.")
 	require.True(t, ok)
 	assert.Equal(t, englishText.summarize, system)
 }

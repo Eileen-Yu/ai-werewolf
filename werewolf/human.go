@@ -59,7 +59,7 @@ type View struct {
 
 // Line is one event the person saw. Stance is what a speech put on the
 // record, apart from its words, and Suspect and Claim the same stance for
-// the page to lay out. Summary is a line on a long speech that is not the
+// the page to lay out. Summary is a line on a speech that is not the
 // speaker's own words. Kind is "speech", "host", or the kind of a host
 // announcement; Stage is empty for events from before it was kept.
 type Line struct {

@@ -194,11 +194,11 @@ Each page polls its view. A move is posted to `gm` with the person's key, checke
 
 The page tells apart what it can know: the AI the table waits on is thinking, the line being read aloud is someone speaking, and the two are rarely the same player, since the next speech is written while the last is still being read. It also says how it stands with `gm`: in step, with the time of the last poll that worked; reconnecting; unavailable after a minute without an answer; or gone, when `gm` no longer knows the game.
 
-### Summaries of long speeches
+### Summaries of speeches
 
-**Decision.** A long public speech by an AI (a day speech, a campaign speech or last words) gets a one-line summary, written by a second, separate LLM call that is given only the speaker's name and the speech (`brain.summaryPrompt`). It cannot give away a secret, because it is never told one. The summary rides on the `Action` and the event, the page shows it above the speech marked as a summary rather than the character's words, and no prompt ever shows it (`Event.Said` leaves it out), so players read each other's words, not a recap. A person's move carries none; a wolf chat line, private, keeps none.
+**Decision.** Every public speech by an AI (a day speech, a campaign or PK speech, or last words), however short, gets a one-line summary, written by a second, separate LLM call that is given only the speaker's name and the speech (`brain.summaryPrompt`). It cannot give away a secret, because it is never told one. The summary rides on the `Action` and the event, the page shows it under the speech marked as a summary rather than the character's words, open on the latest three speeches and on the one being read aloud and folded to a line on older ones, and no prompt ever shows it (`Event.Said` leaves it out), so players read each other's words, not a recap. A person's move carries none; a wolf chat line, private, keeps none.
 
-**Tradeoff.** One more small LLM call per long speech, made in the same activity, so the speech lands a little later. A failed call just leaves the speech without a summary.
+**Tradeoff.** One more small LLM call per speech, made in the same activity, so the speech lands a little later. A failed call is asked once more; only when both fail does the speech go without a summary.
 
 ### Revealing a vote
 

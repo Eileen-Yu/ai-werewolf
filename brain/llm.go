@@ -456,38 +456,43 @@ func orNobody(l game.Lang, names []string) string {
 	return l.List(names)
 }
 
-// summarize is a line on a long public speech, for the page to show above it
-// as a summary rather than the player's words. A failed ask gets none.
+// summarize is a line on a public speech, for the page to show under it as a
+// summary rather than the player's words. It asks twice before giving up, so
+// that a speech goes without one only when the model is not answering.
 func (l *LLM) summarize(ctx context.Context, t Turn, speech string) string {
 	system, user, ok := summaryPrompt(t, speech)
 	if !ok {
 		return ""
 	}
-	reply, err := l.converse(ctx, []*dapr.ConversationMessageAlpha2{
+	msgs := []*dapr.ConversationMessageAlpha2{
 		{ConversationMessageOfSystem: &dapr.ConversationMessageOfSystemAlpha2{Content: content(system)}},
 		{ConversationMessageOfUser: &dapr.ConversationMessageOfUserAlpha2{Content: content(user)}},
-	})
-	if err != nil {
-		log.Printf("no summary of %s's speech: %v", t.Me.Name, err)
-		return ""
 	}
-	return strings.Trim(strings.TrimSpace(reply), "\"“”「」")
+	var err error
+	for range 2 {
+		var reply string
+		if reply, err = l.converse(ctx, msgs); err == nil {
+			return strings.Trim(strings.TrimSpace(reply), "\"“”「」")
+		}
+	}
+	log.Printf("no summary of %s's speech: %v", t.Me.Name, err)
+	return ""
 }
 
 // summaryPrompt is what a summary is asked from: the speaker's name and the
 // speech, and nothing else, so it cannot give away the role, notes or
-// thinking the player's own answer was written from. Only long public
-// speeches get one.
+// thinking the player's own answer was written from. Every public speech gets
+// one, however short, so the page never leaves one speech without it.
 func summaryPrompt(t Turn, speech string) (system, user string, ok bool) {
 	switch t.Kind {
 	case Speech, Campaign, PKSpeech, LastWords:
 	default:
 		return "", "", false
 	}
-	tx := t.text()
-	if len([]rune(speech)) < tx.summaryFrom {
+	if strings.TrimSpace(speech) == "" {
 		return "", "", false
 	}
+	tx := t.text()
 	return tx.summarize, fmt.Sprintf(tx.summaryOf, t.Me.Name, speech), true
 }
 

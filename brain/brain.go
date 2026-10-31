@@ -116,7 +116,7 @@ type Turn struct {
 // the player to it; a wolf's Claim may be a lie. Fakers, Hook, Focus and Edge
 // are a wolf plan's seer claimants, the wolf who sides with the good players,
 // vote target, and which side of the good players it wipes out first.
-// Summary is a line on a long public speech for the page, written apart from
+// Summary is a line on a public speech for the page, written apart from
 // the player (see LLM.summarize); a player never sets it.
 type Action struct {
 	Observations []string    `json:"observations,omitempty"`
