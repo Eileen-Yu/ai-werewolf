@@ -60,6 +60,7 @@ func (l *LLM) Act(ctx context.Context, t Turn) (Action, error) {
 		)
 	}
 	log.Printf("%s's last %s answer was: %.800s", t.Me.Name, t.Kind, reply)
+	last.Summary = l.summarize(ctx, t, last.Speech)
 	return last, nil
 }
 
