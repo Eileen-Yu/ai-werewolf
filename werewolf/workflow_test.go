@@ -448,6 +448,38 @@ func TestOnlyWolvesGetThePlanAndAnyWolfMayTurnOnATeammate(t *testing.T) {
 	checkWolvesMayTurnOnEachOther(t, b.turns)
 }
 
+// A good player's turn carries nothing only the wolves know: every line on
+// it is public or meant for them, any private thinking on it is their own,
+// and the pack, the wolves and their plan are left off. Their prompt is built
+// from the turn alone, so it cannot know more.
+func TestAGoodPlayerIsToldNothingOnlyTheWolvesKnow(t *testing.T) {
+	client := startEngine(t)
+	startWorker(t, client)
+	for i := range 5 {
+		b := &turnRecorder{}
+		SetBrain(b)
+		playGame(t, client, fmt.Sprintf("no-leak-%d", i))
+		require.NotEmpty(t, b.turns)
+		for _, turn := range b.turns {
+			if turn.Me.Role == game.Werewolf {
+				continue
+			}
+			me := turn.Me.Name
+			assert.Empty(t, turn.Pack, me)
+			assert.Empty(t, turn.Wolves, me)
+			assert.Nil(t, turn.Plan, me)
+			for _, e := range turn.Transcript {
+				if len(e.Audience) > 0 {
+					assert.Contains(t, e.Audience, me, "%s sees a line meant for %v: %q", me, e.Audience, e.Text)
+				}
+				if e.Thought {
+					assert.Equal(t, []string{me}, e.Audience, "%s sees someone else's thinking", me)
+				}
+			}
+		}
+	}
+}
+
 // checkWolvesMayTurnOnEachOther checks only wolves get the pack and the plan,
 // and that whether to name a teammate is every wolf's own call, whatever the
 // plan: each living teammate is on every wolf's vote and suspect list.
