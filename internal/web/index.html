@@ -271,6 +271,30 @@
   #rulesClose { position:absolute; top:8px; right:10px; background:none; color:var(--dim); padding:4px 8px; margin:0; font-size:18px; }
   .ballot { display:inline-block; animation: drop 1.2s ease-in-out infinite; }
   @keyframes drop { 0%, 100% { transform:translateY(-4px); } 50% { transform:translateY(4px); } }
+  #roleBtn { position:fixed; left:20px; bottom:20px; z-index:20; margin:0; width:auto; box-shadow:0 4px 16px rgba(0,0,0,.4); }
+  #deal { position:fixed; inset:0; z-index:35; display:grid; place-items:center; padding:16px; overflow-y:auto;
+    background:rgba(5,6,10,.78); -webkit-backdrop-filter:blur(5px); backdrop-filter:blur(5px); animation: fade .25s; }
+  #deal .wrap { width:min(440px, 100%); display:flex; flex-direction:column; align-items:center; gap:14px; }
+  #deal .flip { width:200px; height:280px; perspective:900px; }
+  #deal .flip .in { position:relative; width:100%; height:100%; transform-style:preserve-3d; transform:rotateY(180deg); }
+  #deal .flip.spin .in { animation: deal 2.2s cubic-bezier(.2,.7,.25,1) both; }
+  #deal .face { position:absolute; inset:0; border-radius:16px; backface-visibility:hidden; -webkit-backface-visibility:hidden;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; border:2px solid; }
+  #deal .back { border-color:#5a4a2a; background: repeating-linear-gradient(45deg, #2a2416 0 10px, #221d12 10px 20px); font-size:64px; }
+  #deal .front { transform:rotateY(180deg); --c: 226,184,92; border-color:rgb(var(--c)); color:rgb(var(--c));
+    background: radial-gradient(circle at 50% 35%, rgba(var(--c),.28), #171a22 70%); box-shadow:0 0 40px rgba(var(--c),.35); }
+  #deal .front.wolf { --c: 217,83,79; } #deal .front.villager { --c: 170,200,150; }
+  #deal .front .ico { font-size:72px; line-height:1; } #deal .front .name { font-size:30px; font-weight:800; letter-spacing:.08em; }
+  #deal .front .camp { font-size:13px; padding:2px 10px; border-radius:999px; background:rgba(var(--c),.14); }
+  #deal .mates { display:flex; align-items:center; gap:8px; color:#ffb3b0; font-size:14px; }
+  #deal .card { width:100%; margin:0; }
+  #deal h4 { margin:10px 0 4px; font-size:14px; color:var(--accent); } #deal h4:first-child { margin-top:0; }
+  #deal ul { padding-left:18px; margin:4px 0; } #deal li { font-size:13.5px; margin:3px 0; }
+  #deal .turn { color:#7fd1ff; font-weight:600; }
+  #deal .later, #deal .card { animation: fade .4s both; }
+  #deal .flip.spin ~ .later, #deal .flip.spin ~ .card { animation-delay:2.1s; }
+  @keyframes deal { 0% { transform:rotateY(0) scale(.6); } 60% { transform:rotateY(1260deg) scale(1.05); } 100% { transform:rotateY(1260deg) scale(1); } }
+  @media (prefers-reduced-motion: reduce) { #deal, #deal .flip.spin .in, #deal .later, #deal .card { animation:none !important; } }
 </style>
 </head>
 <body>
@@ -323,6 +347,13 @@
   <div class="card"><div id="revealBody"></div><div class="actions"><button id="revealSkip" class="secondary" type="button"></button><button id="revealClose" class="secondary" type="button"></button></div></div>
 </div>
 <div id="actionBar" hidden><span class="what" id="barWhat"></span><span class="clock" id="barClock"></span><button id="barGo" type="button"></button><div class="bar"><i id="barFill"></i></div></div>
+<div id="deal" hidden role="dialog" aria-modal="true"><div class="wrap">
+  <div class="flip" id="dealFlip"><div class="in"><div class="face back">🌙</div><div class="face front" id="dealFront"></div></div></div>
+  <div class="later" id="dealMates"></div>
+  <div class="card" id="dealGuide"></div>
+  <div class="later" style="width:100%"><div class="turn" id="dealTurn" hidden></div><button id="dealMore" class="secondary" type="button"></button><button id="dealClose" type="button"></button></div>
+</div></div>
+<button id="roleBtn" class="secondary" type="button" hidden></button>
 <button id="rulesBtn" class="secondary" type="button"></button>
 <section id="rules" class="card" hidden><button id="rulesClose" type="button" aria-label="close">×</button><div id="rulesBody"></div></section>
 <script>
@@ -372,7 +403,18 @@ const UI = {
     you: "你", person: "👤 真人", packmate: "🐺 队友", out: "出局", newLines: n => `${n} 条新消息 ↓`, packTag: "🐺 狼队频道", secret: "🔒 只有你知道",
     stages: { night: r => `第${r}夜`, dawn: r => `第${r}天 · 天亮`, election: r => `第${r}天 · 警长竞选`, day: r => `第${r}天 · 白天讨论`, end: () => "游戏结束" },
     over: "游戏结束", winner: w => `${w}胜利`, mvp: "MVP", failed: "游戏出错：", host: "主持人", again: "再来一局",
-    rulesBtn: "📖 游戏规则",
+    rulesBtn: "📖 游戏规则", roleBtn: "🎴 我的身份",
+    deal: { camps: { wolf: "狼人阵营", god: "好人阵营 · 神民", villager: "好人阵营 · 村民" }, mates: "你的狼同伴", close: "知道了", go: "知道了，去操作",
+      more: "看看这个身份怎么玩", turn: k => `⏰ 轮到你了：${k}`, goal: "目标", night: "夜晚", day: "白天", out: "出局时",
+      goals: { wolf: "村民全部出局，或神职（预言家、女巫、猎人）全部出局，或活着的狼人不少于其他人，狼人就赢。", good: "所有狼人出局，好人就赢。" },
+      days: { all: "第1天先竞选警长，之后每天每人发言一次，再投票放逐一人；被放逐的人留遗言。",
+        werewolf: "你的身份只有狼同伴知道，发言时可以声称任何身份。", seer: "查验结果只有你知道，报不报、什么时候报由你决定。",
+        villager: "你夜里得不到任何信息，只能从大家的发言和投票里找出狼人。" },
+      nights: { werewolf: "和狼同伴在狼队频道商量，一起杀一个人：可以杀任何活着的人，包括自己和同伴。你只知道刀了谁，他死没死要等主持人公布死讯。",
+        seer: "每晚查验一个人，主持人只告诉你他是好人还是狼人。",
+        witch: "你会知道今晚谁被狼人杀了。一瓶解药可以救他，一瓶毒药可以毒死任何一个人；两瓶各用一次，一晚最多用一瓶，只有第1夜能救自己。",
+        hunter: "没有行动。", villager: "没有行动，闭眼等天亮。" },
+      hunterOut: "可以开枪带走一个人，只能在白天开枪：夜里被杀的，天亮公布死讯后再开枪；被女巫毒死的不能开枪。开枪不会公布，主持人只说又有谁死了。" },
     rules: `<h3>游戏规则</h3>
 <p>标准9人局：3狼人、1预言家、1女巫、1猎人、3村民。你的身份随机发，只有你自己知道。</p>
 <h4>夜晚</h4><ul>
@@ -450,7 +492,19 @@ const UI = {
     you: "You", person: "👤 Person", packmate: "🐺 Pack", out: "Out", newLines: n => `${n} new ↓`, packTag: "🐺 Pack only", secret: "🔒 Only you know",
     stages: { night: r => `Night ${r}`, dawn: r => `Day ${r} · Dawn`, election: r => `Day ${r} · Sheriff election`, day: r => `Day ${r} · Discussion`, end: () => "Game over" },
     over: "Game over", winner: w => `The ${w} side wins`, mvp: "MVP", failed: "The game failed: ", host: "Host", again: "Play again",
-    rulesBtn: "📖 Rules",
+    rulesBtn: "📖 Rules", roleBtn: "🎴 My role",
+    deal: { camps: { wolf: "Werewolf side", god: "Good side · power role", villager: "Good side · villager" }, mates: "Your pack", close: "Got it", go: "Got it, to my move",
+      more: "How this role plays", turn: k => `⏰ Your move: ${k}`, goal: "Goal", night: "Night", day: "Day", out: "When you are out",
+      goals: { wolf: "The werewolves win once every villager is out, or every power role (seer, witch, hunter) is out, or the living werewolves are at least as many as everyone else.",
+        good: "The good side wins once every werewolf is out." },
+      days: { all: "Day 1 opens with the sheriff election. Each day everyone speaks once, then votes one player out, who gets last words.",
+        werewolf: "Only your pack knows your role, and you may claim any role when you speak.", seer: "Only you know what you saw: whether and when to tell is up to you.",
+        villager: "You learn nothing at night, so you find the werewolves from what everyone says and how they vote." },
+      nights: { werewolf: "Talk with your pack in the pack channel and kill one player together: anyone alive, even one of your own. You only know who you went for; whether they died waits for the host's announcement.",
+        seer: "Check one player each night. The host only tells you whether they are good or a werewolf.",
+        witch: "You learn who the werewolves killed tonight. Your antidote can save them and your poison can kill anyone; each works once, at most one a night, and you may only save yourself on the first night.",
+        hunter: "Nothing to do.", villager: "Nothing to do: eyes shut until dawn." },
+      hunterOut: "You may shoot one player, by day only: killed at night, you shoot once the deaths are announced; poisoned by the witch, you cannot shoot. The shot is not announced, the host only says who else has died." },
     rules: `<h3>Rules</h3>
 <p>A standard nine-player game: 3 werewolves, a seer, a witch, a hunter and 3 villagers. Your role is dealt at random, and only you know it.</p>
 <h4>Night</h4><ul>
@@ -615,6 +669,8 @@ function render(v) {
     $("role").hidden = $("pack").hidden = true;
     setSide("");
   }
+  $("roleBtn").hidden = !v.you;
+  $("roleBtn").textContent = t.roleBtn;
   document.body.classList.toggle("night", v.phase === "night");
   document.body.classList.toggle("day", v.phase !== "night");
   renderSeats(v, t);
@@ -622,6 +678,7 @@ function render(v) {
   renderLog(v, t);
   renderStage(v, t);
   $("waiting").hidden = !!v.pending && (!v.now || v.now.name === v.you);
+  if (v.you) { maybeDeal(v, t); dealTurn(v, t); }
   if (!v.pending) { $("turnCard").hidden = true; shownEvent = null; clearInterval(timer); renderBar(v, t); return; }
   if (v.pending.event !== shownEvent) showTurn(v.pending, t, w);
 }
@@ -631,9 +688,10 @@ function render(v) {
 // role a mark that it is one. The role comes in the game's words, so its key
 // is found by its word.
 const ROLE_ICON = { werewolf: "🐺", seer: "🔮", witch: "🧪", hunter: "🏹", villager: "🌾" };
+const roleKey = v => Object.keys(ROLE_ICON).find(k => v.words[k] === v.role) || "";
+const sideOf = key => key === "werewolf" ? "wolf" : key === "villager" ? "villager" : key ? "god" : "";
 function renderIdentity(v, t) {
-  const key = Object.keys(ROLE_ICON).find(k => v.words[k] === v.role) || "";
-  const side = key === "werewolf" ? "wolf" : key === "villager" ? "villager" : key ? "god" : "";
+  const key = roleKey(v), side = sideOf(key);
   setSide(side);
   const role = $("role");
   role.hidden = false;
@@ -651,6 +709,61 @@ function renderIdentity(v, t) {
   pack.innerHTML = `🐺 ${esc(t.pack)} ` + (v.pack || []).filter(n => n !== v.you)
     .map(n => avatar(n, true).replace('class="avatar sm"', `class="avatar sm${dead.has(n) ? " gone" : ""}" title="${esc(n)}"`)).join("");
 }
+
+// The deal is the card a seat flips over the first time its page sees its
+// role, with what that role does by night and by day. It is remembered per
+// game and seat, so a reload does not deal again; a role seen in an earlier
+// game only flips, its guide a tap away. The role button opens it again.
+const remembered = {
+  has: k => { try { return localStorage.getItem(k) === "1"; } catch { return false; } },
+  set: k => { try { localStorage.setItem(k, "1"); } catch {} },
+};
+let dealOpen = false;
+function maybeDeal(v, t) {
+  const key = roleKey(v), dealt = `werewolf-dealt:${gameId}:${seatKey}`;
+  if (!key || dealOpen || remembered.has(dealt)) return;
+  remembered.set(dealt);
+  showDeal(v, t, true, !remembered.has(`werewolf-guide:${key}`));
+}
+function showDeal(v, t, spin, guide) {
+  const d = t.deal, key = roleKey(v), side = sideOf(key);
+  $("dealFront").className = "face front " + side;
+  $("dealFront").innerHTML = `<div class="ico">${ROLE_ICON[key] || "🎭"}</div><div class="name">${esc(v.role)}</div><div class="camp">${esc(d.camps[side] || "")}</div>`;
+  const mates = (v.pack || []).filter(n => n !== v.you);
+  $("dealMates").innerHTML = mates.length ? `<div class="mates">🐺 ${esc(d.mates)} ${mates.map(n => avatar(n, true) + esc(n)).join(" ")}</div>` : "";
+  const day = [d.days.all, d.days[key]].filter(Boolean);
+  const parts = [[d.goal, [side === "wolf" ? d.goals.wolf : d.goals.good]], [d.night, [d.nights[key]]], [d.day, day]];
+  if (key === "hunter") parts.push([d.out, [d.hunterOut]]);
+  const g = $("dealGuide");
+  g.innerHTML = parts.map(([h, xs]) => `<h4>${esc(h)}</h4><ul>${xs.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`).join("");
+  g.hidden = !guide;
+  const flip = $("dealFlip");
+  flip.classList.remove("spin");
+  if (spin) { void flip.offsetWidth; flip.classList.add("spin"); }
+  $("dealMore").hidden = guide;
+  $("dealMore").textContent = d.more;
+  $("deal").hidden = false;
+  dealOpen = true;
+  dealTurn(v, t);
+}
+// dealTurn says, over the card, when the game is already waiting on this
+// seat's move, so reading the guide on night 1 does not quietly run out the
+// clock.
+function dealTurn(v, t) {
+  if (!dealOpen) return;
+  const p = v.pending, el = $("dealTurn");
+  el.hidden = !p;
+  if (p) el.textContent = t.deal.turn(t.kinds[p.turn.kind] || p.turn.kind);
+  $("dealClose").textContent = p ? t.deal.go : t.deal.close;
+}
+$("dealMore").onclick = () => { $("dealMore").hidden = true; $("dealGuide").hidden = false; };
+$("dealClose").onclick = () => {
+  remembered.set(`werewolf-guide:${roleKey(view)}`);
+  $("deal").hidden = true;
+  dealOpen = false;
+  if (view.pending) $("turnCard").scrollIntoView({ behavior: "smooth", block: "center" });
+};
+$("roleBtn").onclick = () => { if (view && view.you) showDeal(view, UI[view.lang] || UI.zh, false, true); };
 
 // setSide is which side the page wears: "wolf", "god", "villager", or "" to
 // watch.
