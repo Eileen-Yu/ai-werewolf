@@ -35,6 +35,9 @@ const (
 	SheriffVote TurnKind = "sheriff_vote" // everyone not running picks a candidate
 	Badge       TurnKind = "badge"        // a sheriff on the way out passes the badge on, or tears it up
 
+	Protect TurnKind = "protect" // guard picks who to protect from the wolves tonight, or passes
+	Explode TurnKind = "explode" // white wolf king, after a speech by day: blow up and take someone, or pass
+
 	// Prepare brings a player's notes up to date while someone else is still
 	// speaking, so their own turn only has the latest speech left to take in.
 	Prepare TurnKind = "prepare"
@@ -43,7 +46,7 @@ const (
 // IsChoice reports whether the turn asks for a Target.
 func (k TurnKind) IsChoice() bool {
 	switch k {
-	case Vote, PKVote, WolfPlan, Inspect, Save, Poison, Shoot, Run, Withdraw, SheriffVote, Badge:
+	case Vote, PKVote, WolfPlan, Inspect, Save, Poison, Shoot, Run, Withdraw, SheriffVote, Badge, Protect, Explode:
 		return true
 	}
 	return false
@@ -73,6 +76,7 @@ type Seat struct {
 // already filtered to what this player may see.
 type Turn struct {
 	Lang       game.Lang    `json:"lang,omitempty"`
+	Board      game.Board   `json:"board,omitempty"`
 	Kind       TurnKind     `json:"kind"`
 	Round      int          `json:"round"`
 	Phase      game.Phase   `json:"phase"`
@@ -131,8 +135,11 @@ type Action struct {
 	Summary      string      `json:"summary,omitempty"`
 }
 
-// Claimable is what a player may claim to be. A wolf claims one of these too.
-var Claimable = []game.Role{game.Seer, game.Witch, game.Hunter, game.Villager}
+// Claimable is what a player on board b may claim to be: a good role the
+// board deals. A wolf claims one of these too.
+func Claimable(b game.Board) []game.Role {
+	return append(b.Gods(), game.Villager)
+}
 
 // Check reports everything wrong with an action for this turn, in words
 // that can be handed back to the player.
@@ -205,8 +212,8 @@ func (t Turn) ClaimProblems(c game.Claim) []string {
 			break
 		}
 	}
-	if !slices.Contains(Claimable, c.Role) {
-		problems = append(problems, fmt.Sprintf(tx.badRole, l.Say(string(c.Role))))
+	if claimable := Claimable(t.Board); !slices.Contains(claimable, c.Role) {
+		problems = append(problems, fmt.Sprintf(tx.badRole, l.Say(string(c.Role)), l.List(l.SayAll(roleWords(claimable)))))
 	}
 	if c.Target != "" && !slices.Contains(t.others(), c.Target) {
 		problems = append(problems, fmt.Sprintf(tx.badClaimTarget, c.Target))
@@ -269,8 +276,8 @@ func (t Turn) PitProblems(pits []game.Pit) []string {
 	tx := t.text()
 	var problems []string
 	for _, p := range pits {
-		if len(p.Wolves) > wolfCount() {
-			problems = append(problems, fmt.Sprintf(tx.bigPit, t.Lang.List(p.Wolves), wolfCount()))
+		if n := t.Board.Count(game.Werewolf, game.WolfKing); len(p.Wolves) > n {
+			problems = append(problems, fmt.Sprintf(tx.bigPit, t.Lang.List(p.Wolves), n))
 		}
 		for _, name := range p.Wolves {
 			switch {
@@ -284,21 +291,19 @@ func (t Turn) PitProblems(pits []game.Pit) []string {
 	return problems
 }
 
-// wolfCount is how many wolves the game deals.
-func wolfCount() int {
-	n := 0
-	for _, r := range game.Lineup {
-		if r == game.Werewolf {
-			n++
-		}
+// roleWords is roles as the game's own words.
+func roleWords(roles []game.Role) []string {
+	out := make([]string, len(roles))
+	for i, r := range roles {
+		out[i] = string(r)
 	}
-	return n
+	return out
 }
 
 // sides are the beliefs this player may hold: a wolf reads which edge each
 // good player is on, everyone else which side.
 func (t Turn) sides() []string {
-	if t.Me.Role == game.Werewolf {
+	if t.Me.Role.IsWolf() {
 		return game.WolfSides
 	}
 	return game.Sides
@@ -336,7 +341,7 @@ func hasDuplicates(names []string) bool {
 // vote out or use a power against someone. A werewolf knows who the wolves
 // are, so has no suspicion to weigh.
 func (t Turn) SuspectsSomeone() bool {
-	if t.Me.Role == game.Werewolf {
+	if t.Me.Role.IsWolf() {
 		return false
 	}
 	switch t.Kind {
@@ -477,7 +482,7 @@ func (t Turn) Normalize(a Action) Action {
 // normalPits trims a player's pits: none for a wolf, who knows the pack;
 // otherwise no empty pit, no name twice in one, and at most game.MaxPits.
 func (t Turn) normalPits(pits []game.Pit) []game.Pit {
-	if t.Me.Role == game.Werewolf {
+	if t.Me.Role.IsWolf() {
 		return nil
 	}
 	var out []game.Pit

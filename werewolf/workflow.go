@@ -37,6 +37,9 @@ type Game struct {
 	// Lang is what the game is played in: "zh" (the default) or "en". It
 	// only takes effect when the game is dealt.
 	Lang game.Lang `json:"lang,omitempty"`
+	// Board is which roles are dealt: "nine" (the default) or "twelve". It
+	// only takes effect when the game is dealt.
+	Board game.Board `json:"board,omitempty"`
 	// PhaseDelay is a durable timer between phases, so people watching can
 	// keep up and have time to kill something.
 	PhaseDelay time.Duration `json:"phaseDelay"`
@@ -95,10 +98,14 @@ func GameWorkflow(ctx *workflow.WorkflowContext) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		g.State.Lang = lang
+		board, err := game.ParseBoard(string(g.Board))
+		if err != nil {
+			return nil, err
+		}
+		g.State.Lang, g.State.Board = lang, board
 		for _, h := range g.Humans {
-			if !slices.Contains(game.Characters(lang), h.Replaces) {
-				return nil, fmt.Errorf("a human can replace one of %v, not %q", game.Characters(lang), h.Replaces)
+			if !slices.Contains(game.Characters(lang, board), h.Replaces) {
+				return nil, fmt.Errorf("a human can replace one of %v, not %q", game.Characters(lang, board), h.Replaces)
 			}
 			if h.Key != "" {
 				if g.Keys == nil {
@@ -123,6 +130,7 @@ func GameWorkflow(ctx *workflow.WorkflowContext) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("night %d: %w", g.State.Round, err)
 	}
+	t.unannounced = deaths.dead
 	if g.State.Round == 1 {
 		if err := t.election(); err != nil {
 			return nil, fmt.Errorf("sheriff election: %w", err)
@@ -131,7 +139,8 @@ func GameWorkflow(ctx *workflow.WorkflowContext) (any, error) {
 	if err := t.daybreak(deaths); err != nil {
 		return nil, fmt.Errorf("daybreak %d: %w", g.State.Round, err)
 	}
-	if g.State.Winner() == "" {
+	t.unannounced = nil
+	if g.State.Winner() == "" && !t.blasted {
 		if err := t.day(); err != nil {
 			return nil, fmt.Errorf("day %d: %w", g.State.Round, err)
 		}
@@ -175,6 +184,12 @@ type table struct {
 	pending map[string]*Pending
 	// now is what the table is waiting on from the AI players, for the page.
 	now []*Activity
+	// unannounced is who died last night, until dawn says so: still seated,
+	// but no longer able to do anything.
+	unannounced []string
+	// speaking is set while a go round the table may end in the white wolf
+	// king blowing up, and blasted once he has, which ends the day.
+	speaking, blasted bool
 }
 
 func (t *table) say(word string) string     { return t.s.Lang.Say(word) }
@@ -183,30 +198,44 @@ func (t *table) list(names []string) string { return t.s.Lang.List(names) }
 func (t *table) setup(people []game.Person) error {
 	t.s.Round, t.s.Phase, t.s.Stage = 1, game.Night, game.StageNight
 	var dealt deal
-	in := deal{Players: t.s.Players, Lang: t.s.Lang, Humans: people}
+	in := deal{Players: t.s.Players, Lang: t.s.Lang, Board: t.s.Board, Humans: people}
 	if err := t.ctx.CallActivity(AssignRolesActivity, workflow.WithActivityInput(in)).Await(&dealt); err != nil {
 		return err
 	}
 	t.s.Players = dealt.Players
 
-	t.add("", fmt.Sprintf(t.h.welcome, len(t.s.Players), t.s.Lang.LineupSummary()))
-	wolves := t.s.Living(game.Werewolf)
+	t.add("", fmt.Sprintf(t.h.welcome, len(t.s.Players), t.s.Lang.LineupSummary(t.s.Board)))
+	wolves := t.s.LivingWolves()
 	for _, p := range t.s.Players {
 		t.add("", fmt.Sprintf(t.h.yourRole, t.say(string(p.Role))), p.Name)
 	}
-	t.add("", fmt.Sprintf(t.h.pack, t.list(wolves)), wolves...)
+	pack := make([]string, len(wolves))
+	for i, w := range wolves {
+		pack[i] = w
+		if t.s.Player(w).Role == game.WolfKing {
+			pack[i] = fmt.Sprintf(t.h.kingMark, w)
+		}
+	}
+	t.add("", fmt.Sprintf(t.h.pack, t.list(pack)), wolves...)
 	return nil
 }
 
-// night runs the wolves, then the witch, then the seer, and returns who died,
-// for daybreak to announce without saying how.
+// night runs the guard, the wolves, then the witch, then the seer, and
+// returns who died, for daybreak to announce without saying how. The guard
+// and the seer decide alongside the wolves, since neither needs anything the
+// wolves decide.
 func (t *table) night() (nightDeaths, error) {
 	s := t.s
 	s.Phase, s.Stage = game.Night, game.StageNight
 	t.add("", fmt.Sprintf(t.h.nightFalls, s.Lang.When(s.Round, game.Night)))
 
+	protected := t.guardProtects()
 	checked := t.seerChecks()
 	victim, err := t.wolvesHunt()
+	if err != nil {
+		return nightDeaths{}, err
+	}
+	guarded, err := protected()
 	if err != nil {
 		return nightDeaths{}, err
 	}
@@ -221,9 +250,12 @@ func (t *table) night() (nightDeaths, error) {
 		return nightDeaths{}, err
 	}
 
+	// The guard's protection and the witch's antidote each stop the kill,
+	// but on the same player they cancel out and the victim dies.
+	killed := victim != "" && (guarded == victim) == saved
 	d := nightDeaths{poisoned: poisoned}
 	for _, p := range s.Players { // table order, so the list gives away nothing
-		if (p.Name == victim && !saved) || p.Name == poisoned {
+		if (p.Name == victim && killed) || p.Name == poisoned {
 			d.dead = append(d.dead, p.Name)
 		}
 	}
@@ -291,7 +323,7 @@ func (t *table) aftermath() error {
 // antidote. It returns "" if the wolves pick nobody.
 func (t *table) wolvesHunt() (string, error) {
 	s := t.s
-	wolves := s.Living(game.Werewolf)
+	wolves := s.LivingWolves()
 	targets := s.Living()
 	if len(wolves) > 1 { // a lone wolf has nobody to plot with
 		if _, err := t.goRound(brain.WolfChat, wolves, targets, wolves...); err != nil {
@@ -333,7 +365,9 @@ func (t *table) wolvesHunt() (string, error) {
 }
 
 // witchActs lets the witch, told tonight's victim, use at most one potion.
-// She may save herself on the first night only.
+// On a board where she may save herself, she may on the first night only;
+// on one where she never may, she is no longer told the victim once her
+// antidote is gone.
 func (t *table) witchActs(victim string) (saved bool, poisoned string, err error) {
 	s := t.s
 	witches := s.Living(game.Witch)
@@ -341,9 +375,11 @@ func (t *table) witchActs(victim string) (saved bool, poisoned string, err error
 		return false, "", nil
 	}
 	w := witches[0]
-	if victim == "" {
+	switch {
+	case s.AntidoteUsed && !s.Board.WitchSeesKillAfterAntidote():
+	case victim == "":
 		t.add("", t.h.noKill, w)
-	} else {
+	default:
 		t.add("", fmt.Sprintf(t.h.victim, victim), w)
 	}
 	var left []string
@@ -361,6 +397,8 @@ func (t *table) witchActs(victim string) (saved bool, poisoned string, err error
 
 	switch {
 	case s.AntidoteUsed || victim == "":
+	case victim == w && !s.Board.WitchSavesSelf():
+		t.add("", t.h.selfVictimNever, w)
 	case victim == w && s.Round > 1:
 		t.add("", t.h.selfVictim, w)
 	default:
@@ -386,6 +424,40 @@ func (t *table) witchActs(victim string) (saved bool, poisoned string, err error
 	s.PoisonUsed = true
 	t.add("", fmt.Sprintf(t.h.poisoned, pick), w)
 	return false, pick, nil
+}
+
+// guardProtects asks the guard, first thing at night, who to protect: anyone
+// alive but whoever they protected last night, themselves included, or
+// nobody. The func it returns waits for the answer and returns who is
+// protected, "" for nobody. The guard is told who they protected, never
+// whether it mattered.
+func (t *table) guardProtects() func() (string, error) {
+	s := t.s
+	guards := s.Living(game.Guard)
+	if len(guards) == 0 {
+		return func() (string, error) { return "", nil }
+	}
+	guard := guards[0]
+	candidates := append(game.Without(s.Living(), s.Guarded(s.Round-1)), game.Pass)
+	m := t.act(t.turn(brain.Protect, guard, candidates))
+	return func() (string, error) {
+		var a brain.Action
+		if err := m.Await(&a); err != nil {
+			return "", err
+		}
+		t.remember(guard, a)
+		target := a.Target
+		if target == game.Pass {
+			target = ""
+		}
+		s.Guards = append(s.Guards, game.Guarding{Round: s.Round, Target: target})
+		if target == "" {
+			t.add("", t.h.guardedNobody, guard)
+		} else {
+			t.add("", fmt.Sprintf(t.h.guarded, target), guard)
+		}
+		return target, nil
+	}
 }
 
 // seerChecks asks the seer whom to check as night falls, alongside the
@@ -414,27 +486,26 @@ func (t *table) seerChecks() func() error {
 }
 
 // hunterShoots gives a hunter who has just gone out the chance to take
-// someone with them. Passing stays private, so the hunter is not exposed.
-// The shot is not announced either: only the hunter is told, and the one shot
-// is announced as having died, like anyone else. It returns who was shot.
+// someone with them. Passing stays private, so a hunter who keeps his gun is
+// not exposed. A shot is announced to everyone, naming the hunter. It returns
+// who was shot.
 func (t *table) hunterShoots(hunter string) (string, error) {
 	target, err := t.choose(brain.Shoot, hunter, append(game.Without(t.s.Living(), hunter), game.Pass))
 	if err != nil || target == "" || target == game.Pass {
 		return "", err
 	}
-	t.s.Remove(target, t.h.died)
-	t.add("", fmt.Sprintf(t.h.shot, target), hunter)
+	t.s.Remove(target, t.h.shotDeath)
+	t.announce(game.KindDeath, fmt.Sprintf(t.h.shot, hunter, target))
 	return target, nil
 }
 
-// hunterGoes has a hunter who is out take his shot; the one he shot is
-// announced as having died, and passes the badge on if they held it.
+// hunterGoes has a hunter who is out take his shot; the one he shot passes
+// the badge on if they held it.
 func (t *table) hunterGoes(hunter string) error {
 	shot, err := t.hunterShoots(hunter)
 	if err != nil || shot == "" {
 		return err
 	}
-	t.announce(game.KindDeath, fmt.Sprintf(t.h.diedNow, shot))
 	return t.passBadge(shot)
 }
 
@@ -513,6 +584,10 @@ func (t *table) election() error {
 	if _, err := t.goRound(brain.Campaign, runners, nil); err != nil {
 		return err
 	}
+	if t.blasted {
+		end(game.Blasted)
+		return t.pause()
+	}
 	standing, err := t.withdraw(runners)
 	if err != nil {
 		return err
@@ -532,6 +607,9 @@ func (t *table) election() error {
 		won, err := t.sheriffVote(standing, voters)
 		if err != nil {
 			return err
+		}
+		if t.blasted {
+			end(game.Blasted)
 		}
 		if won == "" {
 			return t.pause()
@@ -554,7 +632,7 @@ func (t *table) sheriffVote(standing, voters []string) (string, error) {
 	for pk := 0; ; pk++ {
 		if pk > 0 {
 			t.add("", fmt.Sprintf(t.h.sheriffPK, pk, t.list(standing)))
-			if _, err := t.goRound(brain.Campaign, standing, nil); err != nil {
+			if _, err := t.goRound(brain.Campaign, standing, nil); err != nil || t.blasted {
 				return "", err
 			}
 		}
@@ -650,7 +728,7 @@ func (t *table) day() error {
 	// The sheriff speaks last and may call the vote, so the vote follows
 	// straight on.
 	stances, err := t.goRound(brain.Speech, order, nil)
-	if err != nil {
+	if err != nil || t.blasted {
 		return err
 	}
 	summary := make([]string, len(order))
@@ -667,7 +745,7 @@ func (t *table) day() error {
 	t.announce(game.KindVote, fmt.Sprintf(t.h.votes, t.tallyLine(votes)))
 
 	out, err := t.settle(order, votes)
-	if err != nil {
+	if err != nil || t.blasted {
 		return err
 	}
 	if out == "" {
@@ -720,7 +798,7 @@ func (t *table) settle(order []string, votes []game.Vote) (string, error) {
 			return "", nil
 		}
 		t.add("", fmt.Sprintf(t.h.pk, pk, t.list(tied)))
-		if _, err := t.goRound(brain.PKSpeech, tied, nil); err != nil {
+		if _, err := t.goRound(brain.PKSpeech, tied, nil); err != nil || t.blasted {
 			return "", err
 		}
 		var err error
@@ -735,8 +813,12 @@ func (t *table) settle(order []string, votes []game.Vote) (string, error) {
 
 // goRound has each speaker talk in order, each one told who has spoken
 // before them and who is still to come. It returns their actions in order.
+// After each public speech the white wolf king may blow up, which ends the
+// round there, the rest of the actions left empty.
 func (t *table) goRound(kind brain.TurnKind, order, candidates []string, audience ...string) ([]brain.Action, error) {
 	actions := make([]brain.Action, len(order))
+	t.speaking = kind.Declares()
+	defer func() { t.speaking = false }()
 	// ahead is the next speaker bringing their notes up to date while this one
 	// speaks, so their own turn has only this speech left to take in.
 	var ahead move
@@ -761,8 +843,86 @@ func (t *table) goRound(kind brain.TurnKind, order, candidates []string, audienc
 			return nil, err
 		}
 		actions[i] = a
+		if !t.speaking {
+			continue
+		}
+		if blasted, err := t.kingBlasts(); err != nil || blasted {
+			return actions, err
+		}
 	}
 	return actions, nil
+}
+
+// BlastEvent names the event a person playing the white wolf king raises to
+// blow up during round's speeches, its Target who he takes.
+func BlastEvent(round int) string { return fmt.Sprintf("blast-%d", round) }
+
+// kingBlasts gives a living white wolf king, after a speech, the chance to
+// blow himself up and take someone with him. An AI king is asked each time;
+// a person presses the page's button whenever they like, and the press is
+// played here, after the speech it came during. It reports whether he did.
+func (t *table) kingBlasts() (bool, error) {
+	s := t.s
+	kings := game.Without(s.Living(game.WolfKing), t.unannounced...)
+	if len(kings) == 0 {
+		return false, nil
+	}
+	king := kings[0]
+	candidates := game.Without(s.Living(), king)
+	var a brain.Action
+	if s.Player(king).Human {
+		if err := t.ctx.WaitForExternalEvent(BlastEvent(s.Round), 0).Await(&a); err != nil || !slices.Contains(candidates, a.Target) {
+			return false, nil
+		}
+	} else {
+		// Not shown as something the table waits on, which would tell
+		// everyone after each speech that the king is still alive.
+		turn := t.turn(brain.Explode, king, append(slices.Clone(candidates), game.Pass))
+		if err := t.ctx.CallActivity(ActActivity, workflow.WithActivityInput(turn), retry).Await(&a); err != nil {
+			return false, err
+		}
+		if !slices.Contains(candidates, a.Target) {
+			a.Thinking = "" // passing after every speech would crowd out the thoughts that matter
+			t.remember(king, a)
+			return false, nil
+		}
+		t.remember(king, a)
+	}
+	return true, t.blast(king, a.Target)
+}
+
+// blast takes the white wolf king and the one he takes out of the game, with
+// no last words, and ends the day. A sheriff king's badge is lost; a sheriff
+// taken passes it on, and a hunter taken still shoots. Someone who died last
+// night and is taken before dawn says so is announced at dawn as usual.
+func (t *table) blast(king, target string) error {
+	s := t.s
+	t.blasted = true
+	s.Explosions = append(s.Explosions, game.Explosion{Round: s.Round, Stage: s.Stage, King: king, Target: target})
+	text := t.h.blast
+	if s.Stage == game.StageElection {
+		text = t.h.blastElection
+	}
+	dead := slices.Contains(t.unannounced, target)
+	s.Remove(king, t.h.blown)
+	if !dead {
+		s.Remove(target, t.h.taken)
+	}
+	t.announce(game.KindDeath, fmt.Sprintf(text, king, target))
+	if s.Sheriff == king {
+		s.Sheriff = ""
+		t.announce(game.KindResult, fmt.Sprintf(t.h.badgeSwallowed, king))
+	}
+	if dead {
+		return nil
+	}
+	if err := t.passBadge(target); err != nil {
+		return err
+	}
+	if s.Player(target).Role == game.Hunter {
+		return t.hunterGoes(target)
+	}
+	return nil
 }
 
 var retry = workflow.WithActivityRetryPolicy(&workflow.RetryPolicy{
@@ -778,6 +938,7 @@ func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brai
 	}
 	turn := brain.Turn{
 		Lang:       t.s.Lang,
+		Board:      t.s.Board,
 		Kind:       kind,
 		Round:      t.s.Round,
 		Phase:      t.s.Phase,
@@ -791,13 +952,8 @@ func (t *table) turn(kind brain.TurnKind, name string, candidates []string) brai
 	if kind.Declares() {
 		turn.Suspects = append(t.s.VoteCandidates(name), game.Nobody)
 	}
-	if turn.Me.Role == game.Werewolf {
-		turn.Pack = t.s.Living(game.Werewolf)
-		for _, p := range t.s.Players {
-			if p.Role == game.Werewolf {
-				turn.Wolves = append(turn.Wolves, p.Name)
-			}
-		}
+	if turn.Me.Role.IsWolf() {
+		turn.Pack, turn.Wolves = t.s.LivingWolves(), t.s.Wolves()
 		turn.Plan = t.s.PlanFor(t.s.Round)
 	}
 	return turn
@@ -977,6 +1133,7 @@ func (t *table) narrate(e game.Event) {
 type deal struct {
 	Players []game.Player `json:"players,omitempty"`
 	Lang    game.Lang     `json:"lang,omitempty"`
+	Board   game.Board    `json:"board,omitempty"`
 	Humans  []game.Person `json:"humans,omitempty"`
 }
 
@@ -997,20 +1154,20 @@ func (d deal) fill(rng *rand.Rand) (deal, error) {
 		for i, h := range d.Humans {
 			with[i] = h.Replaces
 		}
-		cast, err := game.Cast(d.Lang, rng, with)
+		cast, err := game.Cast(d.Lang, d.Board, rng, with)
 		if err != nil {
 			return d, err
 		}
 		d.Players = cast
 	}
 	if len(d.Humans) > 0 {
-		seated, err := game.SeatHumans(d.Players, d.Humans, d.Lang)
+		seated, err := game.SeatHumans(d.Players, d.Humans, d.Lang, d.Board)
 		if err != nil {
 			return d, err
 		}
 		d.Players = seated
 	}
-	d.Players = game.AssignRoles(d.Players, rng)
+	d.Players = game.AssignRoles(d.Players, d.Board, rng)
 	return d, nil
 }
 

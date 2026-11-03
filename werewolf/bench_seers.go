@@ -153,7 +153,7 @@ func twoFakersDay1() (*table, []string) {
 		}
 		cast = append(cast, p)
 	}
-	cast, err := game.SeatHumans(cast, []game.Person{{Name: "鹅鹅", Replaces: "摸鱼王"}}, game.Chinese)
+	cast, err := game.SeatHumans(cast, []game.Person{{Name: "鹅鹅", Replaces: "摸鱼王"}}, game.Chinese, game.Nine)
 	if err != nil {
 		panic(err)
 	}
@@ -164,7 +164,7 @@ func twoFakersDay1() (*table, []string) {
 	t := &table{s: s, h: hostFor(game.Chinese)}
 	wolves := s.Living(game.Werewolf)
 
-	s.Add("", fmt.Sprintf(t.h.welcome, len(s.Players), s.Lang.LineupSummary()))
+	s.Add("", fmt.Sprintf(t.h.welcome, len(s.Players), s.Lang.LineupSummary(s.Board)))
 	for _, p := range s.Players {
 		s.Add("", fmt.Sprintf(t.h.yourRole, t.say(string(p.Role))), p.Name)
 	}

@@ -22,9 +22,9 @@ type Human struct {
 	Key string `json:"key,omitempty"`
 }
 
-// MaxHumans is how many people a table seats: all of it, with AI only
-// covering the moves a person runs out of time for.
-const MaxHumans = 9
+// MaxHumans is how many people a table on board b seats: all of it, with AI
+// only covering the moves a person runs out of time for.
+func MaxHumans(b game.Board) int { return b.Seats() }
 
 // HumanTimeout is how long a person has for a move before an AI plays it.
 var HumanTimeout = 5 * time.Minute
@@ -38,10 +38,16 @@ var HumanGrace = 30 * time.Second
 // workflow publishes for the web page. A spectator's view has no You, role
 // or pending move, and only what everyone at the table hears.
 type View struct {
-	You   string       `json:"you"`
-	Lang  game.Lang    `json:"lang"`
-	Role  string       `json:"role"`
-	Pack  []string     `json:"pack,omitempty"`
+	You   string     `json:"you"`
+	Lang  game.Lang  `json:"lang"`
+	Board game.Board `json:"board,omitempty"`
+	Role  string     `json:"role"`
+	Pack  []string   `json:"pack,omitempty"`
+	// King is, for a wolf, which of the pack is the white wolf king.
+	King string `json:"king,omitempty"`
+	// Blast is, for a white wolf king who may blow up right now, the event
+	// to raise to do it.
+	Blast string       `json:"blast,omitempty"`
 	Alive bool         `json:"alive"`
 	Round int          `json:"round"`
 	Phase game.Phase   `json:"phase"`
@@ -195,8 +201,12 @@ type humanSeat struct {
 	Name    string   `json:"name"`
 	Role    string   `json:"role"`
 	Pack    []string `json:"pack,omitempty"`
+	King    string   `json:"king,omitempty"`
 	Alive   bool     `json:"alive"`
 	Pending *Pending `json:"pending,omitempty"`
+	// Blast is, for a white wolf king who may blow up right now, the event
+	// to raise to do it.
+	Blast string `json:"blast,omitempty"`
 }
 
 // ErrNoSeat is a key that opens no seat at the table.
@@ -226,7 +236,7 @@ func ReadView(meta *workflow.WorkflowMetadata, key string) (View, bool, error) {
 	visible := func(e game.Event) bool { return len(e.Audience) == 0 }
 	if i >= 0 {
 		me := b.Humans[i]
-		v.You, v.Role, v.Pack, v.Alive, v.Pending = me.Name, me.Role, me.Pack, me.Alive, me.Pending
+		v.You, v.Role, v.Pack, v.King, v.Alive, v.Pending, v.Blast = me.Name, me.Role, me.Pack, me.King, me.Alive, me.Pending, me.Blast
 		visible = func(e game.Event) bool { return e.VisibleTo(me.Name) }
 	}
 	for _, e := range b.Record {
@@ -304,12 +314,16 @@ func (t *table) publish() {
 			continue
 		}
 		me := humanSeat{Key: t.keys[p.Name], Name: p.Name, Role: t.say(string(p.Role)), Alive: p.Alive, Pending: t.pending[p.Name]}
-		if p.Role == game.Werewolf {
+		if p.Role.IsWolf() {
+			me.Pack = t.s.Wolves() // the dead too, or a wolf left alone sees no pack
 			for _, q := range t.s.Players {
-				if q.Role == game.Werewolf {
-					me.Pack = append(me.Pack, q.Name) // the dead too, or a wolf left alone sees no pack
+				if q.Role == game.WolfKing {
+					me.King = q.Name
 				}
 			}
+		}
+		if p.Role == game.WolfKing && p.Alive && t.speaking && !t.blasted && !slices.Contains(t.unannounced, p.Name) {
+			me.Blast = BlastEvent(t.s.Round)
 		}
 		b.Humans = append(b.Humans, me)
 	}
@@ -317,10 +331,13 @@ func (t *table) publish() {
 	for _, p := range t.s.Players {
 		b.Seats = append(b.Seats, brain.Seat{Name: p.Name, Death: p.Death, Sheriff: p.Name == t.s.Sheriff})
 	}
-	for _, r := range brain.Claimable {
-		b.Words[string(r)] = t.say(string(r))
+	b.Board = t.s.Board
+	for _, r := range game.Roles {
+		if t.s.Board.Has(r) {
+			b.Words[string(r)] = t.say(string(r))
+		}
 	}
-	for _, w := range []string{game.Good, string(game.Werewolf), game.God} {
+	for _, w := range []string{game.Good, game.God} {
 		b.Words[w] = t.say(w)
 	}
 	for _, e := range t.s.Log {

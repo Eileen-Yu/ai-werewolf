@@ -1,6 +1,7 @@
-// Package game holds the rules of a nine-player werewolf game. Nothing here
-// talks to Dapr: the workflow drives it, and everything random is passed in
-// so the workflow can keep it inside activities.
+// Package game holds the rules of a werewolf game, on a nine- or a
+// twelve-player board. Nothing here talks to Dapr: the workflow drives it,
+// and everything random is passed in so the workflow can keep it inside
+// activities.
 package game
 
 import (
@@ -20,14 +21,18 @@ const (
 	Witch    Role = "witch"
 	Hunter   Role = "hunter"
 	Villager Role = "villager"
+	// Guard protects one player a night from the wolves.
+	Guard Role = "guard"
+	// WolfKing is a werewolf who may blow himself up after a speech by day
+	// and take someone with him.
+	WolfKing Role = "white wolf king"
 )
 
-// Gods are the villager-side roles with a power. Wolves win by removing all
-// of them or all of the plain villagers.
-var Gods = []Role{Seer, Witch, Hunter}
+// Roles are every role, in the order a lineup lists them.
+var Roles = []Role{Werewolf, WolfKing, Seer, Witch, Hunter, Guard, Villager}
 
-// Lineup is the standard nine-player mix.
-var Lineup = []Role{Werewolf, Werewolf, Werewolf, Seer, Witch, Hunter, Villager, Villager, Villager}
+// IsWolf reports whether r is on the werewolf side.
+func (r Role) IsWolf() bool { return r == Werewolf || r == WolfKing }
 
 // The sides: a seer's result is string(Werewolf) or Good, and a player's
 // belief about someone may also be Unsure.
@@ -53,14 +58,15 @@ var Edges = []string{God, string(Villager)}
 
 // Side is what a seer learns about a role.
 func Side(r Role) string {
-	if r == Werewolf {
+	if r.IsWolf() {
 		return string(Werewolf)
 	}
 	return Good
 }
 
 // Pass is the candidate a player picks to decline an optional power: the
-// witch's potions and the hunter's gun.
+// witch's potions, the hunter's gun, the guard's watch and the white wolf
+// king's blast.
 const Pass = "pass"
 
 // Nobody is the suspect a player names when they suspect no one.
@@ -95,18 +101,19 @@ type Player struct {
 	Death string `json:"death,omitempty"`
 }
 
-// Cast picks the players for a game started without any, in a random seat
-// order, always seating the characters named in with. A Chinese game seats
-// nine of the eleven: every pair of rivals and one loner, or three pairs and
-// every loner. Rivals sit down together or not at all, so nobody written to
-// play off someone is seated without them, and the 3-in-11 split gives every
-// character the same 9-in-11 chance of a seat when nobody is asked for. It
-// fails if with names characters no table seats together: two loners and
-// someone from every pair.
-func Cast(l Lang, rng *rand.Rand, with []string) ([]Player, error) {
+// Cast picks the players for a game on board started without any, in a
+// random seat order, always seating the characters named in with. An English
+// game seats the whole English cast for the board. A Chinese game seats as
+// many pairs of rivals and loners as the board has seats, in one of two
+// splits: the most pairs that fit, or one pair fewer and two more loners.
+// Rivals sit down together or not at all, so nobody written to play off
+// someone is seated without them, and the odds between the splits give every
+// character the same chance of a seat when nobody is asked for. It fails if
+// with names characters neither split seats together.
+func Cast(l Lang, b Board, rng *rand.Rand, with []string) ([]Player, error) {
 	var cast []Player
 	if l == English {
-		cast = slices.Clone(englishCast)
+		cast = englishFor(b)
 	} else {
 		pairs, loners := slices.Clone(chineseRivals), slices.Clone(chineseLoners)
 		rng.Shuffle(len(pairs), func(i, j int) { pairs[i], pairs[j] = pairs[j], pairs[i] })
@@ -121,28 +128,44 @@ func Cast(l Lang, rng *rand.Rand, with []string) ([]Player, error) {
 		for _, p := range loners {
 			wantLoners += asked(p.Name, with)
 		}
-		allPairs := rng.IntN(11) < 3
+		seats := b.Seats()
+		most := min(len(pairs), seats/2)
+		fits := func(p int) bool {
+			l := seats - 2*p
+			return p >= 0 && l <= len(loners) && wantPairs <= p && wantLoners <= l
+		}
+		var nPairs int
 		switch {
-		case wantLoners > 1 && wantPairs == len(pairs):
-			return nil, fmt.Errorf("no table seats %s together: it seats every pair of rivals and one of %s, or three pairs and all of them",
-				l.List(with), l.List(Names(chineseLoners)))
-		case wantLoners > 1:
-			allPairs = false
-		case wantPairs == len(pairs):
-			allPairs = true
+		case fits(most) && fits(most-1):
+			nPairs = most - 1
+			if rng.Float64() < mostPairsOdds(most, len(pairs), seats-2*most, len(loners)) {
+				nPairs = most
+			}
+		case fits(most):
+			nPairs = most
+		case fits(most - 1):
+			nPairs = most - 1
+		default:
+			return nil, fmt.Errorf("no table seats %s together: it seats %d pairs of rivals and %d of %s, or %d pairs and %d of them",
+				l.List(with), most, seats-2*most, l.List(Names(chineseLoners)), most-1, seats-2*most+2)
 		}
-		if allPairs {
-			loners = loners[:1]
-		} else {
-			pairs = pairs[:len(pairs)-1]
-		}
-		for _, pair := range pairs {
+		for _, pair := range pairs[:nPairs] {
 			cast = append(cast, pair[:]...)
 		}
-		cast = append(cast, loners...)
+		cast = append(cast, loners[:seats-2*nPairs]...)
 	}
 	rng.Shuffle(len(cast), func(i, j int) { cast[i], cast[j] = cast[j], cast[i] })
 	return cast, nil
+}
+
+// mostPairsOdds is how often to seat p of pairs pairs and l of loners
+// loners, rather than one pair fewer and two loners more, so that a rival
+// and a loner are as likely as each other to be seated.
+func mostPairsOdds(p, pairs, l, loners int) float64 {
+	fp1, fl1 := float64(p)/float64(pairs), float64(l)/float64(loners)
+	fp2, fl2 := float64(p-1)/float64(pairs), float64(l+2)/float64(loners)
+	w := (fl2 - fp2) / (fp1 - fp2 - fl1 + fl2)
+	return max(0, min(1, w))
 }
 
 func asked(name string, with []string) int {
@@ -165,13 +188,14 @@ func Names(ps []Player) []string {
 	return names
 }
 
-// Characters is everyone a game in l may seat, for a person to pick whose
-// seat to take.
-func Characters(l Lang) []string { return Names(everyone(l)) }
+// Characters is everyone a game in l on board b may seat, for a person to
+// pick whose seat to take.
+func Characters(l Lang, b Board) []string { return Names(everyone(l, b)) }
 
-// Character is the character a game in l seats as name, if there is one.
+// Character is the character a game in l seats as name, on any board, if
+// there is one.
 func Character(l Lang, name string) (Player, bool) {
-	pool := everyone(l)
+	pool := everyone(l, Twelve)
 	i := slices.IndexFunc(pool, func(p Player) bool { return p.Name == name })
 	if i < 0 {
 		return Player{}, false
@@ -179,11 +203,11 @@ func Character(l Lang, name string) (Player, bool) {
 	return pool[i], true
 }
 
-// everyone is every character a game in l may seat: the rivals pair by pair,
-// then the loners.
-func everyone(l Lang) []Player {
+// everyone is every character a game in l on board b may seat: for Chinese
+// the rivals pair by pair, then the loners.
+func everyone(l Lang, b Board) []Player {
 	if l == English {
-		return slices.Clone(englishCast)
+		return englishFor(b)
 	}
 	var pool []Player
 	for _, pair := range chineseRivals {
@@ -192,17 +216,27 @@ func everyone(l Lang) []Player {
 	return append(pool, chineseLoners...)
 }
 
+// englishFor is the English cast for board b: the nine at every table, and on
+// a bigger board the ones who only sit down there.
+func englishFor(b Board) []Player {
+	cast := slices.Clone(englishCast)
+	if b.Seats() > len(cast) {
+		cast = append(cast, englishTwelve...)
+	}
+	return cast
+}
+
 // CheckPeople reports what would stop people from taking these seats in a
-// game in l, whichever cast is drawn.
-func CheckPeople(l Lang, people []Person) error {
+// game in l on board b, whichever cast is drawn.
+func CheckPeople(l Lang, b Board, people []Person) error {
 	with := make([]string, len(people))
 	for i, h := range people {
 		with[i] = h.Replaces
 	}
-	if _, err := Cast(l, rand.New(rand.NewPCG(1, 1)), with); err != nil {
+	if _, err := Cast(l, b, rand.New(rand.NewPCG(1, 1)), with); err != nil {
 		return err
 	}
-	_, err := SeatHumans(everyone(l), people, l)
+	_, err := SeatHumans(everyone(l, b), people, l, b)
 	return err
 }
 
@@ -218,7 +252,7 @@ type Person struct {
 // who left are dropped, since nobody by that name is at the table. If a person
 // times out, an AI plays their move with persona. Names must tell everyone at
 // the table apart, so no name may contain another.
-func SeatHumans(cast []Player, people []Person, l Lang) ([]Player, error) {
+func SeatHumans(cast []Player, people []Person, l Lang, b Board) ([]Player, error) {
 	out := slices.Clone(cast)
 	var gone []string
 	for _, h := range people {
@@ -231,7 +265,7 @@ func SeatHumans(cast []Player, people []Person, l Lang) ([]Player, error) {
 		}
 		i := slices.IndexFunc(out, func(p Player) bool { return !p.Human && p.Name == h.Replaces })
 		if i < 0 {
-			return nil, fmt.Errorf("no character %q to replace: pick one of %v", h.Replaces, Characters(l))
+			return nil, fmt.Errorf("no character %q to replace: pick one of %v", h.Replaces, Characters(l, b))
 		}
 		gone = append(gone, h.Replaces)
 		out[i] = Player{Name: name, Persona: humanPersona[l], Human: true}
@@ -256,8 +290,32 @@ var humanPersona = map[Lang]string{
 	English: "a human player whose move an AI is covering for: steady, goes by the evidence",
 }
 
-// englishCast is exactly nine, so every one of them sits down in every
-// English game and each may have rivals.
+// englishTwelve only sit down on a twelve-seat board, where everyone in
+// englishCast is at the table too, so their rivalries may name anyone in
+// either; nobody in englishCast may name them.
+var englishTwelve = []Player{
+	{
+		Name: "Crypto Bro", Persona: "sees every game as a market: talks in pumps, dumps, HODL and \"to the moon\", and calls every accusation FUD",
+		Habit:   "you buy the dip and hold: you back players the table has just turned on, and once you have backed someone you stick with them through every bad day unless the evidence against them is hard",
+		Badge:   "the badge is a governance token, and you run whenever you smell an early entry",
+		Rivalry: "Karen wants a refund on every coin you ever sold her, and LinkedIn Influencer keeps calling you a Web3 thought leader while refusing to buy in",
+	},
+	{
+		Name: "Reply Guy", Persona: "answers every speech with \"well, actually\" and a correction nobody asked for",
+		Habit:   "you pick apart whatever was just said: you suspect whoever ignores your corrections or gets a small fact wrong, and you vote for the player whose story has the most errors in it",
+		Badge:   "you run when you feel the candidates need correcting, which is most of the time",
+		Rivalry: "Chronically Online Girl has blocked you on every app, and Discord Mod keeps muting you for replying to everything",
+	},
+	{
+		Name: "True Crime Podcaster", Persona: "narrates the game like an episode of her podcast: cold opens, \"and that's when things got dark\", and a sponsor read now and then",
+		Habit:   "you build a profile of the killers from the nights: who each death helps, who was quiet before it, who spoke loudest after. You vote for whoever fits your profile best and redraw it when a death does not fit",
+		Badge:   "you run when you think the case needs a lead investigator, which is often",
+		Rivalry: "Conspiracy Carl keeps calling in to your show with theories, and you keep telling him a real investigation needs evidence",
+	},
+}
+
+// englishCast sits down at every English table, so each of them may have
+// rivals among the others.
 var englishCast = []Player{
 	{
 		Name: "Florida Man", Persona: "has done things that made the local news, and talks in wild stories and wilder plans",
@@ -374,6 +432,20 @@ var chineseRivals = [][2]Player{
 			Rivalry: "摸鱼王越催，你越慢",
 		},
 	},
+	{
+		{
+			Name: "唐僧", Persona: "苦口婆心的话痨，开口就是\"阿弥陀佛\"，一件小事能讲成一段经，动不动就劝大家向善",
+			Habit:   "心软，宁信其善：只有发言、投票或死亡里有确凿的矛盾，你才肯怀疑一个人。被怀疑的人哭两句你就动摇，但证据面前你照样认",
+			Badge:   "你觉得带大家走正道是你的责任，常常上警",
+			Rivalry: "孙悟空一冲动你就念叨他，说他太急躁、不讲道理",
+		},
+		{
+			Name: "孙悟空", Persona: "急性子，说话冲，口头禅\"俺老孙一眼就看出来了\"，最烦别人啰嗦",
+			Habit:   "凭火眼金睛下判断：谁的发言让你觉得不对劲，你当场就点他，很少等第二天。认准了就打，被证据打脸也认，但认得很不情愿",
+			Badge:   "你想一棒子打出狼来，经常上警",
+			Rivalry: "唐僧一念叨你就头疼，嫌他太容易被人骗",
+		},
+	},
 }
 
 // chineseLoners play off the whole table rather than one rival; a game seats
@@ -391,11 +463,15 @@ var chineseLoners = []Player{
 		Name: "光头强", Persona: "暴脾气，一急就破防，口头禅\"我都说了我不是狼！你们是不是有病啊！\"",
 		Habit: "一被怀疑就急：谁怀疑你，你就立刻反咬他、投他。越被怀疑越激动，说话越像在狡辩", Badge: "你凭一口气：觉得有人会怀疑你，就上警先发制人",
 	},
+	{
+		Name: "祥林嫂", Persona: "逢人就讲自己的遭遇，口头禅\"我真傻，真的\"，每次发言都要先把前几天的事再讲一遍",
+		Habit: "认死理：哪个人第一次让你觉得吃了亏，你就一直记着，每天发言都翻出来讲。新证据能让你改判断，但你会先把旧事再念叨一遍", Badge: "你一般不上警，除非觉得只有你记得前几天发生过什么",
+	},
 }
 
-// AssignRoles deals Lineup to the players in a random order.
-func AssignRoles(players []Player, rng *rand.Rand) []Player {
-	roles := slices.Clone(Lineup)
+// AssignRoles deals the board's lineup to the players in a random order.
+func AssignRoles(players []Player, b Board, rng *rand.Rand) []Player {
+	roles := b.Lineup()
 	rng.Shuffle(len(roles), func(i, j int) { roles[i], roles[j] = roles[j], roles[i] })
 	out := slices.Clone(players)
 	for i := range out {
@@ -564,7 +640,10 @@ type Plan struct {
 }
 
 type State struct {
-	Lang    Lang     `json:"lang,omitempty"`
+	Lang Lang `json:"lang,omitempty"`
+	// Board is the set of roles dealt; "" is Nine, for games from before
+	// there was a choice.
+	Board   Board    `json:"board,omitempty"`
 	Round   int      `json:"round"`
 	Phase   Phase    `json:"phase"`
 	Players []Player `json:"players"`
@@ -584,6 +663,10 @@ type State struct {
 	Exiles []Exile `json:"exiles,omitempty"`
 	// Saves is the witch's answer each night she was offered the antidote.
 	Saves []Save `json:"saves,omitempty"`
+	// Guards is who the guard protected each night, "" for nobody.
+	Guards []Guarding `json:"guards,omitempty"`
+	// Explosions is every time the white wolf king blew himself up.
+	Explosions []Explosion `json:"explosions,omitempty"`
 	// Sheriff holds the badge: elected on the first day, passed on or torn
 	// up when they go. "" when nobody holds it.
 	Sheriff string `json:"sheriff,omitempty"`
@@ -680,13 +763,37 @@ func (s *State) VoteCandidates(voter string) []string {
 	return Without(s.Living(), voter)
 }
 
+// Wolves are every player on the werewolf side, the dead too, in seat order.
+func (s *State) Wolves() []string {
+	var out []string
+	for _, p := range s.Players {
+		if p.Role.IsWolf() {
+			out = append(out, p.Name)
+		}
+	}
+	return out
+}
+
+// LivingWolves are the wolves still alive, in seat order.
+func (s *State) LivingWolves() []string { return s.Living(Werewolf, WolfKing) }
+
+// Guarded is who the guard protected on the night of round, "" for nobody.
+func (s *State) Guarded(round int) string {
+	for _, g := range s.Guards {
+		if g.Round == round {
+			return g.Target
+		}
+	}
+	return ""
+}
+
 // Winner is the winning side, string(Werewolf) or Good, once the game is
 // decided, and "" before. Wolves
 // win by clearing a side (all gods or all villagers), or once they are as many
 // as everyone else and so control every vote.
 func (s *State) Winner() string {
-	wolves := len(s.Living(Werewolf))
-	gods := len(s.Living(Gods...))
+	wolves := len(s.LivingWolves())
+	gods := len(s.Living(s.Board.Gods()...))
 	villagers := len(s.Living(Villager))
 	switch {
 	case wolves == 0:
@@ -732,6 +839,20 @@ type Save struct {
 	Saved  bool   `json:"saved"`
 }
 
+// Guarding is who the guard protected one night, "" for nobody.
+type Guarding struct {
+	Round  int    `json:"round"`
+	Target string `json:"target,omitempty"`
+}
+
+// Explosion is the white wolf king blowing himself up and who he took.
+type Explosion struct {
+	Round  int    `json:"round"`
+	Stage  Stage  `json:"stage"`
+	King   string `json:"king"`
+	Target string `json:"target"`
+}
+
 type Election struct {
 	Round int `json:"round"`
 	// Runners is everyone who ran, Withdrew those of them who withdrew.
@@ -751,6 +872,7 @@ const (
 	AllWithdrew Outcome = "all_withdrew" // every candidate withdrew
 	Unopposed   Outcome = "unopposed"    // one candidate was left, so no vote
 	Voted       Outcome = "voted"        // the voters chose, or tied
+	Blasted     Outcome = "blasted"      // the white wolf king blew up and the badge was lost
 )
 
 // Total is the votes one target got, the sheriff's counting one and a half.

@@ -118,10 +118,17 @@ Trust nobody. Especially the one who says they're the seer.
 A standard nine-player game: 3 werewolves, a seer, a witch, a hunter and 3 villagers.
 
 - **Night**: the werewolves talk in private and pick who to kill (they may pick one of their own). The witch learns who was killed and may save them or poison someone: each potion works once, at most one per night, and she may only save herself on the first night. The seer checks one player.
-- **Dawn**: only who died is announced, not how. A hunter who is out may shoot one player, by day only, unless the witch poisoned him. A hunter killed at night shoots once the deaths are announced, and a hunter voted out shoots after his last words. The shot is not announced either: the host only says who has died.
+- **Dawn**: only who died is announced, not how. A hunter who is out may shoot one player, by day only, unless the witch poisoned him. A hunter killed at night shoots once the deaths are announced, and a hunter voted out shoots after his last words. A shot is announced, naming the hunter and whom he shot; a hunter who keeps his gun is not.
 - **Sheriff**: on Day 1, before the night's deaths are announced, the table elects a sheriff, so whoever died that night still takes part. Each of them decides whether to run; the candidates give a campaign speech, then any of them may withdraw, and those who never ran vote. A candidate who withdraws cannot vote either. A tie goes to a sheriff PK: the tied candidates speak again, then the same voters vote between them, up to three PKs. If nobody runs, everybody runs, every candidate withdraws, everyone abstains, or the third PK ties too, there is no sheriff. The sheriff speaks last each day and their vote counts 1.5. A sheriff who is out passes the badge to a living player or tears it up. The page marks the sheriff with 🎖️ and shows the 1.5 in the vote card.
 - **Day**: everyone speaks once, the sheriff last to call the vote. Then straight to a vote, where anyone may abstain; if everyone does, nobody goes. A tie goes to a PK: the tied players speak again, then everyone else votes between them. A PK that ties goes to another between the newly tied, up to three; if the third ties too, nobody goes that day. Whoever is voted out gets last words.
 - **Winning**: the good side wins when every werewolf is out. The werewolves win when every villager is out, every power role is out, or the living werewolves are at least as many as everyone else, since from then on they control every vote. Then the AI players look back on the game with the roles revealed: who read it right, and who was fooled by whom.
+
+There is also a twelve-player game: 3 werewolves and a white wolf king, a seer, a witch, a hunter, a guard and 4 villagers. You choose the board when you start a game. It plays as above, with these changes:
+
+- **Guard**: wakes first each night and protects one living player, themselves included, or nobody, but never the same player two nights running. The werewolves cannot kill whoever is protected that night, but the witch's poison still can, and someone both protected and saved by the witch dies. The guard is never told whether it worked.
+- **Witch**: may never save herself, and once the antidote is used she is no longer told who the werewolves killed.
+- **White wolf king**: kills with the pack. In the sheriff election, the day's speeches and a PK, whenever someone finishes speaking he may reveal himself, blow up and take any living player with him. Neither gets last words, a hunter taken still shoots, and the day ends at once for the night. Blowing up in the election loses the badge, and on Day 1 the night's deaths are announced before night falls; a sheriff king takes the badge with him. Voted out or poisoned, he takes nobody, and plain werewolves cannot blow up.
+- **Winning**: the power roles the werewolves can wipe out include the guard.
 
 ## Quick start: play with LLMs on Catalyst
 
@@ -209,7 +216,7 @@ Add `-web :8080` when you start the game master:
 diagrid dev run --project werewolf --id werewolf --approve -- ./bin/werewolf gm -brain llm -web :8080
 ```
 
-Open <http://localhost:8080>, pick a language and how many people play, from none to all 9, and give each a name and whose seat to take. AI plays the other seats. Alone, you go straight to your seat. With friends, the page lists one private link per person, on this machine's address on your network, so everyone opens theirs on their own phone or computer on the same Wi-Fi. A link only opens its own seat, so nobody sees anyone else's role. The list ends with a spectator link, which shows only what everyone at the table hears; with nobody playing, you go straight to it and watch nine AIs. The page shows every seat at the top: who is out, who holds the badge, which AI is thinking and whose speech is being read aloud, which seats people play, and your own role and pack, with everyone's roles once the game is over. Below it, the timeline groups the game by night, dawn, sheriff election and day, sets votes, deaths and the host's results apart from speeches, and stops following new lines while you scroll back. Each speech leads with the role it claims and who it suspects, names the players it mentions in bold, and a long one has a one-line AI summary over it, marked as not the character's words. It shows what your seat sees and, on your turn, a bar along the bottom with the time left, and asks for your move: a speech with who you suspect and, if you like, a role claim, or a pick for a vote, a check, a potion or a shot. While you wait, it shows what the table is doing: the wolves plotting under a night sky, who is speaking, or everyone voting, and for how long. The top corner says whether the page is in step with the game master, and when it last was. The game master's terminal is still the god's-eye feed, so keep it out of sight while you play.
+Open <http://localhost:8080>, pick a language, the nine- or twelve-player board, and how many people play, from none to every seat, and give each a name and whose seat to take. AI plays the other seats. Alone, you go straight to your seat. With friends, the page lists one private link per person, on this machine's address on your network, so everyone opens theirs on their own phone or computer on the same Wi-Fi. A link only opens its own seat, so nobody sees anyone else's role. The list ends with a spectator link, which shows only what everyone at the table hears; with nobody playing, you go straight to it and watch nine AIs. The page shows every seat at the top: who is out, who holds the badge, which AI is thinking and whose speech is being read aloud, which seats people play, and your own role and pack, with everyone's roles once the game is over. Below it, the timeline groups the game by night, dawn, sheriff election and day, sets votes, deaths and the host's results apart from speeches, and stops following new lines while you scroll back. Each speech leads with the role it claims and who it suspects, names the players it mentions in bold, and a long one has a one-line AI summary over it, marked as not the character's words. It shows what your seat sees and, on your turn, a bar along the bottom with the time left, and asks for your move: a speech with who you suspect and, if you like, a role claim, or a pick for a vote, a check, a potion or a shot. While you wait, it shows what the table is doing: the wolves plotting under a night sky, who is speaking, or everyone voting, and for how long. The top corner says whether the page is in step with the game master, and when it last was. The game master's terminal is still the god's-eye feed, so keep it out of sight while you play.
 
 The page can also talk. Click **🔊 Read aloud** and every new line is spoken, each character in a voice, pitch and pace of their own. On your speaking turns, **🎤 Speak** types what you say into the speech box, where you can fix it before you submit. Both use the browser's own speech support, so nothing goes through the game master; voice input needs Chrome or Edge and microphone access, and Chrome sends the audio to Google to transcribe it.
 
@@ -242,8 +249,9 @@ The `--data` for `diagrid workflow start` is JSON, and every field is optional:
 | Field | Default | Meaning |
 |---|---|---|
 | `lang` | `"zh"` | `"zh"` for Chinese, `"en"` for English |
+| `board` | `"nine"` | `"nine"` for the nine-player game, `"twelve"` for the twelve-player one with a guard and a white wolf king |
 | `phaseDelay` | `0` | How long the game waits after the night, the election and each day before going on, so watchers can follow it. It is a durable timer, so it is also a window to kill the gm and watch the game resume. Written in nanoseconds because that is how Go encodes a duration: `2000000000` is 2 seconds |
-| `humans` | none | Seats people: `[{"name":"Eileen","replaces":"Karen","key":"..."}]`, up to 9. Each `key` opens that person's seat on the page. The web page sets this for you, with a random key each |
+| `humans` | none | Seats people: `[{"name":"Eileen","replaces":"Karen","key":"..."}]`, up to one per seat. Each `key` opens that person's seat on the page. The web page sets this for you, with a random key each |
 
 ```bash
 diagrid workflow start GameWorkflow --project werewolf --id werewolf --instance-id game-2 \
@@ -261,6 +269,7 @@ diagrid workflow start GameWorkflow --project werewolf --id werewolf --instance-
 | | `-human-timeout <duration>` | How long a person has for a move before an AI plays it. Default `3m` |
 | `werewolf start` | `-engine <address>` | As above |
 | | `-lang zh\|en` | Language of the game. Default `zh` |
+| | `-board nine\|twelve` | Which roles are dealt. Default `nine` |
 | | `-delay <duration>` | Pause between phases. Default `2s` |
 | | `-id <name>` | Game instance ID. Default is generated from the time |
 | `werewolf engine` | `-addr <address>` | Address the local engine listens on. Default `localhost:4001` |
@@ -271,7 +280,7 @@ diagrid workflow start GameWorkflow --project werewolf --id werewolf --instance-
 | | `-out <file>` | Also write every answer as JSON |
 | `werewolf stats` | `-n <count>` | Play many games on the running gm, with its brain, and count how they went: how often the wolves claim seer and what they report, whether a wolf wins the badge, whether Day 1 exiles a wolf, whether the witch saves on Night 1, and the wolves' win rate for each Day 1 play. Default `50` |
 | | `-parallel <count>` | Games played at once. Default `4` |
-| | `-engine <address>`, `-lang zh\|en` | As for `start` |
+| | `-engine <address>`, `-lang zh\|en`, `-board nine\|twelve` | As for `start`. On the twelve-player board it also counts how often the guard stops the kill and when the white wolf king blows up |
 | | `-out <file>` | Also write every game's counts as JSON |
 
 ### The model

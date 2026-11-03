@@ -212,13 +212,31 @@ func prompt(t Turn) (system, user string) {
 		}
 	}
 	strategy := tx.strategies[t.Me.Role]
-	if t.Me.Role == game.Werewolf {
+	switch t.Me.Role {
+	case game.WolfKing:
+		strategy = tx.strategies[game.Werewolf] + strategy + tx.packPlays
+	case game.Werewolf:
 		strategy += tx.packPlays
-	} else {
+	default:
 		strategy += tx.goodVoting
 	}
-	system = fmt.Sprintf(tx.rules, len(names), len(names), l.List(names), l.LineupSummary(),
-		t.Me.Name, l.Say(string(t.Me.Role)), t.Me.Persona, character, strategy)
+	var abilities strings.Builder
+	for _, r := range game.Roles {
+		line := tx.abilities[r]
+		if r == game.Witch && !t.Board.WitchSavesSelf() {
+			line = tx.strictWitch
+		}
+		if t.Board.Has(r) {
+			abilities.WriteString("- " + line + "\n")
+		}
+	}
+	peaceful := tx.peaceful
+	if t.Board.Has(game.Guard) {
+		peaceful = tx.guardPeaceful
+	}
+	system = fmt.Sprintf(tx.rules, len(names), l.List(names), l.LineupSummary(t.Board), abilities.String(),
+		l.List(l.SayAll(roleWords(t.Board.Gods()))), t.Me.Name, l.Say(string(t.Me.Role)), t.Me.Persona, character, strategy,
+		t.Board.Count(game.Werewolf, game.WolfKing), peaceful)
 
 	var seats, secrets, public, claims, known strings.Builder
 	var thoughts []string
@@ -324,12 +342,12 @@ func prompt(t Turn) (system, user string) {
 
 	f := tx.fields
 	notesField, notesLine := f.notes, tx.notesLine
-	if t.Me.Role == game.Werewolf {
+	if t.Me.Role.IsWolf() {
 		notesField = f.wolfNotes
 	}
 	if t.Prepared {
 		notesField, notesLine = f.changedNotes, tx.changedNotesLine
-		if t.Me.Role == game.Werewolf {
+		if t.Me.Role.IsWolf() {
 			notesField = f.wolfChangedNotes
 		}
 	}
@@ -430,8 +448,10 @@ func edges(t Turn) string {
 		}
 	}
 	good, unsure = unordered(t, good), unordered(t, unsure)
+	powers := t.Board.Gods()
 	return fmt.Sprintf(tx.edges, l.List(t.Pack), len(t.Pack), orNobody(l, good), len(good), orNobody(l, gone),
-		orNobody(l, gods), orNobody(l, villagers), orNobody(l, unsure), max(0, len(good)-len(t.Pack)))
+		orNobody(l, gods), orNobody(l, villagers), orNobody(l, unsure),
+		len(powers), l.List(l.SayAll(roleWords(powers))), t.Board.Count(game.Villager), max(0, len(good)-len(t.Pack)))
 }
 
 // unordered shuffles names on Night 1, when nothing tells the players apart

@@ -6,7 +6,7 @@ import "github.com/Eileen-Yu/ai-werewolf/game"
 type host struct {
 	welcome, yourRole, pack, nightFalls, noKill, victim, potionsLeft  string
 	antidote, poison, noPotions, selfVictim, saved, poisoned          string
-	inspected, peaceful, died, dawnDead, shot, diedNow, order         string
+	inspected, peaceful, died, dawnDead, shot, shotDeath, order       string
 	stance, stances, vote, votes, abstain, tie, allAbstained          string
 	pk, pkVotes, pkNoVoters                                           string
 	votedOut, exiled, plan, noFaker, faker, hook, undecided, gameOver string
@@ -21,7 +21,12 @@ type host struct {
 	sheriffPK, sheriffPKVotes, sheriffTie, sheriffAbstained      string
 	elected, sheriffVote                                         string
 	badgePassed, badgeTorn                                       string
-	peacefulAfterElection, deadAfterElection                     string
+
+	// The guard, the witch who never saves herself, and the white wolf
+	// king blowing himself up.
+	guarded, guardedNobody, selfVictimNever, kingMark  string
+	blast, blastElection, badgeSwallowed, blown, taken string
+	peacefulAfterElection, deadAfterElection           string
 
 	// The god's-eye feed: asides, thoughts and secret lines.
 	observed, rejudged, judged, fromNothing, thinks, onlyFor, narrator string
@@ -53,8 +58,8 @@ var chineseHost = host{
 	peaceful:     "天亮了，昨晚是平安夜。",
 	died:         "死亡",
 	dawnDead:     "天亮了，昨晚死亡的是：%s。",
-	shot:         "你开枪带走了%s。",
-	diedNow:      "%s死亡了。",
+	shot:         "%s发动猎人技能，开枪带走了%s！",
+	shotDeath:    "被猎人开枪带走",
 	order:        "今天的发言顺序：%s。",
 	stance:       "%s：%s",
 	stances:      "投票前，各人的最新表态：%s。",
@@ -102,6 +107,16 @@ var chineseHost = host{
 	badgePassed:      "警长%s把警徽移交给了%s。",
 	badgeTorn:        "警长%s撕掉了警徽，从此没有警长。",
 
+	guarded:         "你今晚守护了%s。",
+	guardedNobody:   "你今晚空守，谁也没守。",
+	selfVictimNever: "被杀的是你自己。本局女巫不能自救。",
+	kingMark:        "%s（白狼王）",
+	blast:           "%s自爆，亮明身份是白狼王，带走了%s！两人都没有遗言，今天到此结束，直接入夜。",
+	blastElection:   "%s自爆，亮明身份是白狼王，带走了%s！两人都没有遗言，竞选中断，警徽流失，本局没有警长。",
+	badgeSwallowed:  "警长%s自爆，警徽流失，从此没有警长。",
+	blown:           "自爆",
+	taken:           "被白狼王带走",
+
 	peacefulAfterElection: "警长竞选结束，公布昨晚的情况：昨晚是平安夜。",
 	deadAfterElection:     "警长竞选结束，公布昨晚的死讯：%s。",
 
@@ -134,8 +149,8 @@ var englishHost = host{
 	peaceful:     "Day breaks. Nobody died last night.",
 	died:         "died",
 	dawnDead:     "Day breaks. Died last night: %s.",
-	shot:         "You shot %s.",
-	diedNow:      "%s has died.",
+	shot:         "%s, the hunter, shoots %s!",
+	shotDeath:    "shot by the hunter",
 	order:        "Today's speaking order: %s.",
 	stance:       "%s: %s",
 	stances:      "Before the vote, everyone's latest stance: %s.",
@@ -182,6 +197,16 @@ var englishHost = host{
 	sheriffVote:      "%s (sheriff)",
 	badgePassed:      "Sheriff %s passes the badge to %s.",
 	badgeTorn:        "Sheriff %s tears up the badge; there is no sheriff any more.",
+
+	guarded:         "You protect %s tonight.",
+	guardedNobody:   "You protect nobody tonight.",
+	selfVictimNever: "The one killed is you. On this board the witch may never save herself.",
+	kingMark:        "%s (white wolf king)",
+	blast:           "%s blows himself up, revealed as the white wolf king, and takes %s with him! Neither gets last words; the day ends here and night falls.",
+	blastElection:   "%s blows himself up, revealed as the white wolf king, and takes %s with him! Neither gets last words; the election is over, the badge is lost, and there is no sheriff this game.",
+	badgeSwallowed:  "Sheriff %s blew himself up, so the badge is lost and there is no sheriff any more.",
+	blown:           "blew himself up",
+	taken:           "taken by the white wolf king",
 
 	peacefulAfterElection: "The election is over, so now last night: nobody died.",
 	deadAfterElection:     "The election is over, so now last night's deaths: %s.",

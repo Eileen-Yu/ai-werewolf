@@ -34,10 +34,10 @@ type Judge interface {
 }
 
 // Rules picks an MVP without reading the game: from the winning side, a
-// survivor before the dead, and the seer, witch and hunter before the rest.
+// survivor before the dead, and the power roles before the rest.
 func Rules(f Final) MVP {
 	rank := func(p game.Player) int {
-		r := slices.Index([]game.Role{game.Seer, game.Witch, game.Hunter, game.Werewolf, game.Villager}, p.Role)
+		r := slices.Index([]game.Role{game.Seer, game.Witch, game.Hunter, game.Guard, game.WolfKing, game.Werewolf, game.Villager}, p.Role)
 		if !p.Alive {
 			r += 10
 		}

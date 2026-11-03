@@ -32,8 +32,9 @@
   .boardHead .me { flex:1; min-width:180px; }
   .boardHead #voiceBtn { margin:0; }
   .seats { display:grid; grid-template-columns: repeat(9, 1fr); gap:8px; }
-  @media (max-width: 860px) { .seats { grid-template-columns: repeat(5, 1fr); } }
-  @media (max-width: 520px) { .seats { grid-template-columns: repeat(3, 1fr); } }
+  .seats.twelve { grid-template-columns: repeat(6, 1fr); }
+  @media (max-width: 860px) { .seats, .seats.twelve { grid-template-columns: repeat(5, 1fr); } }
+  @media (max-width: 520px) { .seats, .seats.twelve { grid-template-columns: repeat(3, 1fr); } }
   .seat { position:relative; display:flex; flex-direction:column; align-items:center; gap:3px; padding:10px 4px 8px;
     border:1px solid var(--line); border-radius:10px; background:rgba(255,255,255,.02); text-align:center; min-width:0; transition: opacity .4s; }
   .seat .name { font-size:13px; font-weight:600; line-height:1.25; min-height:2.5em; max-width:100%; overflow:hidden; overflow-wrap:anywhere;
@@ -196,7 +197,8 @@
   .rolebadge.witch { color:#9fe0b8; background:rgba(90,200,140,.10); border-color:rgba(90,200,140,.32); }
   .rolebadge.hunter { color:#f6b47c; background:rgba(240,150,80,.10); border-color:rgba(240,150,80,.32); }
   .rolebadge.villager { color:#d6d9e2; background:rgba(255,255,255,.05); border-color:var(--line); }
-  .rolebadge.werewolf { color:#ffb3b0; background:rgba(217,83,79,.14); border-color:rgba(217,83,79,.45); }
+  .rolebadge.guard { color:#9cc8f0; background:rgba(90,150,220,.10); border-color:rgba(90,150,220,.32); }
+  .rolebadge.werewolf, .rolebadge.wolfking { color:#ffb3b0; background:rgba(217,83,79,.14); border-color:rgba(217,83,79,.45); }
   .packmark { display:inline-flex; align-items:center; gap:4px; font-size:12.5px; color:#ffb3b0; padding:2px 8px 2px 6px; border-radius:999px; background:rgba(217,83,79,.08); }
   .packmark .avatar.sm { width:22px; height:22px; font-size:11px; box-shadow:0 0 0 1.5px rgba(217,83,79,.7); }
   .packmark .avatar.gone { filter:grayscale(1); opacity:.5; }
@@ -219,6 +221,8 @@
   .link { padding:8px 0; border-bottom:1px solid var(--line); } .link code { word-break:break-all; font-size:12.5px; color:var(--dim); }
   .link button { margin:6px 8px 0 0; }
   .mvp { font-size:17px; } .mvp b { color:var(--accent); }
+  button.danger { background:var(--wolf); color:#fff; }
+  #blastCard { border-color:rgba(217,83,79,.45); }
   button.secondary { background:transparent; color:var(--accent); border:1px solid var(--accent); padding:5px 12px; margin:10px 8px 0 0; }
 
   /* The stage: what the table is waiting on. Night brings a sky, the moon and,
@@ -304,6 +308,8 @@
   <section id="setup" class="card" hidden>
     <label>Language / 语言</label>
     <select id="lang"><option value="zh">中文</option><option value="en">English</option></select>
+    <label id="boardLabel"></label>
+    <select id="boardPick"></select>
     <label id="countLabel"></label>
     <select id="count"></select>
     <div id="people"></div>
@@ -331,6 +337,12 @@
       <div class="card timeline"><div class="logbar" id="logBar" hidden><button id="sumAll" class="secondary" type="button"></button></div><div id="log"></div><button id="newPill" type="button" hidden></button></div>
       <div class="side">
         <div class="card" id="result" hidden></div>
+        <div class="card" id="blastCard" hidden>
+          <div id="blastTitle" style="font-weight:600"></div>
+          <div class="dim" id="blastHint"></div>
+          <form id="blastForm"><select name="target"></select><button type="submit" class="danger" id="blastBtn"></button></form>
+          <div id="blastErr" class="err"></div>
+        </div>
         <div class="card" id="turnCard" hidden>
           <div id="turnTitle" style="font-weight:600"></div>
           <div class="dim" id="countdown"></div>
@@ -360,6 +372,10 @@
 const UI = {
   zh: {
     title: "AI 狼人杀", count: "真人玩家人数（其余座位由AI坐）", player: i => `玩家${i}`, name: "名字", start: "开始游戏",
+    board: "板子", boards: { nine: "9人 · 预女猎（3狼）", twelve: "12人 · 预女猎守（3狼 + 白狼王）" },
+    blast: { title: "💥 白狼王自爆", hint: "每当有人发言结束，你都可以自爆，带走一个活着的人：你和他都没有遗言，今天立刻结束，直接入夜。",
+      pick: "带走谁", go: "自爆", sure: x => `确定自爆并带走 ${x}？` },
+    guardNobody: "空守（今晚谁都不守）",
     linksTitle: "游戏开始了：每人一条链接", copy: "复制", copied: "已复制", open: "打开",
     linksHint: "把链接分别发给每位玩家，在同一个 Wi-Fi 下用各自的手机或电脑打开。每条链接只能看到自己的座位，别点开别人的。",
     youAre: "你是", pack: "狼队", godSide: "✨ 神民", waiting: "等待其他玩家……", dead: "你已出局，继续观战。", submit: "提交",
@@ -373,7 +389,7 @@ const UI = {
     line: { summary: "🔍 分析", summaryTip: "AI 主持人写的摘要，不是角色原话", sumAll: "展开全部分析", sumAuto: "恢复自动折叠", claims: r => `声称${r}`, checked: (x, r) => `查验 ${x}：${r}`, potion: x => `用药：${x}`,
       suspects: "怀疑", nobody: "暂不怀疑谁" },
     kinds: { speech: "轮到你发言", wolf_chat: "狼队夜聊", wolf_plan: "你来定今晚的计划",
-      last_words: "留下遗言", vote: "投票放逐", inspect: "今晚查验谁", save: "要用解药救他吗", poison: "要用毒药吗", shoot: "开枪带走谁",
+      last_words: "留下遗言", vote: "投票放逐", protect: "今晚守护谁", inspect: "今晚查验谁", save: "要用解药救他吗", poison: "要用毒药吗", shoot: "开枪带走谁",
       run: "竞选警长：要上警吗", campaign: "警长竞选发言", withdraw: "竞选结束：要退水吗", sheriff_vote: "投票选警长", badge: "移交警徽",
       pk_speech: "PK 发言：说服大家别投你", pk_vote: "PK 投票：在 PK 的人里放逐一人" },
     run: "上警", noRun: "不上警", stay: "继续竞选", withdraw: "退水", tearBadge: "撕掉警徽", sheriff: "警长",
@@ -391,7 +407,7 @@ const UI = {
       exiled: n => `${n} 被放逐出局`, elected: n => `${n} 当选警长 🎖️`, tie: n => `${n} 平票，今天无人出局`, pk: n => `${n} 平票，进入 PK`,
       electionTie: n => `${n} 平票，警徽流失，本局没有警长`, abstained: "所有人都弃票，今天无人出局", electionAbstained: "所有人都弃票，警徽流失，本局没有警长",
       unopposed: n => `警上只剩 ${n} 一人，不用投票，直接当选 🎖️`, no_runners: "没有人上警，本局没有警长",
-      all_ran: "所有人都上警了，没有人投票，本局没有警长", all_withdrew: "上警的人都退水了，本局没有警长" },
+      all_ran: "所有人都上警了，没有人投票，本局没有警长", all_withdrew: "上警的人都退水了，本局没有警长", blasted: "白狼王自爆，竞选中断，警徽流失，本局没有警长" },
     faker: "谁来悍跳预言家", faker2: "第二只悍跳（可选，双狼悍跳）", hook: "谁来倒钩（白天踩队友）", focus: "白天集中投谁（可选）", edge: "先屠哪一边（可选）", none: "（不选）",
     voiceOn: "🔊 语音朗读：开", voiceOff: "🔇 语音朗读：关", mic: "🎤 语音输入", micStop: "⏹ 停止录音", micErr: "语音输入出错：",
     micErrors: { "no-speech": "没听到声音。确认系统设置里选的输入设备是你在用的麦克风、没有静音，点 🎤 之后马上开始说。",
@@ -399,31 +415,39 @@ const UI = {
       "audio-capture": "找不到麦克风：检查麦克风有没有连上、系统设置里有没有选它。",
       network: "语音识别连不上网络：Chrome 需要联网把录音发给 Google 识别。" },
     voiceReady: "语音朗读已开启，之后的发言会读出来。",
-    watchOnly: "0（只观战：9个AI对局）", watching: "👀 观战中：只看得到公开的信息", watchLink: "观战链接（任何人都能看，只有公开信息）",
+    watchOnly: n => `0（只观战：${n}个AI对局）`, watching: "👀 观战中：只看得到公开的信息", watchLink: "观战链接（任何人都能看，只有公开信息）",
     you: "你", person: "👤 真人", packmate: "🐺 队友", out: "出局", newLines: n => `${n} 条新消息 ↓`, packTag: "🐺 狼队频道", secret: "🔒 只有你知道",
     stages: { night: r => `第${r}夜`, dawn: r => `第${r}天 · 天亮`, election: r => `第${r}天 · 警长竞选`, day: r => `第${r}天 · 白天讨论`, end: () => "游戏结束" },
     over: "游戏结束", winner: w => `${w}胜利`, mvp: "MVP", failed: "游戏出错：", host: "主持人", again: "再来一局",
     rulesBtn: "📖 游戏规则", roleBtn: "🎴 我的身份",
     deal: { camps: { wolf: "狼人阵营", god: "好人阵营 · 神民", villager: "好人阵营 · 村民" }, mates: "你的狼同伴", close: "知道了", go: "知道了，去操作",
       more: "看看这个身份怎么玩", turn: k => `⏰ 轮到你了：${k}`, goal: "目标", night: "夜晚", day: "白天", out: "出局时",
-      goals: { wolf: "村民全部出局，或神职（预言家、女巫、猎人）全部出局，或活着的狼人不少于其他人，狼人就赢。", good: "所有狼人出局，好人就赢。" },
+      goals: { wolf: b => `村民全部出局，或神职（${GODS.zh[b]}）全部出局，或活着的狼人不少于其他人，狼人就赢。`, good: "所有狼人出局，好人就赢。" },
       days: { all: "第1天先竞选警长，之后每天每人发言一次，再投票放逐一人；被放逐的人留遗言。",
         werewolf: "你的身份只有狼同伴知道，发言时可以声称任何身份。", seer: "查验结果只有你知道，报不报、什么时候报由你决定。",
+        "white wolf king": "警长竞选、白天发言和 PK 发言时，每当有人说完，你都可以自爆，带走任意一个活着的人：你和他都没有遗言，被带走的猎人仍可以开枪，今天立刻结束、直接入夜。竞选时自爆，警徽流失；你是警长时自爆，警徽随你消失。被放逐或被毒死就不能带人。",
         villager: "你夜里得不到任何信息，只能从大家的发言和投票里找出狼人。" },
       nights: { werewolf: "和狼同伴在狼队频道商量，一起杀一个人：可以杀任何活着的人，包括自己和同伴。你只知道刀了谁，他死没死要等主持人公布死讯。",
+        "white wolf king": "和狼同伴一起杀人，和普通狼人一样。",
         seer: "每晚查验一个人，主持人只告诉你他是好人还是狼人。",
-        witch: "你会知道今晚谁被狼人杀了。一瓶解药可以救他，一瓶毒药可以毒死任何一个人；两瓶各用一次，一晚最多用一瓶，只有第1夜能救自己。",
+        witch: b => b === "twelve"
+          ? "解药还在时，你会知道今晚谁被狼人杀了。一瓶解药可以救他，一瓶毒药可以毒死任何一个人；两瓶各用一次，一晚最多用一瓶，全程不能救自己。解药用掉之后，就不再知道谁被杀了。守卫守住的人你再救，他反而会死（奶穿）。"
+          : "你会知道今晚谁被狼人杀了。一瓶解药可以救他，一瓶毒药可以毒死任何一个人；两瓶各用一次，一晚最多用一瓶，只有第1夜能救自己。",
+        guard: "每晚第一个睁眼，守护一个活着的人，可以守自己，也可以空守；不能连续两晚守同一个人。被守的人当晚不会被狼人杀死，但挡不住女巫的毒；女巫再救他，他反而会死（奶穿）。你不会知道守没守中。",
         hunter: "没有行动。", villager: "没有行动，闭眼等天亮。" },
-      hunterOut: "可以开枪带走一个人，只能在白天开枪：夜里被杀的，天亮公布死讯后再开枪；被女巫毒死的不能开枪。开枪不会公布，主持人只说又有谁死了。" },
-    rules: `<h3>游戏规则</h3>
-<p>标准9人局：3狼人、1预言家、1女巫、1猎人、3村民。你的身份随机发，只有你自己知道。</p>
+      hunterOut: "可以开枪带走一个人，只能在白天开枪：夜里被杀的，天亮公布死讯后再开枪；被女巫毒死的不能开枪。开枪会公布：主持人会说你是猎人、带走了谁；不开枪就不公布。" },
+    rules: b => `<h3>游戏规则</h3>
+${b === "twelve" ? "<p>12人预女猎守：3狼人、1白狼王、1预言家、1女巫、1猎人、1守卫、4村民。你的身份随机发，只有你自己知道。</p>"
+  : "<p>标准9人局：3狼人、1预言家、1女巫、1猎人、3村民。你的身份随机发，只有你自己知道。</p>"}
 <h4>夜晚</h4><ul>
-<li>狼人睁眼商量，杀一个人，可以杀任何活着的人，包括自己和同伴（自刀）。</li>
+${b === "twelve" ? "<li>守卫先睁眼，守护一个人，可以守自己，也可以空守；不能连续两晚守同一个人。被守的人当晚不会被狼人杀死，但挡不住女巫的毒。守卫不会知道守没守中。</li>" : ""}
+<li>狼人${b === "twelve" ? "（包括白狼王）" : ""}睁眼商量，杀一个人，可以杀任何活着的人，包括自己和同伴（自刀）。</li>
 <li>预言家查验一个人是好人还是狼人。</li>
-<li>女巫知道谁被杀了：一瓶解药可以救他，一瓶毒药可以毒死任何人。两瓶各用一次，一晚最多用一瓶，只有第1夜能救自己。</li></ul>
+${b === "twelve" ? "<li>女巫的解药还在时，她知道谁被杀了：一瓶解药可以救他，一瓶毒药可以毒死任何人。两瓶各用一次，一晚最多用一瓶，全程不能救自己；解药用掉之后，她就不再知道谁被杀了。</li><li>同一个人被守卫守住、又被女巫救，反而会死（奶穿）。</li>"
+  : "<li>女巫知道谁被杀了：一瓶解药可以救他，一瓶毒药可以毒死任何人。两瓶各用一次，一晚最多用一瓶，只有第1夜能救自己。</li>"}</ul>
 <h4>天亮</h4><ul>
 <li>主持人只公布谁死了，不说怎么死的。第1天要等警长竞选结束才公布，昨晚死的人也照常参加竞选。</li>
-<li>猎人出局时可以开枪带走一个人，只能在白天开枪；被女巫毒死的不能开枪。开枪也不会公布，主持人只说又有谁死了。</li></ul>
+<li>猎人出局时可以开枪带走一个人，只能在白天开枪；被女巫毒死的不能开枪。开枪会公布谁是猎人、带走了谁；不开枪就不公布。</li></ul>
 <h4>警长（第1天）</h4><ul>
 <li>想当警长的上警。上警的人轮流竞选发言，发言完可以退水。</li>
 <li>没上警的人投票选警长；上警的人（包括退水的）不能投。只剩一个候选人时直接当选。平票就由平票的人按座位顺序再各发言一次，没上警的人再在他们中间投票，上过警的人仍然不投；再平就再 PK，最多3轮。第3轮还平、都弃票、没人上警或都退水，就没有警长。</li>
@@ -432,9 +456,14 @@ const UI = {
 <li>每人发言一次，警长最后发言归票，说完直接投票放逐一人。可以弃票；都弃票就没人出局。</li>
 <li>平票就 PK：平票的人按发言顺序再各发言一次，其他人听完只能在他们中间投票，他们自己不投。再平就在新的平票者中再 PK，最多3轮；第3轮还平，今天就没人出局。</li>
 <li>被放逐的人留遗言。</li></ul>
+${b === "twelve" ? `<h4>白狼王自爆</h4><ul>
+<li>警长竞选、白天发言和 PK 发言时，每当有人说完，白狼王都可以亮明身份自爆，带走任意一个活着的人。投票和遗言时不能自爆。</li>
+<li>白狼王和被带走的人都没有遗言；被带走的猎人仍可以开枪。</li>
+<li>自爆后当天立刻结束，直接入夜。竞选时自爆，警徽流失，本局没有警长；第1天竞选时自爆，昨晚的死讯在入夜前公布。白狼王是警长时自爆，警徽随他消失。</li>
+<li>白狼王被放逐或被毒死就不能带人。普通狼人不能自爆。</li></ul>` : ""}
 <h4>胜负</h4><ul>
-<li>好人：所有狼人出局。</li>
-<li>狼人：村民全部出局，或神职（预言家、女巫、猎人）全部出局，或活着的狼人不少于其他人。</li>
+<li>好人：所有狼人${b === "twelve" ? "（包括白狼王）" : ""}出局。</li>
+<li>狼人：村民全部出局，或神职（${GODS.zh[b]}）全部出局，或活着的狼人不少于其他人。</li>
 <li>游戏结束、身份公开后，AI 玩家会挨个复盘：哪里看对了、被谁骗了。</li></ul>
 <h4>你怎么玩</h4><ul>
 <li>轮到你时，屏幕底部会出现行动栏和倒计时，右边是操作框；5分钟没操作，AI 会替你走这一步。</li>
@@ -447,6 +476,10 @@ const UI = {
   },
   en: {
     title: "AI Werewolf", count: "How many people play (AI takes the other seats)", player: i => `Player ${i}`, name: "Name", start: "Start game",
+    board: "Board", boards: { nine: "9 players · seer, witch, hunter (3 werewolves)", twelve: "12 players · seer, witch, hunter, guard (3 werewolves + a white wolf king)" },
+    blast: { title: "💥 White wolf king: blow up", hint: "Whenever someone finishes speaking you may blow up and take one living player with you: neither of you gets last words, and the day ends at once for the night.",
+      pick: "Who to take", go: "Blow up", sure: x => `Blow up and take ${x} with you?` },
+    guardNobody: "Guard nobody tonight",
     linksTitle: "The game is on: one link each", copy: "Copy", copied: "Copied", open: "Open",
     linksHint: "Send each player their own link, to open on their own phone or computer on the same Wi-Fi. A link only shows its own seat, so don't open anyone else's.",
     youAre: "You are", pack: "Pack", godSide: "✨ Power role", waiting: "Waiting for the others…", dead: "You are out. Keep watching.", submit: "Submit",
@@ -460,7 +493,7 @@ const UI = {
     line: { summary: "🔍 Analysis", summaryTip: "The AI game master's summary, not the character's words", sumAll: "Expand all analysis", sumAuto: "Back to auto-fold", claims: r => `Claims ${r}`, checked: (x, r) => `checked ${x}: ${r}`, potion: x => `potion on ${x}`,
       suspects: "Suspects", nobody: "Suspects nobody yet" },
     kinds: { speech: "Your turn to speak", wolf_chat: "Wolf chat", wolf_plan: "Set tonight's plan",
-      last_words: "Your last words", vote: "Vote someone out", inspect: "Who to check tonight", save: "Use the antidote on them?", poison: "Use the poison?", shoot: "Who to shoot",
+      last_words: "Your last words", vote: "Vote someone out", protect: "Who to guard tonight", inspect: "Who to check tonight", save: "Use the antidote on them?", poison: "Use the poison?", shoot: "Who to shoot",
       run: "Sheriff election: will you run?", campaign: "Your campaign speech", withdraw: "Campaign over: withdraw?", sheriff_vote: "Vote for sheriff", badge: "Pass on the badge",
       pk_speech: "Your PK speech: talk your way out", pk_vote: "PK vote: exile one of those in the PK" },
     run: "Run for sheriff", noRun: "Stay out", stay: "Stay in the race", withdraw: "Withdraw", tearBadge: "Tear up the badge", sheriff: "Sheriff",
@@ -480,7 +513,7 @@ const UI = {
       electionTie: n => `A tie between ${n}: the badge is lost and there is no sheriff this game`, abstained: "Everyone abstained: nobody is voted out today",
       electionAbstained: "Everyone abstained: the badge is lost and there is no sheriff this game",
       unopposed: n => `${n} is the only candidate left, so is sheriff without a vote 🎖️`, no_runners: "Nobody ran, so there is no sheriff this game",
-      all_ran: "Everyone ran, so nobody was left to vote and there is no sheriff this game", all_withdrew: "Every candidate withdrew, so there is no sheriff this game" },
+      all_ran: "Everyone ran, so nobody was left to vote and there is no sheriff this game", all_withdrew: "Every candidate withdrew, so there is no sheriff this game", blasted: "The white wolf king blew up, so the election is over and there is no sheriff this game" },
     faker: "Who fakes the seer", faker2: "A second faker (optional, a double claim)", hook: "Who plays the hook (turns on a packmate by day)", focus: "Who the pack votes tomorrow (optional)", edge: "Which side to wipe out first (optional)", none: "(none)",
     voiceOn: "🔊 Read aloud: on", voiceOff: "🔇 Read aloud: off", mic: "🎤 Speak", micStop: "⏹ Stop", micErr: "Voice input failed: ",
     micErrors: { "no-speech": "Heard nothing. Check that your system's input device is the microphone you are using and is not muted, and start talking right after clicking 🎤.",
@@ -488,32 +521,40 @@ const UI = {
       "audio-capture": "No microphone found: check it is plugged in and selected in your system settings.",
       network: "Speech recognition cannot reach the network: Chrome sends the recording to Google to transcribe it." },
     voiceReady: "Read aloud is on. New lines will be read out.",
-    watchOnly: "0 (just watch nine AIs play)", watching: "👀 Watching: you only see what everyone hears", watchLink: "Spectator link (anyone can watch; public information only)",
+    watchOnly: n => `0 (just watch ${n} AIs play)`, watching: "👀 Watching: you only see what everyone hears", watchLink: "Spectator link (anyone can watch; public information only)",
     you: "You", person: "👤 Person", packmate: "🐺 Pack", out: "Out", newLines: n => `${n} new ↓`, packTag: "🐺 Pack only", secret: "🔒 Only you know",
     stages: { night: r => `Night ${r}`, dawn: r => `Day ${r} · Dawn`, election: r => `Day ${r} · Sheriff election`, day: r => `Day ${r} · Discussion`, end: () => "Game over" },
     over: "Game over", winner: w => `The ${w} side wins`, mvp: "MVP", failed: "The game failed: ", host: "Host", again: "Play again",
     rulesBtn: "📖 Rules", roleBtn: "🎴 My role",
     deal: { camps: { wolf: "Werewolf side", god: "Good side · power role", villager: "Good side · villager" }, mates: "Your pack", close: "Got it", go: "Got it, to my move",
       more: "How this role plays", turn: k => `⏰ Your move: ${k}`, goal: "Goal", night: "Night", day: "Day", out: "When you are out",
-      goals: { wolf: "The werewolves win once every villager is out, or every power role (seer, witch, hunter) is out, or the living werewolves are at least as many as everyone else.",
+      goals: { wolf: b => `The werewolves win once every villager is out, or every power role (${GODS.en[b]}) is out, or the living werewolves are at least as many as everyone else.`,
         good: "The good side wins once every werewolf is out." },
       days: { all: "Day 1 opens with the sheriff election. Each day everyone speaks once, then votes one player out, who gets last words.",
         werewolf: "Only your pack knows your role, and you may claim any role when you speak.", seer: "Only you know what you saw: whether and when to tell is up to you.",
+        "white wolf king": "In the sheriff election, the day's speeches and a PK, whenever someone finishes speaking you may blow up and take any living player with you: neither of you gets last words, a hunter you take still shoots, and the day ends at once for the night. Blowing up in the election loses the badge; blowing up as sheriff takes the badge with you. Voted out or poisoned, you take nobody.",
         villager: "You learn nothing at night, so you find the werewolves from what everyone says and how they vote." },
       nights: { werewolf: "Talk with your pack in the pack channel and kill one player together: anyone alive, even one of your own. You only know who you went for; whether they died waits for the host's announcement.",
+        "white wolf king": "Kill with your pack, as any werewolf does.",
         seer: "Check one player each night. The host only tells you whether they are good or a werewolf.",
-        witch: "You learn who the werewolves killed tonight. Your antidote can save them and your poison can kill anyone; each works once, at most one a night, and you may only save yourself on the first night.",
+        witch: b => b === "twelve"
+          ? "While you still have the antidote, you learn who the werewolves killed tonight. Your antidote can save them and your poison can kill anyone; each works once, at most one a night, and you may never save yourself. Once the antidote is used you are no longer told who was killed. Saving someone the guard protected kills them."
+          : "You learn who the werewolves killed tonight. Your antidote can save them and your poison can kill anyone; each works once, at most one a night, and you may only save yourself on the first night.",
+        guard: "You wake first each night and protect one living player, yourself included, or nobody; never the same player two nights running. Whoever you protect cannot be killed by the werewolves that night, but the witch's poison still kills them, and if the witch also saves them they die. You are never told whether it worked.",
         hunter: "Nothing to do.", villager: "Nothing to do: eyes shut until dawn." },
-      hunterOut: "You may shoot one player, by day only: killed at night, you shoot once the deaths are announced; poisoned by the witch, you cannot shoot. The shot is not announced, the host only says who else has died." },
-    rules: `<h3>Rules</h3>
-<p>A standard nine-player game: 3 werewolves, a seer, a witch, a hunter and 3 villagers. Your role is dealt at random, and only you know it.</p>
+      hunterOut: "You may shoot one player, by day only: killed at night, you shoot once the deaths are announced; poisoned by the witch, you cannot shoot. The shot is announced: the host says you are the hunter and whom you shot. Keeping your gun is not announced." },
+    rules: b => `<h3>Rules</h3>
+${b === "twelve" ? "<p>A twelve-player game: 3 werewolves, a white wolf king, a seer, a witch, a hunter, a guard and 4 villagers. Your role is dealt at random, and only you know it.</p>"
+  : "<p>A standard nine-player game: 3 werewolves, a seer, a witch, a hunter and 3 villagers. Your role is dealt at random, and only you know it.</p>"}
 <h4>Night</h4><ul>
-<li>The werewolves talk in private and kill one player: anyone alive, even one of their own.</li>
+${b === "twelve" ? "<li>The guard wakes first and protects one player, themselves included, or nobody; never the same player two nights running. The werewolves cannot kill whoever is protected that night, but the witch's poison still can. The guard is never told whether it worked.</li>" : ""}
+<li>The werewolves${b === "twelve" ? ", the white wolf king among them," : ""} talk in private and kill one player: anyone alive, even one of their own.</li>
 <li>The seer checks whether one player is good or a werewolf.</li>
-<li>The witch learns who was killed: her antidote can save them, her poison can kill anyone. Each works once, at most one a night, and she may only save herself on the first night.</li></ul>
+${b === "twelve" ? "<li>While she has the antidote, the witch learns who was killed: her antidote can save them, her poison can kill anyone. Each works once, at most one a night, and she may never save herself; once the antidote is used she is no longer told who was killed.</li><li>Someone both protected by the guard and saved by the witch dies.</li>"
+  : "<li>The witch learns who was killed: her antidote can save them, her poison can kill anyone. Each works once, at most one a night, and she may only save herself on the first night.</li>"}</ul>
 <h4>Dawn</h4><ul>
 <li>The host only says who died, never how. On Day 1 that waits until the sheriff election is over, so whoever died that night still takes part in it.</li>
-<li>A hunter who is out may shoot one player, by day only, unless the witch poisoned him. The shot is not announced either: the host only says who else has died.</li></ul>
+<li>A hunter who is out may shoot one player, by day only, unless the witch poisoned him. A shot is announced, naming the hunter and whom he shot; keeping the gun is not.</li></ul>
 <h4>Sheriff (Day 1)</h4><ul>
 <li>Whoever wants the badge runs. Candidates give a campaign speech and may then withdraw.</li>
 <li>Those who never ran vote; candidates, even ones who withdrew, do not. A lone candidate wins without a vote. A tie goes to a PK: the tied candidates speak again in seat order and those who never ran vote again between them, candidates still not voting; another tie means another PK, at most 3. A third tie, everyone abstaining, nobody running or everyone withdrawing means no sheriff.</li>
@@ -522,9 +563,14 @@ const UI = {
 <li>Everyone speaks once, the sheriff last to call the vote, and then everyone votes someone out. You may abstain; if everyone does, nobody goes.</li>
 <li>A tie goes to a PK: the tied players speak again in speaking order, then everyone else votes between them, and they do not vote. Another tie means another PK between the newly tied, at most 3; if the third ties too, nobody goes today.</li>
 <li>Whoever is voted out gets last words.</li></ul>
+${b === "twelve" ? `<h4>The white wolf king blows up</h4><ul>
+<li>In the sheriff election, the day's speeches and a PK, whenever someone finishes speaking the white wolf king may reveal himself, blow up and take any living player with him. Not during a vote or last words.</li>
+<li>Neither he nor the player taken gets last words; a hunter taken still shoots.</li>
+<li>The day ends at once and night falls. Blowing up in the election loses the badge and there is no sheriff; on Day 1 the night's deaths are announced before night falls. A sheriff king takes the badge with him.</li>
+<li>Voted out or poisoned, the white wolf king takes nobody. Plain werewolves cannot blow up.</li></ul>` : ""}
 <h4>Winning</h4><ul>
-<li>Good: every werewolf is out.</li>
-<li>Werewolves: every villager is out, or every power role (seer, witch, hunter) is out, or the living werewolves are at least as many as everyone else.</li>
+<li>Good: every werewolf${b === "twelve" ? ", the white wolf king included," : ""} is out.</li>
+<li>Werewolves: every villager is out, or every power role (${GODS.en[b]}) is out, or the living werewolves are at least as many as everyone else.</li>
 <li>Once the game is over and the roles are out, each AI player looks back: what they read right and who fooled them.</li></ul>
 <h4>How you play</h4><ul>
 <li>On your turn an action bar with a countdown appears at the bottom, and the move box on the right; after five minutes, an AI plays the move for you.</li>
@@ -537,16 +583,20 @@ const UI = {
   },
 };
 const $ = id => document.getElementById(id);
+// GODS is each board's power roles, for the werewolves' win.
+const GODS = { zh: { nine: "预言家、女巫、猎人", twelve: "预言家、女巫、猎人、守卫" },
+  en: { nine: "seer, witch, hunter", twelve: "seer, witch, hunter, guard" } };
+const boardOf = v => v.board || "nine";
 
 // The rules panel opens and closes from a button in the corner, in the game's
-// language, or the setup page's before a game starts.
-let rulesLang = null;
-function renderRules(lang) {
-  if (lang === rulesLang) return; // the page redraws every poll; keep the reader's scroll
-  rulesLang = lang;
+// language and board, or the setup page's before a game starts.
+let rulesFor = null;
+function renderRules(lang, board) {
+  if (`${lang}:${board}` === rulesFor) return; // the page redraws every poll; keep the reader's scroll
+  rulesFor = `${lang}:${board}`;
   const t = UI[lang] || UI.zh;
   $("rulesBtn").textContent = t.rulesBtn;
-  $("rulesBody").innerHTML = t.rules;
+  $("rulesBody").innerHTML = t.rules(board);
 }
 $("rulesBtn").onclick = () => { $("rules").hidden = !$("rules").hidden; };
 $("rulesClose").onclick = () => { $("rules").hidden = true; };
@@ -568,14 +618,17 @@ async function api(path, body) {
 // character to begin with. Names typed in are kept when the count changes.
 let characters = [];
 async function loadSetup() {
-  const lang = $("lang").value, t = UI[lang];
-  renderRules(lang);
+  const lang = $("lang").value, t = UI[lang], board = $("boardPick").value || "nine";
+  renderRules(lang, board);
   $("title").textContent = t.title;
+  $("boardLabel").textContent = t.board;
+  $("boardPick").innerHTML = Object.entries(t.boards).map(([b, name]) => `<option value="${b}"${b === board ? " selected" : ""}>${esc(name)}</option>`).join("");
   $("countLabel").textContent = t.count;
   $("startBtn").textContent = t.start;
-  const n = $("count").value || "1";
-  $("count").innerHTML = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => `<option value="${i}"${String(i) === n ? " selected" : ""}>${i ? i : esc(t.watchOnly)}</option>`).join("");
-  ({ characters } = await api(`/api/characters?lang=${lang}`));
+  let seats;
+  ({ characters, seats } = await api(`/api/characters?lang=${lang}&board=${board}`));
+  const n = String(Math.min(+($("count").value || "1"), seats));
+  $("count").innerHTML = Array.from({ length: seats + 1 }, (_, i) => `<option value="${i}"${String(i) === n ? " selected" : ""}>${i ? i : esc(t.watchOnly(seats))}</option>`).join("");
   renderPeople(true);
 }
 function renderPeople(newCast) {
@@ -587,12 +640,13 @@ function renderPeople(newCast) {
     `<select>${characters.map(c => `<option${c === (seats[i] || characters[i]) ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></div>`).join("");
 }
 $("lang").onchange = loadSetup;
+$("boardPick").onchange = loadSetup;
 $("count").onchange = () => renderPeople(false);
 $("startBtn").onclick = async () => {
   $("setupErr").textContent = "";
   const humans = [...$("people").children].map(r => ({ name: r.querySelector("input").value, replaces: r.querySelector("select").value }));
   try {
-    const g = await api("/api/games", { lang: $("lang").value, humans });
+    const g = await api("/api/games", { lang: $("lang").value, board: $("boardPick").value, humans });
     const link = s => `?game=${encodeURIComponent(g.id)}&seat=${encodeURIComponent(s.key)}`;
     if (!g.seats.length) { location.search = `?game=${encodeURIComponent(g.id)}`; return; }
     if (g.seats.length === 1) { location.search = link(g.seats[0]); return; }
@@ -658,7 +712,7 @@ function render(v) {
   const t = UI[v.lang] || UI.zh, w = k => v.words[k] || k;
   $("title").textContent = t.title;
   document.title = v.pending ? `${t.bar.title} · ${t.title}` : t.title;
-  renderRules(v.lang);
+  renderRules(v.lang, boardOf(v));
   $("voiceBtn").textContent = voice.on ? t.voiceOn : t.voiceOff;
   $("when").textContent = stageLabel(t, v.round, v.stage, v.phase);
   if (v.you) {
@@ -679,6 +733,7 @@ function render(v) {
   renderStage(v, t);
   $("waiting").hidden = !!v.pending && (!v.now || v.now.name === v.you);
   if (v.you) { maybeDeal(v, t); dealTurn(v, t); }
+  renderBlast(v, t);
   if (!v.pending) { $("turnCard").hidden = true; shownEvent = null; clearInterval(timer); renderBar(v, t); return; }
   if (v.pending.event !== shownEvent) showTurn(v.pending, t, w);
 }
@@ -687,15 +742,16 @@ function render(v) {
 // the pack with a portrait each, a fallen packmate greyed out; for a power
 // role a mark that it is one. The role comes in the game's words, so its key
 // is found by its word.
-const ROLE_ICON = { werewolf: "🐺", seer: "🔮", witch: "🧪", hunter: "🏹", villager: "🌾" };
+const ROLE_ICON = { werewolf: "🐺", "white wolf king": "👑", seer: "🔮", witch: "🧪", hunter: "🏹", guard: "🛡️", villager: "🌾" };
 const roleKey = v => Object.keys(ROLE_ICON).find(k => v.words[k] === v.role) || "";
-const sideOf = key => key === "werewolf" ? "wolf" : key === "villager" ? "villager" : key ? "god" : "";
+const isWolf = key => key === "werewolf" || key === "white wolf king";
+const sideOf = key => isWolf(key) ? "wolf" : key === "villager" ? "villager" : key ? "god" : "";
 function renderIdentity(v, t) {
   const key = roleKey(v), side = sideOf(key);
   setSide(side);
   const role = $("role");
   role.hidden = false;
-  role.className = "rolebadge " + key;
+  role.className = "rolebadge " + (key === "white wolf king" ? "wolfking" : key);
   role.innerHTML = `<span class="ico">${ROLE_ICON[key] || "🎭"}</span>${esc(v.role)}`;
   const pack = $("pack");
   pack.hidden = side !== "wolf" && side !== "god";
@@ -707,8 +763,35 @@ function renderIdentity(v, t) {
   const dead = new Set(v.seats.filter(s => s.death).map(s => s.name));
   pack.className = "packmark";
   pack.innerHTML = `🐺 ${esc(t.pack)} ` + (v.pack || []).filter(n => n !== v.you)
-    .map(n => avatar(n, true).replace('class="avatar sm"', `class="avatar sm${dead.has(n) ? " gone" : ""}" title="${esc(n)}"`)).join("");
+    .map(n => avatar(n, true, n === v.king ? `<span class="badge">👑</span>` : "")
+      .replace('class="avatar sm"', `class="avatar sm${dead.has(n) ? " gone" : ""}" title="${esc(n === v.king ? `${n} · ${v.words["white wolf king"]}` : n)}"`)).join("");
 }
+
+// renderBlast is the white wolf king's button to blow up, while the game
+// takes one: after each speech of the election, the day or a PK. The game
+// stops offering it once it is pressed.
+function renderBlast(v, t) {
+  const card = $("blastCard"), f = $("blastForm");
+  if (!v.blast) { card.hidden = true; delete f.dataset.event; return; }
+  card.hidden = false;
+  if (f.dataset.event === v.blast) return; // keep the pick across polls
+  f.dataset.event = v.blast;
+  $("blastTitle").textContent = t.blast.title;
+  $("blastHint").textContent = t.blast.hint;
+  $("blastBtn").textContent = t.blast.go;
+  $("blastBtn").disabled = false;
+  $("blastErr").textContent = "";
+  const living = v.seats.filter(s => !s.death && s.name !== v.you).map(s => s.name);
+  f.elements.target.innerHTML = `<option value="">${esc(t.blast.pick)}</option>` + living.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+}
+$("blastForm").onsubmit = async e => {
+  e.preventDefault();
+  const f = $("blastForm"), t = UI[view.lang] || UI.zh, target = f.elements.target.value;
+  if (!target || !confirm(t.blast.sure(target))) return;
+  $("blastBtn").disabled = true;
+  try { await api(`/api/games/${encodeURIComponent(gameId)}/moves${seatQuery}`, { event: f.dataset.event, action: { target } }); $("blastCard").hidden = true; }
+  catch (err) { $("blastErr").textContent = err.message; $("blastBtn").disabled = false; }
+};
 
 // The deal is the card a seat flips over the first time its page sees its
 // role, with what that role does by night and by day. It is remembered per
@@ -730,9 +813,11 @@ function showDeal(v, t, spin, guide) {
   $("dealFront").className = "face front " + side;
   $("dealFront").innerHTML = `<div class="ico">${ROLE_ICON[key] || "🎭"}</div><div class="name">${esc(v.role)}</div><div class="camp">${esc(d.camps[side] || "")}</div>`;
   const mates = (v.pack || []).filter(n => n !== v.you);
-  $("dealMates").innerHTML = mates.length ? `<div class="mates">🐺 ${esc(d.mates)} ${mates.map(n => avatar(n, true) + esc(n)).join(" ")}</div>` : "";
+  const mate = n => avatar(n, true) + esc(n) + (n === v.king ? ` 👑${esc(v.words["white wolf king"] || "")}` : "");
+  $("dealMates").innerHTML = mates.length ? `<div class="mates">🐺 ${esc(d.mates)} ${mates.map(mate).join(" ")}</div>` : "";
+  const b = boardOf(v), say = x => typeof x === "function" ? x(b) : x;
   const day = [d.days.all, d.days[key]].filter(Boolean);
-  const parts = [[d.goal, [side === "wolf" ? d.goals.wolf : d.goals.good]], [d.night, [d.nights[key]]], [d.day, day]];
+  const parts = [[d.goal, [side === "wolf" ? say(d.goals.wolf) : d.goals.good]], [d.night, [say(d.nights[key])]], [d.day, day]];
   if (key === "hunter") parts.push([d.out, [d.hunterOut]]);
   const g = $("dealGuide");
   g.innerHTML = parts.map(([h, xs]) => `<h4>${esc(h)}</h4><ul>${xs.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`).join("");
@@ -821,11 +906,12 @@ let revealed = null; // every seat's role, once the game is over
 function renderSeats(v, t, roles = revealed) {
   const thinking = v.now && v.now.name, speaking = reading && reading.speaker, people = v.people || [], pack = v.pack || [];
   const w = k => v.words[k] || k;
+  $("seats").classList.toggle("twelve", v.seats.length > 9);
   $("seats").innerHTML = v.seats.map(s => {
     const me = s.name === v.you, tags = [];
     if (me) tags.push(`<span class="tag you">${esc(t.you)}</span>`);
     else if (people.includes(s.name)) tags.push(`<span class="tag person">${esc(t.person)}</span>`);
-    if (roles) tags.push(`<span class="tag revealed${roles[s.name] === "werewolf" ? " wolf" : ""}">${esc(w(roles[s.name]))}</span>`);
+    if (roles) tags.push(`<span class="tag revealed${isWolf(roles[s.name]) ? " wolf" : ""}">${esc(w(roles[s.name]))}</span>`);
     else if (!me && pack.includes(s.name)) tags.push(`<span class="tag wolf">${esc(t.packmate)}</span>`);
     if (s.death) tags.push(`<span class="tag out">${esc(t.out)}</span>`);
     const state = s.name === speaking ? "speaking" : !roles && s.name === thinking ? "thinking" : "";
@@ -1125,11 +1211,12 @@ function showTurn(p, t, w) {
   $("turnCard").hidden = false; $("turnErr").textContent = "";
   $("turnTitle").textContent = t.kinds[k] || k;
   const opts = (xs, blank) => (blank ? `<option value="">${t.none}</option>` : "") + xs.map(x => `<option value="${esc(x)}">${esc(w(x))}</option>`).join("");
-  const choice = ["vote", "pk_vote", "wolf_plan", "inspect", "save", "poison", "shoot", "run", "withdraw", "sheriff_vote", "badge"].includes(k);
+  const choice = ["vote", "pk_vote", "wolf_plan", "protect", "inspect", "save", "poison", "shoot", "run", "withdraw", "sheriff_vote", "badge"].includes(k);
   const speaks = !choice || k === "wolf_plan", declares = ["speech", "campaign", "pk_speech"].includes(k);
   let h = "";
   if (k === "run") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${x === "pass" ? t.noRun : t.run}</option>`).join("")}</select>`;
   else if (k === "withdraw") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${x === "pass" ? t.withdraw : t.stay}</option>`).join("")}</select>`;
+  else if (k === "protect") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${esc(x === "pass" ? t.guardNobody : w(x))}</option>`).join("")}</select>`;
   else if (k === "badge") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${esc(x === "pass" ? t.tearBadge : w(x))}</option>`).join("")}</select>`;
   else if (choice) h += `<label>${t.target}</label><select name="target">${opts(turn.candidates || [])}</select>`;
   if (k === "wolf_plan") h += `<label>${t.faker}</label><select name="faker">${opts([...(turn.pack || []), "nobody"])}</select>`;
@@ -1140,7 +1227,7 @@ function showTurn(p, t, w) {
   if (declares) {
     const others = turn.seats.map(s => s.name).filter(n => n !== turn.me.name);
     h += `<label>${t.suspect}</label><select name="suspect">${opts(turn.suspects || [])}</select>`;
-    h += `<label>${t.claim}</label><select name="claimRole"><option value="">${t.noClaim}</option>${opts(["seer", "witch", "hunter", "villager"])}</select>`;
+    h += `<label>${t.claim}</label><select name="claimRole"><option value="">${t.noClaim}</option>${opts(boardOf(view) === "twelve" ? ["seer", "witch", "hunter", "guard", "villager"] : ["seer", "witch", "hunter", "villager"])}</select>`;
     h += `<div class="row" id="claimDetail"><div><label id="claimTargetLabel"></label><select name="claimTarget">${opts(others, true)}</select></div>`;
     h += `<div id="claimResultBox"><label>${t.claimResult}</label><select name="claimResult">${opts(["good", "werewolf"], true)}</select></div></div>`;
   }
@@ -1247,6 +1334,12 @@ const cast = {
   "Gym Bro": { sex: "m", voices: ["Eddy", "Reed"], pitch: 0.95, rate: 1.15 },
   "NPC Steve": { sex: "m", voices: ["Fred", "Ralph"], pitch: 1, rate: 1 },
   "Chronically Online Girl": { sex: "f", voices: ["Sandy", "Nicky"], pitch: 1.15, rate: 1.15 },
+  "Crypto Bro": { sex: "m", voices: ["Reed", "Eddy"], pitch: 1.05, rate: 1.2 },
+  "Reply Guy": { sex: "m", voices: ["Aaron", "Fred"], pitch: 1.05, rate: 1.1 },
+  "True Crime Podcaster": { sex: "f", voices: ["Moira", "Samantha"], pitch: 0.95, rate: 0.95 },
+  "唐僧": { sex: "m", voices: ["Li-Mu"], pitch: 1.05, rate: 0.85 },
+  "孙悟空": { sex: "m", voices: ["Li-Mu"], pitch: 1.25, rate: 1.25 },
+  "祥林嫂": { sex: "f", voices: ["Meijia", "Tingting"], pitch: 0.95, rate: 0.85 },
   "华妃": { sex: "f", voices: ["Tingting"], pitch: 1.15, rate: 1.1 },
   "安陵容": { sex: "f", voices: ["Yu-shu", "Tingting"], pitch: 1.25, rate: 0.95 },
   "皇后": { sex: "f", voices: ["Meijia", "Yu-shu"], pitch: 0.9, rate: 0.9 },

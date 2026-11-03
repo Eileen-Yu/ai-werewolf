@@ -280,21 +280,23 @@ func (b *savingWitch) Act(ctx context.Context, t brain.Turn) (brain.Action, erro
 }
 
 // The host only states what anyone at the table could see: who died and when,
-// and who was voted out. How someone died, who was saved and who holds a
-// power never reach the public record or the seats.
+// who was voted out, and whom the hunter shot. How else someone died, who was
+// saved and who holds any other power never reach the public record or the
+// seats.
 func TestTheHostNeverSaysHowAnyoneDied(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
 
 	causes := []string{"狼人杀", "被杀", "刀", "毒", "救", "解药", "猎人", "开枪", "女巫", "预言家"}
-	death := regexp.MustCompile(`^第\d+(夜死亡|天死亡|天被投票放逐)$`)
+	death := regexp.MustCompile(`^第\d+(夜死亡|天死亡|天被投票放逐|天被猎人开枪带走)$`)
+	shot := regexp.MustCompile(`^.+发动猎人技能，开枪带走了.+！$`)
 	for i := range 8 {
 		b := &turnRecorder{}
 		SetBrain(b)
 		playGame(t, client, fmt.Sprintf("facts-%d", i))
 		for _, turn := range b.turns {
 			for _, e := range turn.Transcript {
-				if e.Speaker != "" || len(e.Audience) > 0 || strings.HasPrefix(e.Text, "欢迎") || e.Stage == game.StageEnd {
+				if e.Speaker != "" || len(e.Audience) > 0 || strings.HasPrefix(e.Text, "欢迎") || e.Stage == game.StageEnd || shot.MatchString(e.Text) {
 					continue
 				}
 				// The stances repeat what a player claimed in public, which gives nothing away.
@@ -312,7 +314,7 @@ func TestTheHostNeverSaysHowAnyoneDied(t *testing.T) {
 	}
 }
 
-func TestTheHuntersShotIsNeverAnnounced(t *testing.T) {
+func TestTheHuntersShotIsAnnouncedToEveryone(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
 
@@ -327,20 +329,17 @@ func TestTheHuntersShotIsNeverAnnounced(t *testing.T) {
 		assert.Zero(t, b.atNight, "the hunter was asked to shoot at night")
 		killedAtNight = killedAtNight || b.killedAtNight
 		shot := b.shots[0]
+		announced := fmt.Sprintf(chineseHost.shot, shot.hunter, shot.target)
 		for _, turn := range b.turns {
-			for _, e := range turn.Transcript {
-				if strings.HasPrefix(e.Text, "你开枪带走了") {
-					assert.Equal(t, shot.hunter, turn.Me.Name, "only the hunter is told who he shot")
-				}
-				if len(e.Audience) == 0 && e.Speaker == "" && !strings.HasPrefix(e.Text, "欢迎") && e.Stage != game.StageEnd {
-					assert.NotContains(t, e.Text, "猎人", "the host never says who the hunter is")
-				}
-			}
 			for _, s := range turn.Seats {
-				if s.Name == shot.target && s.Death != "" {
-					seen++
-					assert.Equal(t, game.Chinese.When(shot.round, shot.phase)+"死亡", s.Death, "%s is shown dying like anyone else", s.Name)
+				if s.Name != shot.target || s.Death == "" {
+					continue
 				}
+				seen++
+				assert.Equal(t, game.Chinese.Death(game.Chinese.When(shot.round, shot.phase), chineseHost.shotDeath), s.Death)
+				assert.True(t, slices.ContainsFunc(turn.Transcript, func(e game.Event) bool {
+					return e.Text == announced && len(e.Audience) == 0 && e.Speaker == ""
+				}), "%s, who sees %s out, never heard the shot announced", turn.Me.Name, shot.target)
 			}
 		}
 	}
@@ -545,7 +544,7 @@ func TestAnEnglishGameIsAllEnglish(t *testing.T) {
 		for _, s := range turn.Seats {
 			assert.False(t, han.MatchString(s.Death), "%s: %s", s.Name, s.Death)
 			if s.Death != "" {
-				assert.Regexp(t, `^(died on (Night|Day) \d+|voted out on Day \d+)$`, s.Death, s.Name)
+				assert.Regexp(t, `^(died on (Night|Day) \d+|voted out on Day \d+|shot by the hunter on Day \d+)$`, s.Death, s.Name)
 			}
 		}
 		for _, e := range turn.Transcript {
@@ -659,7 +658,7 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 	client := startEngine(t)
 	startWorker(t, client)
 	passed, torn, withdrewOnce, deadRan, doubled, none := false, false, false, false, false, false
-	for i := 0; i < 30 && !(passed && torn && deadRan); i++ {
+	for i := 0; i < 30 && !(passed && torn && deadRan && withdrewOnce && doubled && none); i++ {
 		b := &campaigner{tear: i%2 == 1}
 		SetBrain(b)
 		res := play(t, client, fmt.Sprintf("sheriff-%d", i), newGame())

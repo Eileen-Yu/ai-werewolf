@@ -155,8 +155,13 @@ func runStart(ctx context.Context, args []string) error {
 	delay := fs.Duration("delay", 2*time.Second, "pause between phases")
 	id := fs.String("id", fmt.Sprintf("werewolf-%d", time.Now().Unix()), "game instance ID")
 	langName := fs.String("lang", "zh", "language the game is played in: zh or en")
+	boardName := fs.String("board", "nine", "roles dealt: nine (预女猎) or twelve (预女猎守 with a white wolf king)")
 	_ = fs.Parse(args)
 	lang, err := game.ParseLang(*langName)
+	if err != nil {
+		return err
+	}
+	board, err := game.ParseBoard(*boardName)
 	if err != nil {
 		return err
 	}
@@ -168,7 +173,7 @@ func runStart(ctx context.Context, args []string) error {
 	defer closeConn()
 
 	client := workflow.NewClient(conn)
-	input := werewolf.Game{PhaseDelay: *delay, Lang: lang}
+	input := werewolf.Game{PhaseDelay: *delay, Lang: lang, Board: board}
 	if _, err := client.ScheduleWorkflow(ctx, "GameWorkflow", workflow.WithInstanceID(*id), workflow.WithInput(input)); err != nil {
 		return fmt.Errorf("start game: %w", err)
 	}
@@ -194,9 +199,14 @@ func runStats(ctx context.Context, args []string) error {
 	n := fs.Int("n", 50, "games to play")
 	parallel := fs.Int("parallel", 4, "games played at once")
 	langName := fs.String("lang", "zh", "language the games are played in: zh or en")
+	boardName := fs.String("board", "nine", "roles dealt: nine or twelve")
 	out := fs.String("out", "", "file to write every game's stats to as JSON")
 	_ = fs.Parse(args)
 	lang, err := game.ParseLang(*langName)
+	if err != nil {
+		return err
+	}
+	board, err := game.ParseBoard(*boardName)
 	if err != nil {
 		return err
 	}
@@ -216,7 +226,7 @@ func runStats(ctx context.Context, args []string) error {
 			limit <- struct{}{}
 			defer func() { <-limit }()
 			id := fmt.Sprintf("%s-%d", prefix, i)
-			if _, err := client.ScheduleWorkflow(ctx, "GameWorkflow", workflow.WithInstanceID(id), workflow.WithInput(werewolf.Game{Lang: lang})); err != nil {
+			if _, err := client.ScheduleWorkflow(ctx, "GameWorkflow", workflow.WithInstanceID(id), workflow.WithInput(werewolf.Game{Lang: lang, Board: board})); err != nil {
 				log.Printf("%s: start: %v", id, err)
 				return
 			}

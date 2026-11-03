@@ -36,6 +36,13 @@ func (Random) Act(_ context.Context, t Turn) (Action, error) {
 		return Action{Speech: fmt.Sprintf(pick(tx.wolfLines), pick(t.Candidates))}, nil
 	case Prepare:
 		return Action{}, nil
+	case Explode:
+		// After every speech, a king who blew up at random would end nearly
+		// every day; he does it now and then.
+		if rand.IntN(10) > 0 {
+			return Action{Target: game.Pass}, nil
+		}
+		return Action{Target: pick(spare(t, game.Without(t.Candidates, game.Pass)))}, nil
 	}
 	if t.Kind == Vote || t.Kind == PKVote {
 		return Action{Target: pick(spare(t, t.Candidates))}, nil

@@ -34,6 +34,8 @@ var chinese = map[string]string{
 	string(Witch):    "女巫",
 	string(Hunter):   "猎人",
 	string(Villager): "村民",
+	string(Guard):    "守卫",
+	string(WolfKing): "白狼王",
 	Good:             "好人",
 	Unsure:           "不确定",
 	God:              "神职",
@@ -50,6 +52,11 @@ var aliases = map[string]string{
 	"werewolves":  string(Werewolf),
 	"bad":         string(Werewolf),
 	"狼":           string(Werewolf),
+	"白狼":          string(WolfKing),
+	"wolf king":   string(WolfKing),
+	"white wolf":  string(WolfKing),
+	"bodyguard":   string(Guard),
+	"守":           string(Guard),
 	"神":           God,
 	"屠神":          God,
 	"民":           string(Villager),
@@ -130,15 +137,15 @@ func (l Lang) Death(when, how string) string {
 	return when + how
 }
 
-// LineupSummary describes Lineup in this language, such as
+// LineupSummary describes the board's lineup in this language, such as
 // "3 werewolves, 1 seer, …".
-func (l Lang) LineupSummary() string {
+func (l Lang) LineupSummary(b Board) string {
 	counts := map[Role]int{}
-	for _, r := range Lineup {
+	for _, r := range b.Lineup() {
 		counts[r]++
 	}
 	var parts []string
-	for _, r := range []Role{Werewolf, Seer, Witch, Hunter, Villager} {
+	for _, r := range Roles {
 		n := counts[r]
 		switch {
 		case n == 0:

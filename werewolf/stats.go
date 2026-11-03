@@ -23,9 +23,20 @@ type Stats struct {
 	Exile game.Role `json:"exile,omitempty"`
 	// WitchAsked is whether the witch was offered the antidote on Night 1,
 	// and WitchSaved whether she used it.
-	WitchAsked bool   `json:"witchAsked"`
-	WitchSaved bool   `json:"witchSaved"`
-	Winner     string `json:"winner"`
+	WitchAsked bool `json:"witchAsked"`
+	WitchSaved bool `json:"witchSaved"`
+	// Guarding is whether the board has a guard; then GuardedFirst is
+	// whether the guard protected anyone on Night 1, Blocked how many nights
+	// the guard stopped the kill, and DoubleSaves how many the guard and the
+	// witch both covered the victim, who died of it.
+	Guarding     bool `json:"guarding,omitempty"`
+	GuardedFirst bool `json:"guardedFirst,omitempty"`
+	Blocked      int  `json:"blocked,omitempty"`
+	DoubleSaves  int  `json:"doubleSaves,omitempty"`
+	// Blast is when the white wolf king blew up, "" if he never did: the
+	// stage, election or day.
+	Blast  game.Stage `json:"blast,omitempty"`
+	Winner string     `json:"winner"`
 }
 
 // Report is a check a wolf claiming seer reported: good or werewolf, and
@@ -46,13 +57,13 @@ func StatsOf(s *game.State) Stats {
 		if e.Round != 1 || e.Claim == nil || e.Claim.Role != game.Seer || slices.Contains(fakers, e.Speaker) {
 			continue
 		}
-		if p := s.Player(e.Speaker); p == nil || p.Role != game.Werewolf {
+		if p := s.Player(e.Speaker); p == nil || !p.Role.IsWolf() {
 			continue
 		}
 		fakers = append(fakers, e.Speaker)
 		r := Report{Result: e.Claim.Result}
 		if t := s.Player(e.Claim.Target); t != nil {
-			r.OnTeammate = t.Role == game.Werewolf
+			r.OnTeammate = t.Role.IsWolf()
 		}
 		st.Reports = append(st.Reports, r)
 	}
@@ -69,6 +80,24 @@ func StatsOf(s *game.State) Stats {
 		if v.Round == 1 {
 			st.WitchAsked, st.WitchSaved = true, v.Saved
 		}
+	}
+	st.Guarding = s.Board.Has(game.Guard)
+	for _, g := range s.Guards {
+		if g.Round == 1 {
+			st.GuardedFirst = g.Target != ""
+		}
+		p := s.PlanFor(g.Round)
+		if g.Target == "" || p == nil || p.Victim != g.Target {
+			continue
+		}
+		if slices.ContainsFunc(s.Saves, func(v game.Save) bool { return v.Round == g.Round && v.Saved }) {
+			st.DoubleSaves++
+		} else {
+			st.Blocked++
+		}
+	}
+	if len(s.Explosions) > 0 {
+		st.Blast = s.Explosions[0].Stage
 	}
 	return st
 }
@@ -93,6 +122,7 @@ func WriteTally(w io.Writer, games []Stats, failed int) {
 		return fmt.Sprintf("%d/%d (%.0f%%)", k, of, 100*float64(k)/float64(of))
 	}
 	var faked, reports, good, wolf, teammate, elected, wolfSheriff, exiled, wolfExiled, asked, saved, wolvesWon int
+	var guarded, guardedFirst, blocked, doubleSaves, blasts, blastsInElection int
 	byStrategy := map[string][2]int{}
 	var strategies []string
 	for _, g := range games {
@@ -113,13 +143,13 @@ func WriteTally(w io.Writer, games []Stats, failed int) {
 		}
 		if g.Sheriff != "" {
 			elected++
-			if g.Sheriff == game.Werewolf {
+			if g.Sheriff.IsWolf() {
 				wolfSheriff++
 			}
 		}
 		if g.Exile != "" {
 			exiled++
-			if g.Exile == game.Werewolf {
+			if g.Exile.IsWolf() {
 				wolfExiled++
 			}
 		}
@@ -127,6 +157,20 @@ func WriteTally(w io.Writer, games []Stats, failed int) {
 			asked++
 			if g.WitchSaved {
 				saved++
+			}
+		}
+		if g.Guarding {
+			guarded++
+			if g.GuardedFirst {
+				guardedFirst++
+			}
+			blocked += g.Blocked
+			doubleSaves += g.DoubleSaves
+		}
+		if g.Blast != "" {
+			blasts++
+			if g.Blast == game.StageElection {
+				blastsInElection++
 			}
 		}
 		won := g.Winner == string(game.Werewolf)
@@ -150,6 +194,11 @@ func WriteTally(w io.Writer, games []Stats, failed int) {
 	fmt.Fprintf(w, "a wolf won the badge: %s of elections with a sheriff\n", pct(wolfSheriff, elected))
 	fmt.Fprintf(w, "Day 1 exiled a wolf: %s of days with an exile\n", pct(wolfExiled, exiled))
 	fmt.Fprintf(w, "witch saved on Night 1: %s of nights she was offered the antidote\n", pct(saved, asked))
+	if guarded > 0 {
+		fmt.Fprintf(w, "guard protected someone on Night 1: %s of games with a guard\n", pct(guardedFirst, guarded))
+		fmt.Fprintf(w, "nights the guard stopped the kill: %d; the guard and the witch both covered the victim, who died: %d\n", blocked, doubleSaves)
+		fmt.Fprintf(w, "white wolf king blew up: %s of twelve-player games, %d of them in the sheriff election\n", pct(blasts, guarded), blastsInElection)
+	}
 	fmt.Fprintf(w, "wolves won: %s\n", pct(wolvesWon, n))
 	fmt.Fprintln(w, "by the pack's Day 1 play:")
 	slices.Sort(strategies)

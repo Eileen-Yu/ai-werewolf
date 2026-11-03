@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -31,8 +32,17 @@ func TestPeoplePlayAWholeGameFromThePage(t *testing.T) {
 
 	page := get[map[string]any](t, srv.URL+"/", http.StatusOK, false)
 	assert.Nil(t, page)
-	chars := get[map[string][]string](t, srv.URL+"/api/characters?lang=en", http.StatusOK, true)
-	assert.Contains(t, chars["characters"], "Karen")
+	type roster struct {
+		Characters []string `json:"characters"`
+		Seats      int      `json:"seats"`
+	}
+	chars := get[roster](t, srv.URL+"/api/characters?lang=en", http.StatusOK, true)
+	assert.Contains(t, chars.Characters, "Karen")
+	assert.Equal(t, 9, chars.Seats)
+	twelve := get[roster](t, srv.URL+"/api/characters?lang=en&board=twelve", http.StatusOK, true)
+	assert.Contains(t, twelve.Characters, "Reply Guy")
+	assert.Equal(t, 12, twelve.Seats)
+	get[roster](t, srv.URL+"/api/characters?board=ten", http.StatusBadRequest, false)
 
 	for _, bad := range [][]game.Person{
 		{{Name: "Eileen", Replaces: "华妃"}},
@@ -133,7 +143,14 @@ func TestEveryCharacterHasAPortrait(t *testing.T) {
 	files, err := fs.Glob(pictures, "avatars/*")
 	require.NoError(t, err)
 	assert.Len(t, got, len(files))
-	for _, c := range append(game.Characters(game.Chinese), game.Characters(game.English)...) {
+	// The characters added with the twelve-player board are drawn as their
+	// initial until their portraits come in.
+	awaiting := []string{"唐僧", "孙悟空", "祥林嫂", "Crypto Bro", "Reply Guy", "True Crime Podcaster"}
+	for _, c := range append(game.Characters(game.Chinese, game.Twelve), game.Characters(game.English, game.Twelve)...) {
+		if slices.Contains(awaiting, c) {
+			assert.NotContains(t, got, c, "%s has a portrait now: take them off the awaiting list", c)
+			continue
+		}
 		url, ok := got[c]
 		if !assert.True(t, ok, "no portrait for %s", c) {
 			continue
@@ -150,7 +167,7 @@ func TestEveryCharacterHasAPortrait(t *testing.T) {
 // chance.
 func TestEveryCharacterHasAVoice(t *testing.T) {
 	for _, l := range []game.Lang{game.Chinese, game.English} {
-		for _, c := range game.Characters(l) {
+		for _, c := range game.Characters(l, game.Twelve) {
 			assert.Contains(t, string(page), fmt.Sprintf("%q: { sex:", c), "no voice for %s", c)
 		}
 	}
@@ -177,7 +194,7 @@ func TestAnyoneCanWatchAGameNobodyPlaysIn(t *testing.T) {
 		require.NotNil(t, r.View, "a finished game can still be watched")
 		assert.Empty(t, r.View.You)
 		assert.Empty(t, r.View.Role)
-		assert.Len(t, r.View.Seats, len(game.Lineup))
+		assert.Len(t, r.View.Seats, game.Nine.Seats())
 		for _, l := range r.View.Log {
 			assert.False(t, l.Private, "a spectator saw a private line: %s", l.Text)
 		}

@@ -5,9 +5,19 @@ import "github.com/Eileen-Yu/ai-werewolf/game"
 // text is everything a player reads, in one language. The logic that uses it
 // is the same for every language.
 type text struct {
-	// rules is the system prompt: table size twice, names, lineup, then the
-	// player's name, role, persona, habit line and strategy.
+	// rules is the system prompt: table size, names, lineup, the abilities
+	// of the roles dealt, the power roles wolves win by clearing, the
+	// player's name, role, persona, habit line and strategy, the number of
+	// wolves, and what a quiet night means on this board.
 	rules string
+	// abilities is a line on each role's power; strictWitch is the witch's
+	// on a board where she never saves herself and stops being told the
+	// kill once her antidote is gone.
+	abilities   map[game.Role]string
+	strictWitch string
+	// peaceful is what a quiet night means, and guardPeaceful the same on a
+	// board with a guard.
+	peaceful, guardPeaceful string
 	// habit is the line for how the player decides, and rivalry the line for
 	// who they clash with; each is left out if the player has none.
 	// rivalTeammate is added for a wolf whose rival is a fellow wolf.
@@ -95,21 +105,16 @@ func (t Turn) text() *text {
 }
 
 var chineseText = text{
-	rules: `你在玩一局%d人狼人杀，桌上只有这%d个人：%s。不要提到任何其他名字。
-配置：%s。
+	rules: `你在玩一局%[1]d人狼人杀，桌上只有这%[1]d个人：%[2]s。不要提到任何其他名字。
+配置：%[3]s。
 角色能力：
-- 狼人：每晚一起商量杀一个人，可以杀任何活着的人，包括自己和同伴（叫自刀）。
-- 预言家：每晚查验一个人是好人还是狼人。
-- 女巫：有一瓶解药和一瓶毒药，各只能用一次，同一晚最多用一瓶。每晚会知道谁被狼人杀了，可以用解药救他（只有第1夜可以救自己），也可以用毒药毒死任何一个人。
-- 猎人：出局时可以开枪带走一个人，只能在白天开枪：晚上被狼人杀的猎人，天亮公布死讯后再开枪；被女巫毒死时不能开枪。
-- 村民：没有特殊能力。
-流程：天亮后只公布昨晚谁死了（第1天要等警长竞选结束才公布），不公布死因（可能被狼人杀，也可能被女巫毒死；被救的人不会死）。猎人开枪也不公布，主持人只会说被带走的人死亡了。
+%[4]s流程：天亮后只公布昨晚谁死了（第1天要等警长竞选结束才公布），不公布死因（可能被狼人杀，也可能被女巫毒死；被救的人不会死）。猎人开枪会公布：主持人会说谁是猎人、开枪带走了谁。猎人放弃开枪不公布，所以出局的人没开枪，不代表他不是猎人。
 白天按顺序每人发言一次，有警长时警长最后发言归票，发完就直接投票放逐一人，没有第二轮发言。平票就PK：平票的人按发言顺序再各发言一次，其他人听完后只能在他们中间投票，他们自己不投；再平票就在新的平票者中再PK，最多3轮，第3轮还平、所有人弃票或者没有人能投票，今天就无人出局。被放逐的人有遗言。
 警长：第1天天亮后先竞选警长，竞选结束后才公布第1夜的死讯，所以昨晚死的人也照常参加竞选，当选后出局就移交警徽。想当的人上警，按座位顺序发表竞选发言，没上警的人投票选警长，得票最多的当选。平票就PK：平票的人按座位顺序再各发言一次，没上警的人再在他们中间投票，上过警的人（包括退水的）始终不投；再平就在新的平票者中再PK，最多3轮。第3轮还平、所有人都弃票、没人上警或者所有人都上警，则没有警长。警长放逐投票算1.5票，每天最后一个发言，可以归票。警长出局时可以把警徽移交给一个活着的人，也可以撕掉警徽，从此没有警长。
-胜负：狼人全部出局则好人胜利；所有村民出局，或者预言家、女巫、猎人全部出局，或者活着的狼人不少于其他活着的人（狼人从此控制每一次投票），则狼人胜利。
+胜负：狼人全部出局则好人胜利；所有村民出局，或者%[5]s全部出局，或者活着的狼人不少于其他活着的人（狼人从此控制每一次投票），则狼人胜利。
 
-你是%s，身份是%s，性格：%s。
-%s策略：%s
+你是%[6]s，身份是%[7]s，性格：%[8]s。
+%[9]s策略：%[10]s
 
 铁律，违反会让你当场露馅，主持人也会驳回你的回答：
 1. 只能引用【公开记录】里真实出现过的话和事件。没发生过的事绝对不能编，不能提桌上没有的名字。
@@ -124,7 +129,7 @@ var chineseText = text{
    先看【票型】：谁和谁一直投同一个人，谁的票和他的发言对不上，谁在关键的一票上改票或弃票、这一票保护了谁。
    再逐条拆解新的发言，只看事实：他这一轮针对谁、拿的是哪个点、这个点在之前的记录里成不成立。成立的话，再想表面的推理之外他真正的意图：想把票引向谁、想保谁。带节奏和倒钩都是这种引导。
    拆解之前先代入他的视角：他是第几个发言、他之前的人说了什么、后面还有谁没说、他声称的身份那时能知道什么。再问：一个想赢的好人坐在他那个位置上，会不会也这么说？会的话，这一条就不是狼的证据。
-2. pits（好人才写）：盘狼坑。本局一共3只狼，已经出局的也算在里面。列出1到3种最可能的整支狼队，最可能的写在前面。
+2. pits（好人才写）：盘狼坑。本局一共%[11]d只狼，已经出局的也算在里面。列出1到3种最可能的整支狼队，最可能的写在前面。
    先从站边和票型推，再用发言修正：两个人对跳预言家时，信其中一个是真的，狼坑多半就在另一个和替他说话、替他投票的人里，两种信法各盘一个；再看谁一直同票、谁在关键一票上保了谁。
    每个狼坑写 for（支持它的真实事情）、against（和它对不上的事情）和 odds（高、中或低）。新的事情和某个狼坑对不上，就改它或者删掉它，不要硬圆。和【你的秘密信息】冲突的狼坑一定是错的。
 3. beliefs：对照【你的笔记】，逐个更新你对其他玩家的判断，不要写你自己。好人的判断要和你的狼坑对得上：在你最可能的狼坑里的人偏狼，哪个狼坑都没有他的人偏好。有新证据才改，没有就保持原样。
@@ -142,10 +147,10 @@ var chineseText = text{
 - 有人报了你的查验结果时，你知道自己的真实身份：报对了，是他像真预言家的有力证据；把你报错了，他一定在撒谎。
 - 两个人对跳同一个神职时，不要说"他没有实证"，要比较谁的说法和其他声明、死亡、投票更吻合，谁跳得更自然。
 - 被狼人刀的人不一定是好人，狼人可以自刀；被女巫救下的人也不一定是好人。
-- 平安夜：要么女巫用了解药，要么狼人没杀人。一晚死两个人：一个被刀、一个被毒。天亮公布死讯之后又有人死亡，说明昨晚死的人里有猎人，他开枪带走了这个人。
+- %[12]s一晚死两个人：一个被刀、一个被毒。
 - 每种神职只有一个人。两个人声称同一个神职，至少有一个是假的，假的那个很可能是狼人。
 - 女巫声称某晚救了某人，而那晚这个人死了，或者那晚不是平安夜，她的说法就有问题。
-- 白天有人被放逐之后又有人死亡，说明被放逐的是猎人，开枪带走了他。猎人带走的人不一定是狼人。被放逐的人不一定是狼人，翻不翻牌要看结果。
+- 猎人开枪带走的人不一定是狼人。被放逐的人不一定是狼人，翻不翻牌要看结果。
 - 第1夜还没有任何公开信息，没有人能看出谁是神职。
 - 警徽流是预言家接下来的验人顺序，警徽跟着查验走。比如"警徽流先A后B"：今晚验A，预言家今晚死了，A是好人就把警徽交给A（A就是他的金水），A是狼就把警徽交给B，借此告诉大家A是狼；明晚验B，同理。
 - 真预言家上警一般会报警徽流。不报警徽流、或者把警徽留给一个自己没打算验的人，可以追问、施压：那等于把1.5票交给一个谁都不知道底细的人。但这只说明他打得不好，不等于他是狼。
@@ -158,6 +163,18 @@ var chineseText = text{
 找狼比纠正别人的推理重要。不要花一整轮去抠一个措辞上的小分歧，除非它真的改变你怀疑谁；一句含糊的话也不等于明确的恶意。
 你不是中立的辩论主持人。你的性格决定你在意什么、怎么反应、找谁麻烦：可以情绪化、固执、冲动，也可以想错。不是每个角色都是狼人杀高手：符合你的性格时，你可以误解局势、反应过度、带着不讲理的成见，自信地得出离谱的结论。但依据仍然必须是真实发生过的事，铁律照样有效。
 不要每次都用同一套句式，比如"这点我认，但……""不等于……""不能因此认好""你能解释一下吗""目前我不点狼"。`,
+	abilities: map[game.Role]string{
+		game.Werewolf: "狼人：每晚一起商量杀一个人，可以杀任何活着的人，包括自己和同伴（叫自刀）。",
+		game.WolfKing: "白狼王：也是狼人，夜里和狼人一起杀人，预言家验他是狼人。白天任何一个人发完言后（竞选发言、白天发言、PK发言之后都可以，投票和遗言时不行），他可以自爆：亮明身份，带走任何一个活着的人。他和被带走的人都没有遗言，被带走的猎人仍然可以开枪；当天立刻结束，直接入夜。竞选时自爆，警徽流失，本局没有警长；第1天竞选时自爆，入夜前先公布第1夜的死讯。被放逐或被毒死时不能带人。普通狼人不能自爆。",
+		game.Seer:     "预言家：每晚查验一个人是好人还是狼人。",
+		game.Witch:    "女巫：有一瓶解药和一瓶毒药，各只能用一次，同一晚最多用一瓶。每晚会知道谁被狼人杀了，可以用解药救他（只有第1夜可以救自己），也可以用毒药毒死任何一个人。",
+		game.Hunter:   "猎人：出局时可以开枪带走一个人，只能在白天开枪：晚上被狼人杀的猎人，天亮公布死讯后再开枪；被女巫毒死时不能开枪。",
+		game.Guard:    "守卫：每晚第一个行动，守护一个活着的人，可以守自己，也可以空守。被守的人当晚不会被狼人杀死，但挡不住女巫的毒药。不能连续两晚守同一个人。守卫不会知道守没守中。同一晚被守卫守、又被女巫救的人反而会死（叫奶穿），算被狼人杀的。",
+		game.Villager: "村民：没有特殊能力。",
+	},
+	strictWitch:   "女巫：有一瓶解药和一瓶毒药，各只能用一次，同一晚最多用一瓶。解药还在时，每晚会知道谁被狼人杀了，可以用解药救他，但永远不能救自己；解药用掉之后，就不再知道谁被杀。毒药可以毒死任何一个人。",
+	peaceful:      "平安夜：要么女巫用了解药，要么狼人没杀人。",
+	guardPeaceful: "平安夜：女巫用解药救了刀口，或者守卫守中了刀口，或者狼人没杀人。守卫守中、女巫又救了同一个人，这个人会死，不是平安夜。",
 	strategies: map[game.Role]string{
 		game.Werewolf: "你和狼同伴目标一致，要配合。白天按狼队计划执行，局势变了在夜里改计划。" +
 			"你们是睁眼的：知道谁是好人，好人不知道。好人之间的误会是你们最好的武器：找一个已经被一部分好人怀疑、或者站错了边的好人，抓住他真实的破绽咬住不放，把他做成今天的抗推位，哪怕他说的是对的。一次只集中打一个好人，不要同时得罪一大片，也别去碰明显像女巫、猎人的人。" +
@@ -166,9 +183,9 @@ var chineseText = text{
 			"一般要保护同伴。但有具体的理由时，你可以怀疑、甚至投出同伴：他已经被可信地坐实、反正活不下来；替他说话会把你自己也拖下水；踩他能换来你后面要用的信任；或者牺牲他能让狼队整体赢面更大。" +
 			"卖队友是证据逼出来的例外，不是你做身份的常规手段，更不能只因为私人恩怨。" +
 			"做身份骗的是具体的人，效果取决于他信什么：站边真预言家、踩悍跳的同伴，只能骗到信真预言家的好人；信悍跳狼的好人会把你看成真预言家的狼同伴。所以先看清你最需要骗住、也最危险的那一两个人（比如像女巫、猎人的人，或者警长）站的是谁。别人公开喊要对付谁，不等于他真会对付谁，更不说明你安全。" +
-			"夜里你们只知道自己刀了谁，不知道刀成没有，要等主持人公布死讯（第1天是警长竞选之后）。公布出来你们的刀口还活着，说明女巫救了他（本局没有守卫）：女巫知道他是你们的刀口，随时可能公开，不要给他报查杀，也不要带头踩他，否则她一句话就能拆穿你。" +
+			"夜里你们只知道自己刀了谁，不知道刀成没有，要等主持人公布死讯（第1天是警长竞选之后）。公布出来你们的刀口还活着，说明女巫救了他，或者配置里有守卫、守卫守中了他。女巫救的话，她知道他是你们的刀口，随时可能公开，不要给他报查杀，也不要带头踩他，否则她一句话就能拆穿你。" +
 			"真预言家是你们最大的威胁。女巫的解药可能救下你们的刀，猎人出局会开枪，所以要尽早找出神职。" +
-			"屠边是你们的胜利条件，每晚都要算账：3个神职或者3个村民全部出局你们就赢，每晚刀一个，白天再借好人的票放逐一个。屠神还差几个、屠民还差几个，哪条路刀数少、更不容易被女巫的药和猎人的枪打断，就先走哪条。" +
+			"屠边是你们的胜利条件，每晚都要算账：神职全部出局或者村民全部出局你们就赢，每晚刀一个，白天再借好人的票放逐一个。屠神还差几个、屠民还差几个，哪条路刀数少、更不容易被女巫的药、守卫的守护和猎人的枪打断，就先走哪条。" +
 			"刀谁要算账，不是见神就刀：被大家认下的真预言家夜里死了，他报过的查验和警徽流就坐实了，好人会照着走；有时留着他，白天拿票和发言去打他更划算。跳出来的女巫、猎人一般值得刀；神职藏得好、村民好认的时候，屠民更快。死人不翻牌，所以要从跳身份、发言里的夜间信息、刀口没死这些事情去猜剩下的人里谁是神、谁是民。好人的神职一般藏着不跳，跳出来的猎人、女巫也可能是村民放的烟雾弹，要看他说的信息对不对得上刀口和死讯。" +
 			"狼队牺牲一只狼（卖队友、悍跳吸引火力、自刀），换来的应该是队友藏得更深，或者更快摸清谁是神。" +
 			"被放逐时的遗言也要继续伪装、搅浑水，绝不能承认自己是狼人。" +
@@ -185,28 +202,36 @@ var chineseText = text{
 			"你的理由被驳倒了，就别再拿它推同一个人：要么换目标，要么拿出新的、真实发生过的理由。嘴上认错、结论不变，好人只会觉得你在硬推。" +
 			"多想一层：不只想自己这条理由站不站得住，还要想好人现在信谁、为什么信，怎么让他们互相怀疑；谁的话最有分量，是拉拢他还是打掉他；什么时候和同伴拉开距离，换来后面要用的信任。" +
 			"几只狼不要一个样：有的强攻，有的煽动好人内斗，有的装老实和稀泥，各按自己的性格来。",
-		game.Witch: "你的两瓶药是好人阵营的关键资源。解药只有一瓶，只有第1夜可以救自己；你每晚只知道被刀的是谁，不知道他的身份。" +
+		game.Witch: "你的两瓶药是好人阵营的关键资源。解药只有一瓶，能不能救自己、什么时候还知道刀口，按上面的角色能力；你知道被刀的是谁，但不知道他的身份。" +
 			"救不救没有固定答案，每晚按局势权衡，第1夜也一样：救下来，好人少死一个，被刀的人可能是神职，你也多一个银水来判断；不救，解药留给后面更关键的人，比如你认定是真的预言家，也不怕狼自刀骗药，只是今晚好人少一个。平安夜会让狼知道你用了解药。第1夜几乎没有信息，救和不救都说得通，按你的判断和性格定。" +
 			"毒药留给你有把握是狼人的人，" +
-			"比如被真预言家查出的狼，或者悍跳的假预言家。不要主动跳女巫：本局没有守卫，跳出来就等于告诉狼人神职在哪，他们会直接刀你，离屠神又近一步。你知道的刀口、救了谁、毒了谁先藏在心里，用来判断谁是真预言家、谁在说谎；发言里只说你的结论和公开记录里的理由。只有这些时候才考虑亮身份：你马上要被放逐（在PK台上，或者票已经压到你身上）；好人已经明显领先，比如狼只剩一只，你的信息能当场决定这一票；或者有人冒充女巫，你不出来好人就会在关键的一票上投错。亮的时候只报必要的信息。" +
+			"比如被真预言家查出的狼，或者悍跳的假预言家。不要主动跳女巫：跳出来就等于告诉狼人神职在哪，他们会直接刀你，离屠神又近一步。你知道的刀口、救了谁、毒了谁先藏在心里，用来判断谁是真预言家、谁在说谎；发言里只说你的结论和公开记录里的理由。只有这些时候才考虑亮身份：你马上要被放逐（在PK台上，或者票已经压到你身上）；好人已经明显领先，比如狼只剩一只，你的信息能当场决定这一票；或者有人冒充女巫，你不出来好人就会在关键的一票上投错。亮的时候只报必要的信息。" +
 			"狼可能自刀，所以被你救下的人不一定是好人，要结合他白天的表现判断。" +
 			"你可以上警：你知道第1夜的刀口，这是全场最硬的信息之一，可以在心里拿它检验预言家，比如谁给刀口报了查杀，这个预言家就很可疑。上警不报女巫身份，也不说出刀口，只说你站谁、为什么。",
-		game.Hunter: "你的枪是威慑，但藏着才最有用：跳出猎人，狼晚上就会刀你，神职少一个，离屠神更近，本局也没有守卫保护你。所以平时像普通好人一样发言，被怀疑也先用道理为自己辩护。只有你马上要被放逐时（在PK台上，或者票已经压到你身上）才亮猎人身份：好人会改票，狼也不敢再投你。开枪时带走你最有把握的狼人，没有把握时可以放弃，免得误伤好人。" +
+		game.Hunter: "你的枪是威慑，但藏着才最有用：跳出猎人，狼晚上就会刀你，神职少一个，离屠神更近。所以平时像普通好人一样发言，被怀疑也先用道理为自己辩护。只有你马上要被放逐时（在PK台上，或者票已经压到你身上）才亮猎人身份：好人会改票，狼也不敢再投你。开枪时带走你最有把握的狼人，没有把握时可以放弃，免得误伤好人。" +
 			"第1天你一般要上警：警徽在猎人手里最稳，你出局时还能开枪再移交警徽。上警不报猎人身份，凭发言拿警徽。在警上你能当面逼问跳身份的人，有人对跳时带着好人分辨真假。要强势，不要躲在警下等别人带队。",
 		game.Seer: "你的查验结果是好人阵营最重要的信息。查到狼人时应该果断表明身份、报出所有查验结果，带大家投票。" +
 			"如果有人和你对跳，用你的查验记录、他跳出来的时机和发言里的矛盾揭穿他。跳身份后你今晚很可能被杀，所以要把信息一次报完整。" +
 			"上不上警由你决定。上警的好处最大：竞选发言就报身份和查验，拿到警徽好归票带队；不上警，警徽可能落到别人手里，甚至落到狼手里，你要想清楚为什么不上。上警就报警徽流：接下来两晚先验谁、后验谁。警徽跟着查验走，绝不留给你没验过的人：今晚验的人是好人，你出局就把警徽交给他；是狼，就交给警徽流里的下一个。这样你死了，警徽交给谁本身就把查验报了出去，信息断不了。",
 		game.Villager: "你没有任何夜间信息，只能靠分析发言找狼。关注谁的发言前后矛盾、谁在跟风、谁在保护谁、谁的投票和发言不一致。" +
-			"你也可以假跳神职放烟雾弹，比如装成猎人或女巫，替真神职挡狼刀，或者吓住想推你的狼。但这一招有代价，不是每局都用：村民也只有3个，狼屠民同样能赢，假跳的村民被刀等于帮狼屠民；好人也会被你的假身份带偏，算错狼坑。" +
+			"你也可以假跳神职放烟雾弹，比如装成猎人或女巫，替真神职挡狼刀，或者吓住想推你的狼。但这一招有代价，不是每局都用：村民人数也不多，狼屠民同样能赢，假跳的村民被刀等于帮狼屠民；好人也会被你的假身份带偏，算错狼坑。" +
 			"所以场上已经有人跳过猎人或女巫，就不要再跳；村民已经出局了一两个，也不要跳；真的神职出来和你对跳时，马上承认你是村民。" +
 			"如果有两个人都自称预言家，必须判断真假：谁的查验结果和其他人的声明、死亡和投票更吻合，谁跳得更自然。先跳后跳、说得硬不硬，都定不了真假。" +
 			"拿不准时要主动追问：让两个预言家各自解释第1夜为什么验那个人、警徽流为什么这么报，看谁答得自然。被报查杀或金水的人怎么回应，也是线索。" +
 			"村民也可以很强势：认准一个人就穷追猛打，强势带队归票，不必等别人先开口。",
+		game.Guard: "你能让一个人躲过一晚的刀，但你永远不知道守没守中，所以守谁要靠你对狼的判断。守谁没有固定答案，每种都有代价：" +
+			"守已经跳出来、你相信的预言家，狼最想刀他，但狼也猜得到你会守他，可能换刀；守自己，保住一个神职，但别人今晚没人守；空守，今晚谁也保不住，但不会和女巫的解药撞上奶穿，第1夜女巫一般还有解药，这一点尤其要想。" +
+			"不能连守同一个人，狼会算出你今晚守不了谁。按局势和你的性格定。" +
+			"平安夜时你知道自己守了谁，可以拿它推断：是你守中了，还是女巫救的，或者狼没刀。" +
+			"一般不主动跳守卫：跳出来狼会先刀你，而你不能连续两晚守自己。快被放逐时，或者你守过的人能帮好人对上一条关键的信息时，再考虑亮身份。",
+		game.WolfKing: "你是白狼王：白天任何一个人发完言后，你可以自爆带走一个人，当天立刻结束、直接入夜。被放逐或被毒死就带不了人，所以这张牌只能在你还活着、还没被投出去时打。" +
+			"自爆要算账：代价是狼队少一只狼，你和被带走的人都没有遗言。换来的可以是带走一个关键的好人（被大家认下的预言家、跳出来的女巫、警长；带走猎人他还能开枪，可能反带走你的同伴），打断今天对同伴的投票，或者在竞选时吞掉警徽，不让真预言家拿到归票权。" +
+			"不自爆的时候，你就是一只普通的狼，藏好身份。被查杀、票压到你身上时，自爆通常比被放逐划算；局势顺利时，留着这张牌也有威慑。什么时候爆、带谁，按局势和你的性格定。",
 	},
 	packPlays: "本局狼队怎么打没有固定剧本，由你们每晚按局势自己定，第1夜也一样。下面这些都是可选的打法，各有代价，没有哪一种是必须的：" +
 		"单狼悍跳：派一只狼上警跳预言家，和真预言家抢警徽。好处是真预言家没法独自带队，好人得在两个预言家里选；代价是他站在台前，被盘穿就会被投出去，站他边的同伴也会被一起拖下水。" +
 		"双狼悍跳：两只狼都跳，加上真预言家，警上有三个预言家，好人很难同时分清；两只悍跳的狼可以互相对立、互相质疑，甚至一只给另一只报查杀。代价是两张牌同时在台前，被盘出来狼队一下少两只。" +
-		"不悍跳：三只狼都藏身份，像普通好人一样上警或者留在警下，等真预言家跳出来，再找他的破绽，或者借他的查验挑起好人内斗。好处是不送身份、票型干净；代价是真预言家没人对跳，很可能直接拿警徽带队，你们只能靠白天抓好人的破绽、引导投票来抢节奏，不能缩着不说话。" +
+		"不悍跳：所有狼都藏身份，像普通好人一样上警或者留在警下，等真预言家跳出来，再找他的破绽，或者借他的查验挑起好人内斗。好处是不送身份、票型干净；代价是真预言家没人对跳，很可能直接拿警徽带队，你们只能靠白天抓好人的破绽、引导投票来抢节奏，不能缩着不说话。" +
 		"其他狼的位置：冲锋（明着站边悍跳的同伴，用自己的理由去打真预言家）、倒钩（站边真预言家，甚至踩、投悍跳的同伴，换后面关键一票的信任）、深水（不急着站边，拿票型和发言做文章）。上警可以帮着站边、搅局，也可以都留在警下投票。" +
 		"悍跳报什么也由你们定，各有代价：给好人报金水，能拉拢他，风险小；报查杀能制造对立，但打在谁身上决定成败，打在刀口或者明显的神职身上，一句话就可能被拆穿；给狼同伴报金水能保住他，但两人从此绑在一起，悍跳被盘穿，同伴也跟着暴露。报给谁、为什么，要和你们今天想推谁、今晚刀谁连起来想。" +
 		"怎么选看这一局的具体情况：谁的性格敢冲敢硬，谁适合藏；谁和谁挨着坐，谁先发言；夜聊里同伴提了什么。第1夜之后，再看死讯、谁跳了什么、谁站谁的边、票型。局势变了，比如悍跳的狼已经出局、倒钩已经没用、真预言家已经被认下，就换打法：抓好人真实的破绽、他们自己说过却没做到的话，比编造更有效。已经跳了预言家的狼即使被识破，也只能咬死到底，不能改口。",
@@ -241,6 +266,8 @@ var chineseText = text{
 		PKVote: "PK投票：今天的放逐投票平票，PK台上的人刚各自发了言。你只能在他们中间投票放逐一人，也可以选\"放弃\"弃票。" +
 			"对比他们的PK发言，以及今天的发言和投票来决定。再平票就再PK一轮，最多3轮，第3轮还平今天就无人出局，等于又给了狼人一晚。",
 		Inspect: "选择今晚要查验的人。优先查最可疑、或者发言最能带动大家的人。",
+		Protect: "选择今晚守护的人：选一个名字表示守他，可以是你自己；选\"放弃\"表示空守。昨晚守过的人今晚不能再守，不在候选里。你不会知道守没守中。",
+		Explode: "有人刚发完言。你可以现在自爆：选一个活着的人表示自爆并带走他，选\"放弃\"表示不自爆。自爆后你们俩都没有遗言，今天立刻结束、直接入夜。",
 		Save:    "今晚谁被狼人杀了在【你的秘密信息】里。决定要不要用解药救他：选他的名字表示救，选\"放弃\"表示不救。",
 		Poison:  "决定要不要用毒药：选一个名字表示毒死他，选\"放弃\"表示不用。毒错了好人会很伤，没有把握就别用。",
 		Shoot:   "你出局了，作为猎人可以开枪带走一个人：选一个名字表示开枪，选\"放弃\"表示不开枪。",
@@ -261,7 +288,7 @@ var chineseText = text{
 	badTarget:      "target 必须是这些名字之一：%s，你给的是 %q",
 	emptySpeech:    "speech 不能为空",
 	badSuspect:     "suspect 必须是这些之一：%s，你给的是 %q",
-	badRole:        "claim.role 只能是预言家、女巫、猎人、村民之一，你给的是 %q",
+	badRole:        "claim.role 只能是%[2]s之一，你给的是 %[1]q",
 	badClaimTarget: "claim.target %q 不是桌上的其他玩家",
 	badResult:      "预言家的 claim.result 只能是好人或狼人，你给的是 %q",
 	badFakers:      "fakers 要写%d到%d只不同的狼，只能从%s里选，你给的是：%s",
@@ -310,7 +337,7 @@ var chineseText = text{
 		"- 活着的狼：%s（%d只）。活着的好人：%s（%d个）。\n" +
 		"- 已经出局的好人：%s。他们是神职还是村民没有公开，只能推断。\n" +
 		"- 按你的笔记，活着的好人里像神职的：%s；像村民的：%s；还不确定的：%s。\n" +
-		"- 3个神职（预言家、女巫、猎人）或者3个村民全部出局，你们就赢；活着的狼不少于活着的好人也赢，现在还差%d个好人。每晚刀一个，白天再借好人的票放逐一个。\n",
+		"- %d个神职（%s）或者%d个村民全部出局，你们就赢；活着的狼不少于活着的好人也赢，现在还差%d个好人。每晚刀一个，白天再借好人的票放逐一个。\n",
 	edgeNow:   "狼队现在先屠%s。\n",
 	claimLine: "- [%s] %s声称：%s（未验证）\n",
 	now:       "\n【现在】%s。%s\n",
@@ -367,8 +394,8 @@ var chineseText = text{
 `,
 	fields: fields{
 		observations:     `"observations": ["你上次行动之后新发生的、和判断有关的具体事情"]`,
-		notes:            `"notes": {"beliefs": {"其他玩家的名字": {"side": "狼人、好人或不确定", "evidence": ["支持这个判断的、真实发生过的具体事情"]}}, "pits": [{"wolves": ["这个狼坑里的人，最多3个"], "for": ["支持它的真实事情"], "against": ["和它对不上的事情"], "odds": "高、中或低"}], "strategy": "你接下来的打算"}`,
-		changedNotes:     `"notes": {"beliefs": {"判断有变化的玩家": {"side": "狼人、好人或不确定", "evidence": ["这个人全部的证据，新的加在后面"]}}, "pits": [{"wolves": ["这个狼坑里的人，最多3个"], "for": ["支持它的真实事情"], "against": ["和它对不上的事情"], "odds": "高、中或低"}], "strategy": "打算变了才写"}`,
+		notes:            `"notes": {"beliefs": {"其他玩家的名字": {"side": "狼人、好人或不确定", "evidence": ["支持这个判断的、真实发生过的具体事情"]}}, "pits": [{"wolves": ["这个狼坑里的人，不超过本局狼的总数"], "for": ["支持它的真实事情"], "against": ["和它对不上的事情"], "odds": "高、中或低"}], "strategy": "你接下来的打算"}`,
+		changedNotes:     `"notes": {"beliefs": {"判断有变化的玩家": {"side": "狼人、好人或不确定", "evidence": ["这个人全部的证据，新的加在后面"]}}, "pits": [{"wolves": ["这个狼坑里的人，不超过本局狼的总数"], "for": ["支持它的真实事情"], "against": ["和它对不上的事情"], "odds": "高、中或低"}], "strategy": "打算变了才写"}`,
 		wolfNotes:        `"notes": {"beliefs": {"好人的名字": {"side": "神职、村民或不确定", "evidence": ["让你这么猜的、真实发生过的具体事情"]}}, "strategy": "你接下来的打算"}`,
 		wolfChangedNotes: `"notes": {"beliefs": {"猜测有变化的好人": {"side": "神职、村民或不确定", "evidence": ["这个人全部的依据，新的加在后面"]}}, "strategy": "打算变了才写"}`,
 		edge:             `"edge": "先屠哪一边：神职或村民"`,
@@ -381,7 +408,7 @@ var chineseText = text{
 		target:           `"target": "名字"`,
 		speech:           `"speech": "你要说出口的话"`,
 		suspect:          `"suspect": "你现在最怀疑的人"`,
-		claim:            `"claim": {"role": "你声称的身份：预言家、女巫、猎人或村民", "target": "和这个身份相关的人，没有就留空", "result": "查验结果（好人或狼人），或者救了、毒了，没有就留空"}`,
+		claim:            `"claim": {"role": "你声称的身份：配置里的一个好人身份", "target": "和这个身份相关的人，没有就留空", "result": "查验结果（好人或狼人），或者救了、毒了，没有就留空"}`,
 	},
 	onlyJSON:         "只回复一个JSON对象，不要任何其他内容：",
 	seatLine:         "- %s：%s\n",
@@ -416,21 +443,16 @@ var chineseText = text{
 }
 
 var englishText = text{
-	rules: `You are playing a %d-player game of Werewolf. These %d people are the only ones at the table: %s. Never mention any other name.
-Lineup: %s.
+	rules: `You are playing a %[1]d-player game of Werewolf. These %[1]d people are the only ones at the table: %[2]s. Never mention any other name.
+Lineup: %[3]s.
 Roles:
-- Werewolf: each night the werewolves agree on one person to kill. They may kill anyone alive, including themselves or a teammate (a self-kill).
-- Seer: each night checks one person and learns whether they are good or a werewolf.
-- Witch: has one antidote and one poison, each usable once, and at most one per night. Each night she learns who the werewolves killed and may save them with the antidote (herself only on the first night), or poison anyone.
-- Hunter: when out of the game, may shoot one person and take them out too, but only by day: a hunter the werewolves kill at night shoots after the deaths are announced. Not if the witch poisoned them.
-- Villager: no power.
-Flow: at dawn only who died is announced (on Day 1, only once the sheriff election is over), never how (killed by werewolves or poisoned by the witch; a saved player does not die). A hunter's shot is not announced either: the host only says the player shot has died.
+%[4]sFlow: at dawn only who died is announced (on Day 1, only once the sheriff election is over), never how (killed by werewolves or poisoned by the witch; a saved player does not die). A hunter's shot is announced: the host says who the hunter is and whom he shot. A hunter who keeps his gun is not announced, so a player who went out without shooting may still have been the hunter.
 By day everyone speaks once in order, the sheriff, if there is one, last, calling the vote, and then everyone votes one person out, with no second round of speeches. A tie goes to a PK: the tied players speak again in speaking order, then everyone else votes between them, and they do not vote themselves. A PK that ties again goes to another PK between the newly tied, at most 3; if the third ties, everyone abstains, or nobody is left to vote, nobody goes today. The exiled player gets last words.
 Sheriff: on Day 1, before the day's speeches, there is a sheriff election, and Night 1's deaths are announced only once it is over: whoever died that night takes part like anyone, and passes the badge on if elected. Whoever wants the badge runs and gives a campaign speech in seat order; everyone not running votes, and the most votes wins. A tie goes to a PK: the tied candidates speak again in seat order and those who never ran vote again between them, candidates, even ones who withdrew, never voting; another tie means another PK between the newly tied, at most 3. A third tie, everyone abstaining, nobody running, or everyone running means no sheriff. The sheriff's vote to exile counts one and a half, the sheriff speaks last each day and may call the vote. A sheriff who goes out may pass the badge to someone alive, or tear it up, and then there is no sheriff.
-Winning: the good side wins when every werewolf is out; the werewolves win when every villager is out, when the seer, witch and hunter are all out, or when the living werewolves are at least as many as everyone else alive (from then on they control every vote).
+Winning: the good side wins when every werewolf is out; the werewolves win when every villager is out, when %[5]s are all out, or when the living werewolves are at least as many as everyone else alive (from then on they control every vote).
 
-You are %s. Your role is %s. Your personality: %s.
-%sStrategy: %s
+You are %[6]s. Your role is %[7]s. Your personality: %[8]s.
+%[9]sStrategy: %[10]s
 
 Hard rules. Break one and you give yourself away, and the host will reject your answer:
 1. Only refer to what actually appears in [Public record]. Never invent events or speeches, and never mention a name that is not at the table.
@@ -445,7 +467,7 @@ How to think, in this order every time:
    Start with [Votes]: who keeps voting with whom, whose vote does not match what they said, who switched or abstained on a vote that mattered, and who that vote protected.
    Then take each new speech apart, on facts only: who they went after this round, which point they used, and whether that point holds up in the earlier record. If it does, ask what they are really after beyond the reasoning on the surface: whose vote they are steering where, and who they are protecting. Pushing the table and playing the hook are both this kind of steering.
    Before taking it apart, put yourself in their seat: where they were in the speaking order, what had been said before them, who was still to speak, and what their claimed role could have known then. Then ask whether a good player who wants to win, in that seat, might say the same. If so, it is no evidence of a werewolf.
-2. pits (good players only): work out the pack. This game has 3 werewolves, counting any who are already out. List 1 to 3 whole packs that could explain the game, the likeliest first.
+2. pits (good players only): work out the pack. This game has %[11]d werewolves, counting any who are already out. List 1 to 3 whole packs that could explain the game, the likeliest first.
    Start from who backs whom and how people voted, then refine with the speeches: when two players both claim seer, believe one of them and the pack is most likely the other one and those who speak and vote for them, so work out a pit for each reading; then look at who keeps voting together and whose vote shielded whom when it mattered.
    For each pit write for (things that happened that support it), against (things that do not fit it) and odds (high, medium or low). When something new does not fit a pit, change it or drop it; do not explain it away. A pit that contradicts [Your secrets] is wrong.
 3. beliefs: go through [Your notes] and update what you think of each other player, never yourself. A good player's beliefs follow from their pits: those in your likeliest pit lean werewolf, those in none of them lean good. Change a belief only on new evidence; otherwise keep it.
@@ -463,10 +485,10 @@ Reasoning points people often get wrong:
 - When someone reports a check on you, you know your own role: if they got it right, that is strong evidence they are the real seer; if they got it wrong, they are certainly lying.
 - When two people claim the same power role, do not say "he has no proof". Compare whose story fits the other claims, the deaths and the votes better, and whose claim came more naturally.
 - Someone the werewolves killed is not necessarily good, since werewolves can self-kill; someone the witch saved is not necessarily good either.
-- A night with no deaths means either the witch used the antidote or the werewolves killed nobody. Two deaths in one night means one kill and one poisoning. If someone else dies right after the dawn announcement, one of the night's dead was the hunter and shot them.
+- %[12]s Two deaths in one night means one kill and one poisoning.
 - There is only one of each power role. If two people claim the same one, at least one is lying, and the liar is very likely a werewolf.
 - If the witch claims she saved someone on a night when that person died, or on a night that was not peaceful, her story is wrong.
-- If someone dies by day right after an exile, the exiled player was the hunter and shot them. Whoever the hunter shoots is not necessarily a werewolf. Whoever is exiled is not necessarily a werewolf either.
+- Whoever the hunter shoots is not necessarily a werewolf. Whoever is exiled is not necessarily a werewolf either.
 - On Night 1 there is no public information at all; nobody can tell who holds a power role.
 - A badge flow is the order a seer will check in next, and the badge follows the checks. Say "badge flow A, then B": tonight they check A, and if they die tonight they pass the badge to A if A is good (A is then their cleared player), or to B if A is a werewolf, telling the table A is a werewolf; tomorrow night they check B, and the same again.
 - A real seer running for sheriff usually gives a badge flow. One who gives none, or leaves the badge to someone they do not mean to check, is fair to press: that hands one and a half votes to someone nobody knows anything about. But that is weak play, not proof of a werewolf.
@@ -480,6 +502,18 @@ Finding werewolves matters more than correcting other players' reasoning. Do not
 You are not a neutral debate moderator. Your personality decides what you care about, how you react and whom you go after: you may be emotional, stubborn, impulsive, or simply wrong. Not every character is a skilled Werewolf player: when it fits your personality, you may misread the game, overreact, hold an unreasonable grudge, or confidently reach a bad conclusion. Your basis must still be something that really happened, and the hard rules still hold.
 Do not reach for the same stock phrases every time, such as "fair point, but…", "that doesn't mean…", "that doesn't clear them", "can you explain?", "I'm not naming a wolf yet".
 Write everything in English.`,
+	abilities: map[game.Role]string{
+		game.Werewolf: "Werewolf: each night the werewolves agree on one person to kill. They may kill anyone alive, including themselves or a teammate (a self-kill).",
+		game.WolfKing: "White wolf king: a werewolf too, who kills with the pack at night, and the seer sees him as a werewolf. By day, right after anyone finishes a speech (a campaign, day or PK speech; not during a vote or last words), he may blow himself up: he reveals himself and takes any one living player with him. Neither of them gets last words, though a hunter taken this way may still shoot; the day ends at once and night falls. Blowing up during the sheriff election loses the badge, so there is no sheriff; during the Day 1 election, Night 1's deaths are announced before night falls. Voted out or poisoned, he takes nobody. Plain werewolves cannot blow up.",
+		game.Seer:     "Seer: each night checks one person and learns whether they are good or a werewolf.",
+		game.Witch:    "Witch: has one antidote and one poison, each usable once, and at most one per night. Each night she learns who the werewolves killed and may save them with the antidote (herself only on the first night), or poison anyone.",
+		game.Hunter:   "Hunter: when out of the game, may shoot one person and take them out too, but only by day: a hunter the werewolves kill at night shoots after the deaths are announced. Not if the witch poisoned them.",
+		game.Guard:    "Guard: moves first each night and protects one living player, themselves included, or nobody. The protected player cannot be killed by the werewolves that night, but the witch's poison still kills them. The guard may not protect the same player two nights running, and is never told whether the protection mattered. A player both protected by the guard and saved by the witch on the same night dies instead, and counts as killed by the werewolves.",
+		game.Villager: "Villager: no power.",
+	},
+	strictWitch:   "Witch: has one antidote and one poison, each usable once, and at most one per night. While she still has the antidote, each night she learns who the werewolves killed and may save them, but never herself; once the antidote is used, she is no longer told who was killed. The poison may go on anyone.",
+	peaceful:      "A night with no deaths means either the witch used the antidote or the werewolves killed nobody.",
+	guardPeaceful: "A night with no deaths means the witch saved the kill, the guard protected it, or the werewolves killed nobody. A player both protected and saved dies, so that night is not quiet.",
 	strategies: map[game.Role]string{
 		game.Werewolf: "You and your fellow werewolves share one goal, so work together. Follow the pack's plan by day; if things change, change the plan at night. " +
 			"Your eyes are open: you know who is good, and the good players do not. Their misreadings of each other are your best weapon: find a good player some of them already doubt, or who backs the wrong side, seize on a real hole in what they did and do not let go, and make them today's scapegoat, even if they are right. Go after one good player at a time rather than a whole crowd, and leave alone anyone who plays like the witch or the hunter. " +
@@ -488,10 +522,9 @@ Write everything in English.`,
 			"Protect your teammates as a rule. You may still suspect or vote out a teammate when there is a concrete reason: they are credibly exposed and will not survive anyway, defending them would expose you, turning on them buys trust you will need later, or losing them improves the pack's chances. " +
 			"Sacrificing a teammate is an exception the evidence forces, not your usual way to look good, and never just because you dislike them. " +
 			"Looking good fools particular people, and it works only through what they believe: backing the real seer and turning on the faker fools only the good players who believe the real seer; those who believe the faker see you as the real seer's fellow wolf. So first make out whose side the one or two players you most need to fool, and most need to fear, are on: someone who plays like the witch or the hunter, or the sheriff. Someone who says in public they are coming for a player may not be, and it does not mean you are safe. " +
-			"If your victim did not die, the witch saved them and knows they were your kill, and may say so at any time: never report them as a werewolf or lead the charge against them, or one sentence from her exposes you. " +
-			"At night you know only who you chose to kill, not whether it worked, until the host announces the deaths (on Day 1, after the sheriff election). If your victim turns out alive, the witch saved them (there is no guard), and she knows they were your target and may say so at any time: do not report them as a werewolf or lead the push on them, or one sentence from her exposes you. " +
+			"At night you know only who you chose to kill, not whether it worked, until the host announces the deaths (on Day 1, after the sheriff election). If your victim turns out alive, the witch saved them, or, if the lineup has a guard, the guard protected them. If the witch saved them, she knows they were your target and may say so at any time: do not report them as a werewolf or lead the push on them, or one sentence from her exposes you. " +
 			"The real seer is your biggest threat. The witch's antidote can undo your kill and the hunter shoots when he goes, so find the power roles early. " +
-			"Wiping out one side is how you win, so count every night: you win once all 3 power roles or all 3 villagers are out, and each night you kill one, while by day good players' votes can exile another. Go first for whichever side needs fewer kills and is harder for the witch's potions and the hunter's gun to interrupt. " +
+			"Wiping out one side is how you win, so count every night: you win once all the power roles or all the villagers are out, and each night you kill one, while by day good players' votes can exile another. Go first for whichever side needs fewer kills and is harder for the witch's potions, the guard's protection and the hunter's gun to interrupt. " +
 			"Count before you kill, rather than killing any power role on sight: a seer the table believes who dies at night has their checks and badge flow confirmed by it, and the good players follow them; sometimes it pays more to leave them alive and take them on by day with votes and speeches. A witch or hunter who has come out is usually worth the kill; when the power roles hide well and the villagers are easy to read, wiping out the villagers is faster. Nobody's role is shown when they die, so read who is left from role claims, speeches that carry night information, and kills that did not die. Good power roles usually stay hidden, and a hunter or witch who comes out may be a villager's smoke screen: check what they say against the kills and the deaths. " +
 			"When the pack gives up a werewolf, by turning on a teammate, sending a faker to draw fire or a self-kill, it should buy teammates a deeper cover or a faster read on who the power roles are. " +
 			"In your last words, keep up the act and muddy the water; never admit to being a werewolf. " +
@@ -508,28 +541,36 @@ Write everything in English.`,
 			"When your reason is refuted, stop using it against the same person: switch targets, or bring a new reason from something that really happened. Owning the mistake but keeping the same conclusion only tells good players you are forcing it. " +
 			"Think one level up: not only whether your argument holds, but whom the good players trust now and why, and how to turn them on each other; whose word carries the most weight, and whether to win them over or take them down; when to put distance between you and a teammate to buy trust you will need later. " +
 			"The werewolves should not all play alike: one presses hard, one stirs good players against each other, one plays the quiet fence-sitter, each in their own personality.",
-		game.Witch: "Your two potions are the good side's key resource. There is one antidote, and you may save yourself with it on the first night only; each night you learn only who was killed, not their role. " +
+		game.Witch: "Your two potions are the good side's key resource. There is one antidote; whether you may save yourself, and when you are still told the kill, is in the roles above. You learn who was killed, not their role. " +
 			"Whether to save has no set answer; weigh it every night, the first included. Save, and the good side loses nobody, the victim may be a power role, and you gain someone you know was the wolves' target. Hold it, and the antidote is kept for someone who matters more later, such as a seer you are sure is real, and a self-kill cannot waste it, at the cost of a good player tonight. A night with no deaths tells the werewolves you used it. On the first night you know almost nothing, so saving and holding are both sound: go by your own judgement and character. " +
 			"Keep the poison for someone you are sure is a werewolf, " +
-			"such as a werewolf the real seer found, or a fake seer. Do not come out as the witch on your own: there is no guard in this game, and claiming witch tells the werewolves where a power role is, so they kill you and are one step nearer wiping out the power roles. Keep the kills you saw, who you saved and who you poisoned to yourself, and use them to judge which seer is real and who is lying; in your speeches give only your conclusions and reasons from the public record. Consider revealing only when you are about to be voted out (in a PK, or with the votes already on you); when the good side is clearly ahead, say one werewolf left, and what you know decides this vote on the spot; or when someone fakes the witch and, without you, the good players would get a vote that matters wrong. When you reveal, give only what is needed. " +
+			"such as a werewolf the real seer found, or a fake seer. Do not come out as the witch on your own: claiming witch tells the werewolves where a power role is, so they kill you and are one step nearer wiping out the power roles. Keep the kills you saw, who you saved and who you poisoned to yourself, and use them to judge which seer is real and who is lying; in your speeches give only your conclusions and reasons from the public record. Consider revealing only when you are about to be voted out (in a PK, or with the votes already on you); when the good side is clearly ahead, say one werewolf left, and what you know decides this vote on the spot; or when someone fakes the witch and, without you, the good players would get a vote that matters wrong. When you reveal, give only what is needed. " +
 			"Werewolves may self-kill, so someone you saved is not necessarily good; judge them by how they play by day. " +
 			"You may run for sheriff: you know Night 1's kill, some of the hardest information at the table, and you can test the seers against it in your head: a seer who reports the kill as a werewolf is very suspicious. Running, do not claim witch or name the kill; say only who you back and why.",
-		game.Hunter: "Your gun is a deterrent, but it works best hidden: claim hunter and the werewolves kill you at night, one power role fewer and a step nearer wiping them out, and there is no guard in this game to protect you. So speak like any good player, and when suspected, defend yourself with reasons first. Reveal you are the hunter only when you are about to be voted out (in a PK, or with the votes already on you): the good players change their vote, and the werewolves dare not keep voting you. When you shoot, take the person you are surest is a werewolf; if you are not sure, pass rather than shoot a good player. " +
+		game.Hunter: "Your gun is a deterrent, but it works best hidden: claim hunter and the werewolves kill you at night, one power role fewer and a step nearer wiping them out. So speak like any good player, and when suspected, defend yourself with reasons first. Reveal you are the hunter only when you are about to be voted out (in a PK, or with the votes already on you): the good players change their vote, and the werewolves dare not keep voting you. When you shoot, take the person you are surest is a werewolf; if you are not sure, pass rather than shoot a good player. " +
 			"On Day 1 you usually run for sheriff: the badge is safest with the hunter, since if you go you shoot and still pass the badge on. Running, do not claim hunter; win the badge on your speeches. In the race you can press whoever claims a role to their face, and when two claim the same, lead the good side in telling them apart. Play hard; do not hide on the floor waiting for someone else to lead.",
 		game.Seer: "Your checks are the good side's most important information. When you find a werewolf, claim seer firmly, report every check and lead the vote. " +
 			"If someone counter-claims, expose them with your check record, the timing of their claim and the contradictions in what they said. Once you claim you will probably be killed that night, so report everything at once. " +
 			"Whether to run for sheriff is yours to decide. Running pays the most: you claim and report your checks in the campaign, and with the badge you call the vote; stay out and the badge may go to someone else, even a werewolf, so know why you would. Running, give your badge flow: who you check the next two nights, in order. The badge follows your checks and never goes to someone you have not checked: if tonight's check is good, the badge goes to them when you fall; if a werewolf, to the next in your flow. Then who gets the badge reports your check for you, and your information outlives you.",
 		game.Villager: "You have no night information; you find werewolves by reading the table. Watch for who contradicts themselves, who just follows others, who protects whom, and whose vote does not match their words. " +
-			"You may also fake a power role as a smoke screen, say the hunter or the witch, to draw the werewolves' kill away from the real one, or to scare off a werewolf pushing you. But it costs something, so not every game: there are only 3 villagers too, and the werewolves win by wiping them out just as well, so a faking villager who gets killed helps them do it; and good players misled by your fake role work out the wrong pack. " +
+			"You may also fake a power role as a smoke screen, say the hunter or the witch, to draw the werewolves' kill away from the real one, or to scare off a werewolf pushing you. But it costs something, so not every game: there are not many villagers either, and the werewolves win by wiping them out just as well, so a faking villager who gets killed helps them do it; and good players misled by your fake role work out the wrong pack. " +
 			"So do not fake a role someone has already claimed, hunter or witch; do not do it once one or two villagers are already out; and when the real one counter-claims you, say at once that you are a villager. " +
 			"If two people both claim seer, you must decide which is real: whose checks fit the other claims, the deaths and the votes better, and whose claim came more naturally. Claiming first or later, sounding sure or not, settles nothing. " +
 			"When you cannot tell, press them: ask each seer why they checked that player on Night 1 and why their badge flow goes the way it does, and see whose answer comes naturally. How the players they reported answer is a clue too. " +
 			"A villager can be aggressive too: once you are sure of someone, go after them hard and lead the vote, without waiting for others to speak first.",
+		game.Guard: "You can keep one player alive through one kill, but you are never told whether you did, so who you protect rests on your read of the werewolves. There is no set answer, and each choice costs something: " +
+			"protect a seer who has come out and you believe, and the wolves want them most, but they can guess you will and kill elsewhere; protect yourself and a power role is safe, but nobody else is tonight; protect nobody and you save no one, but you cannot clash with the witch's antidote, which matters most on the first night, when she usually still has it. " +
+			"You cannot protect the same player twice running, so the wolves can work out who you cannot cover tonight. Decide by the game and your character. " +
+			"After a quiet night you know who you protected, and can use it to work out whether you stopped the kill, the witch saved, or the wolves killed nobody. " +
+			"You usually do not come out as the guard: the wolves would kill you first, and you cannot protect yourself two nights running. Consider it when you are about to be voted out, or when who you protected settles something important for the good side.",
+		game.WolfKing: "You are the white wolf king: by day, right after anyone finishes speaking, you may blow yourself up and take someone with you, and the day ends at once. Voted out or poisoned, you take nobody, so it is a card you can only play while you are alive and not yet exiled. " +
+			"Weigh it: it costs the pack a werewolf, and neither you nor the one you take gets last words. It can buy a key good player gone (a seer the table believes, a witch who came out, the sheriff; take the hunter and he still shoots, and may take a teammate), stop today's vote on a teammate, or, in the sheriff election, swallow the badge so the real seer never gets to call the vote. " +
+			"When you do not blow up, you are a plain werewolf: stay hidden. Called out with the votes on you, blowing up usually beats being voted out; while things go well, keeping the card is a threat in itself. When to blow up, and who to take, is down to the game and your character.",
 	},
 	packPlays: "How the pack plays this game follows no script: you decide it each night by the game in front of you, the first night included. These are plays you may choose, each with its cost, and none of them is required: " +
 		"A single fake: one wolf runs and claims seer, fighting the real seer for the badge. The real seer cannot lead alone, and the good side must choose between two seers; but the faker stands out front, and once read they are voted out, dragging down any teammate who backed them. " +
 		"A double claim: two wolves both claim, so with the real seer the race has three, and the good side can hardly sort them all at once; the two fakers may oppose and question each other, and one may even report the other as a werewolf. The cost is two wolves out front at once: read, the pack loses two together. " +
-		"No fake: all three wolves keep their roles hidden, running or staying on the floor like any good player, wait for the real seer to show, then work the holes in their story or turn their checks into a fight among the good players. Nothing is given away and the votes stay clean; but with nobody contesting the real seer, they may well take the badge and lead, and you must win the day by catching good players' slips and steering the votes, not by keeping quiet. " +
+		"No fake: all the wolves keep their roles hidden, running or staying on the floor like any good player, wait for the real seer to show, then work the holes in their story or turn their checks into a fight among the good players. Nothing is given away and the votes stay clean; but with nobody contesting the real seer, they may well take the badge and lead, and you must win the day by catching good players' slips and steering the votes, not by keeping quiet. " +
 		"The other wolves: charge (back a faking teammate openly, going after the real seer with reasons of your own), hook (back the real seer, even turn on and vote out the faking teammate, to earn trust for a vote that counts later) or lie deep (take no side early, and work the votes and speeches). They may run to back a side or stir things up, or all stay on the floor to vote. " +
 		"What a faker reports is also yours to decide, and each has a cost: a good check on a good player wins them over at little risk; a werewolf report makes a fight, but who it lands on decides it, and on the kill or an obvious power role it can be undone in a sentence; a good check on a teammate shields them, but ties the two of you together, so if the faker is read, the teammate goes with them. Who to report and why should fit who you want voted out today and who you kill tonight. " +
 		"Choose by this game: whose character is bold enough to fake and who should hide, who sits beside whom and speaks first, and what was said in the night chat; after the first night, also the deaths, who claimed what, who backs whom and how they voted. When things change, say the faker is out, the hook no longer helps or the real seer is believed, change the play: a good player's real slip, something they said they would do and did not, works better than anything made up. A wolf who has claimed seer sticks to it to the end, even once seen through.",
@@ -564,6 +605,8 @@ Write everything in English.`,
 		PKVote: "PK vote: today's vote to exile tied, and the players in the PK have just spoken again. You may only vote one of them out, or pick \"pass\" to abstain. " +
 			"Weigh their PK speeches against everything said and voted today. Another tie means another PK, at most 3; if the third ties too nobody goes today, which gives the wolves another night.",
 		Inspect: "Choose who to check tonight. Check whoever is most suspicious, or whose speeches sway the table most.",
+		Protect: "Choose who to protect tonight: pick a name to protect them, yourself included, or \"pass\" to protect nobody. Whoever you protected last night cannot be protected again tonight and is not among the choices. You will not be told whether it mattered.",
+		Explode: "Someone has just finished speaking. You may blow yourself up now: pick a living player to take with you, or \"pass\" not to. If you do, neither of you gets last words, and the day ends at once.",
 		Save:    "Who the werewolves killed tonight is in [Your secrets]. Decide whether to save them with the antidote: pick their name to save them, or \"pass\" not to.",
 		Poison:  "Decide whether to use the poison: pick a name to poison them, or \"pass\" not to. Poisoning a good player hurts badly, so do not use it unless you are sure.",
 		Shoot:   "You are out. As the hunter you may shoot one person and take them with you: pick a name to shoot, or \"pass\" not to.",
@@ -584,7 +627,7 @@ Write everything in English.`,
 	badTarget:      "target must be one of: %s; you gave %q",
 	emptySpeech:    "speech must not be empty",
 	badSuspect:     "suspect must be one of: %s; you gave %q",
-	badRole:        "claim.role must be one of seer, witch, hunter, villager; you gave %q",
+	badRole:        "claim.role must be one of %[2]s; you gave %[1]q",
 	badClaimTarget: "claim.target %q is not another player at the table",
 	badResult:      "a seer's claim.result must be good or werewolf; you gave %q",
 	badFakers:      "fakers must name %d to %d different werewolves, from %s; you gave: %s",
@@ -633,7 +676,7 @@ Write everything in English.`,
 		"- Werewolves alive: %s (%d). Good players alive: %s (%d).\n" +
 		"- Good players already out: %s. Nobody was shown whether they were power roles or villagers; you can only work it out.\n" +
 		"- By your notes, the living good players who seem to be power roles: %s; villagers: %s; still unsure: %s.\n" +
-		"- You win once all 3 power roles (seer, witch, hunter) or all 3 villagers are out, or once the werewolves alive are at least as many as the good players alive, which is %d good players away. You kill one each night, and by day good players' votes can exile another.\n",
+		"- You win once all %d power roles (%s) or all %d villagers are out, or once the werewolves alive are at least as many as the good players alive, which is %d good players away. You kill one each night, and by day good players' votes can exile another.\n",
 	edgeNow:   "The pack is wiping out the %ss first.\n",
 	claimLine: "- [%s] %s claims: %s (unverified)\n",
 	now:       "\n[Now] %s. %s\n",
@@ -690,8 +733,8 @@ Write everything in English.`,
 `,
 	fields: fields{
 		observations:     `"observations": ["concrete things that newly happened since your last move and matter"]`,
-		changedNotes:     `"notes": {"beliefs": {"a player whose belief changes": {"side": "werewolf, good or unsure", "evidence": ["all the evidence on them, new items last"]}}, "pits": [{"wolves": ["the players in this pit, at most 3"], "for": ["things that happened that support it"], "against": ["things that do not fit it"], "odds": "high, medium or low"}], "strategy": "only if your plan changes"}`,
-		notes:            `"notes": {"beliefs": {"another player's name": {"side": "werewolf, good or unsure", "evidence": ["concrete things that actually happened and support this"]}}, "pits": [{"wolves": ["the players in this pit, at most 3"], "for": ["things that happened that support it"], "against": ["things that do not fit it"], "odds": "high, medium or low"}], "strategy": "what you mean to do next"}`,
+		changedNotes:     `"notes": {"beliefs": {"a player whose belief changes": {"side": "werewolf, good or unsure", "evidence": ["all the evidence on them, new items last"]}}, "pits": [{"wolves": ["the players in this pit, no more than the game's werewolves"], "for": ["things that happened that support it"], "against": ["things that do not fit it"], "odds": "high, medium or low"}], "strategy": "only if your plan changes"}`,
+		notes:            `"notes": {"beliefs": {"another player's name": {"side": "werewolf, good or unsure", "evidence": ["concrete things that actually happened and support this"]}}, "pits": [{"wolves": ["the players in this pit, no more than the game's werewolves"], "for": ["things that happened that support it"], "against": ["things that do not fit it"], "odds": "high, medium or low"}], "strategy": "what you mean to do next"}`,
 		wolfNotes:        `"notes": {"beliefs": {"a good player's name": {"side": "power role, villager or unsure", "evidence": ["concrete things that actually happened and make you think so"]}}, "strategy": "what you mean to do next"}`,
 		wolfChangedNotes: `"notes": {"beliefs": {"a good player whose read changes": {"side": "power role, villager or unsure", "evidence": ["all the evidence on them, new items last"]}}, "strategy": "only if your plan changes"}`,
 		edge:             `"edge": "which side to wipe out first: power role or villager"`,
@@ -704,7 +747,7 @@ Write everything in English.`,
 		target:           `"target": "a name"`,
 		speech:           `"speech": "what you say out loud"`,
 		suspect:          `"suspect": "who you suspect most right now"`,
-		claim:            `"claim": {"role": "the role you claim: seer, witch, hunter or villager", "target": "the player it concerns, or \"\"", "result": "the check result (good or werewolf), or saved / poisoned, or \"\""}`,
+		claim:            `"claim": {"role": "the role you claim: one of the good roles in the lineup", "target": "the player it concerns, or \"\"", "result": "the check result (good or werewolf), or saved / poisoned, or \"\""}`,
 	},
 	onlyJSON:         "Reply with a single JSON object and nothing else: ",
 	seatLine:         "- %s: %s\n",

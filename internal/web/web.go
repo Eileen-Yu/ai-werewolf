@@ -1,5 +1,5 @@
-// Package web serves the page people play werewolf from: start a game with
-// up to nine people in characters' seats, then each, from their own link,
+// Package web serves the page people play werewolf from: start a game on a
+// nine- or twelve-player board with people in any of the characters' seats, then each, from their own link,
 // watches what their seat sees and makes its moves. A link without a seat
 // watches what everyone at the table hears.
 package web
@@ -39,7 +39,7 @@ var pictures embed.FS
 var avatars = func() map[string]string {
 	out := map[string]string{}
 	for _, l := range []game.Lang{game.Chinese, game.English} {
-		for _, c := range game.Characters(l) {
+		for _, c := range game.Characters(l, game.Twelve) {
 			f := "avatars/" + strings.ReplaceAll(strings.ToLower(c), " ", "-") + ".webp"
 			if _, err := fs.Stat(pictures, f); err == nil {
 				out[c] = "/" + f
@@ -86,11 +86,17 @@ func (s *server) characters(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, err)
 		return
 	}
-	reply(w, map[string]any{"characters": game.Characters(l)})
+	b, err := game.ParseBoard(r.URL.Query().Get("board"))
+	if err != nil {
+		fail(w, http.StatusBadRequest, err)
+		return
+	}
+	reply(w, map[string]any{"characters": game.Characters(l, b), "seats": b.Seats()})
 }
 
 type startRequest struct {
 	Lang   game.Lang     `json:"lang"`
+	Board  game.Board    `json:"board"`
 	Humans []game.Person `json:"humans"`
 }
 
@@ -115,18 +121,23 @@ func (s *server) start(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, err)
 		return
 	}
-	if len(req.Humans) > werewolf.MaxHumans {
-		fail(w, http.StatusBadRequest, fmt.Errorf("a table seats up to %d people", werewolf.MaxHumans))
+	b, err := game.ParseBoard(string(req.Board))
+	if err != nil {
+		fail(w, http.StatusBadRequest, err)
+		return
+	}
+	if len(req.Humans) > werewolf.MaxHumans(b) {
+		fail(w, http.StatusBadRequest, fmt.Errorf("a table seats up to %d people", werewolf.MaxHumans(b)))
 		return
 	}
 	for i := range req.Humans {
 		req.Humans[i].Name = strings.TrimSpace(req.Humans[i].Name)
 	}
-	if err := game.CheckPeople(l, req.Humans); err != nil {
+	if err := game.CheckPeople(l, b, req.Humans); err != nil {
 		fail(w, http.StatusBadRequest, err)
 		return
 	}
-	input := werewolf.Game{Lang: l, PhaseDelay: time.Second}
+	input := werewolf.Game{Lang: l, Board: b, PhaseDelay: time.Second}
 	for _, p := range req.Humans {
 		input.Humans = append(input.Humans, werewolf.Human{Person: p, Key: rand.Text()})
 	}
@@ -190,6 +201,9 @@ func (s *server) game(w http.ResponseWriter, r *http.Request) {
 		if v.Pending != nil && s.wasSent(r.PathValue("id"), v.Pending.Event) {
 			v.Pending = nil
 		}
+		if v.Blast != "" && s.wasSent(r.PathValue("id"), v.Blast) {
+			v.Blast = ""
+		}
 		out.View = &v
 	}
 	switch meta.RuntimeStatus {
@@ -230,13 +244,20 @@ func (s *server) move(w http.ResponseWriter, r *http.Request) {
 	if failed {
 		return
 	}
-	if !ok || v.Pending == nil || v.Pending.Event != req.Event {
+	switch {
+	case ok && v.Blast != "" && v.Blast == req.Event:
+		if !slices.ContainsFunc(v.Seats, func(s brain.Seat) bool { return s.Death == "" && s.Name != v.You && s.Name == req.Action.Target }) {
+			fail(w, http.StatusBadRequest, errors.New("take someone else who is still alive"))
+			return
+		}
+	case !ok || v.Pending == nil || v.Pending.Event != req.Event:
 		fail(w, http.StatusConflict, errors.New("the game is not waiting for this move any more"))
 		return
-	}
-	if err := Check(v.Pending.Turn, req.Action); err != nil {
-		fail(w, http.StatusBadRequest, err)
-		return
+	default:
+		if err := Check(v.Pending.Turn, req.Action); err != nil {
+			fail(w, http.StatusBadRequest, err)
+			return
+		}
 	}
 	if _, dup := s.sent.LoadOrStore(id+"/"+req.Event, true); dup {
 		fail(w, http.StatusConflict, errors.New("the game is not waiting for this move any more"))

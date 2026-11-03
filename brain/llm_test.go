@@ -52,7 +52,7 @@ func TestPromptSeparatesWhatThePlayerKnows(t *testing.T) {
 
 	assert.Contains(t, system, "一局4人狼人杀，桌上只有这4个人：老王、小红、阿杰、美玲")
 	assert.Contains(t, system, "性格：推理小说迷。\n策略：", "no habit, no habit line")
-	assert.Contains(t, system, "配置："+game.Chinese.LineupSummary())
+	assert.Contains(t, system, "配置："+game.Chinese.LineupSummary(game.Nine))
 	assert.Contains(t, system, chineseText.strategies[game.Werewolf])
 	assert.NotContains(t, system, chineseText.goodVoting, "a wolf is not told how the good side should vote")
 	assert.Contains(t, user, "- 老王（你）：存活")
@@ -598,7 +598,7 @@ func TestGoodPlayersAreNotToldHowTheWolvesPlay(t *testing.T) {
 	assert.Contains(t, englishText.twoReadings, "Loose reasoning")
 	for _, tx := range []text{chineseText, englishText} {
 		public := tx.rules + tx.instructions[Run] + tx.instructions[Withdraw] + tx.instructions[SheriffVote] + tx.twoReadings + tx.goodVoting
-		for _, role := range []game.Role{game.Seer, game.Witch, game.Hunter, game.Villager} {
+		for _, role := range []game.Role{game.Seer, game.Witch, game.Hunter, game.Guard, game.Villager} {
 			public += tx.strategies[role]
 		}
 		for _, prior := range []string{"几乎每局", "狼最喜欢抢先", "一定上警", "悍跳的狼一定", "almost every game", "love to claim first", "always runs", "never withdraws"} {
@@ -611,7 +611,9 @@ func TestGoodPlayersAreNotToldHowTheWolvesPlay(t *testing.T) {
 func TestTheWitchWeighsTheFirstNightSave(t *testing.T) {
 	assert.Contains(t, chineseText.strategies[game.Witch], "救和不救都说得通")
 	assert.Contains(t, englishText.strategies[game.Witch], "saving and holding are both sound")
-	assert.Contains(t, chineseText.strategies[game.Witch], "只有第1夜可以救自己")
+	assert.Contains(t, chineseText.abilities[game.Witch], "只有第1夜可以救自己")
+	assert.Contains(t, chineseText.strictWitch, "永远不能救自己")
+	assert.Contains(t, englishText.strictWitch, "never herself")
 	assert.NotContains(t, chineseText.strategies[game.Witch], "解药适合在前期救人")
 	assert.NotContains(t, englishText.strategies[game.Witch], "Use the antidote early")
 }
