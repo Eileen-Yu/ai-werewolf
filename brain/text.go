@@ -161,7 +161,7 @@ var chineseText = text{
 必须点名：说清楚怀疑谁、相信谁、为什么。不超过120字。不要提到你是AI，不要写动作或旁白。
 不要说空话套话，比如"值得关注""转移注意力""大家要谨慎""再观察一下""缺乏证据"。每个怀疑都要有具体依据：某人的原话、他的投票、他跳身份的时机，或者别人的声明之间的矛盾。
 找狼比纠正别人的推理重要。不要花一整轮去抠一个措辞上的小分歧，除非它真的改变你怀疑谁；一句含糊的话也不等于明确的恶意。
-你不是中立的辩论主持人。你的性格决定你在意什么、怎么反应、找谁麻烦：可以情绪化、固执、冲动，也可以想错。不是每个角色都是狼人杀高手：符合你的性格时，你可以误解局势、反应过度、带着不讲理的成见，自信地得出离谱的结论。但依据仍然必须是真实发生过的事，铁律照样有效。
+你不是中立的辩论主持人。你的性格决定你在意什么、怎么反应、找谁麻烦：可以情绪化、固执、冲动，也可以想错。不是每个角色都是狼人杀高手：符合你的性格时，你可以误解局势、反应过度、带着不讲理的成见，自信地得出离谱的结论。但依据仍然必须是真实发生过的事，铁律照样有效。性格只影响你的表达方式、情绪和思考倾向，不决定你的阵营判断：谁是狼、谁可信，要看这一局真实发生的事，同样的性格在不同的局里会得出不同的结论。
 不要每次都用同一套句式，比如"这点我认，但……""不等于……""不能因此认好""你能解释一下吗""目前我不点狼"。`,
 	abilities: map[game.Role]string{
 		game.Werewolf: "狼人：每晚一起商量杀一个人，可以杀任何活着的人，包括自己和同伴（叫自刀）。",
@@ -225,8 +225,10 @@ var chineseText = text{
 			"平安夜时你知道自己守了谁，可以拿它推断：是你守中了，还是女巫救的，或者狼没刀。" +
 			"一般不主动跳守卫：跳出来狼会先刀你，而你不能连续两晚守自己。快被放逐时，或者你守过的人能帮好人对上一条关键的信息时，再考虑亮身份。",
 		game.WolfKing: "你是白狼王：白天任何一个人发完言后，你可以自爆带走一个人，当天立刻结束、直接入夜。被放逐或被毒死就带不了人，所以这张牌只能在你还活着、还没被投出去时打。" +
-			"自爆要算账：代价是狼队少一只狼，你和被带走的人都没有遗言。换来的可以是带走一个关键的好人（被大家认下的预言家、跳出来的女巫、警长；带走猎人他还能开枪，可能反带走你的同伴），打断今天对同伴的投票，或者在竞选时吞掉警徽，不让真预言家拿到归票权。" +
-			"不自爆的时候，你就是一只普通的狼，藏好身份。被查杀、票压到你身上时，自爆通常比被放逐划算；局势顺利时，留着这张牌也有威慑。什么时候爆、带谁，按局势和你的性格定。",
+			"自爆没有固定时机，要算账。代价：狼队少一只狼，你和被带走的人都没有遗言；你亮了身份，你之前站过谁、踩过谁都会被好人拿来重新分析；被你带走的人在好人眼里几乎坐实是好人，带走一个跳预言家的人，等于替他证明了身份。" +
+			"换来的可以是：带走一个关键的好人（预言家、女巫、警长；带走猎人他还能开枪，可能反带走你的同伴），打断今天对同伴的投票，或者在竞选时让警徽流失。" +
+			"决定前先想清楚：跳身份的人只是声称，他是真的可能性有多大？你知道谁是同伴，可以拿他报的查验去对。现在爆值不值，留到后面会不会更值？" +
+			"不自爆的时候，你就是一只普通的狼，藏好身份；留着这张牌本身也是威慑。什么时候爆、带谁，按局势和你的性格定。",
 	},
 	packPlays: "本局狼队怎么打没有固定剧本，由你们每晚按局势自己定，第1夜也一样。下面这些都是可选的打法，各有代价，没有哪一种是必须的：" +
 		"单狼悍跳：派一只狼上警跳预言家，和真预言家抢警徽。好处是真预言家没法独自带队，好人得在两个预言家里选；代价是他站在台前，被盘穿就会被投出去，站他边的同伴也会被一起拖下水。" +
@@ -499,7 +501,7 @@ Speak like a real player: casual, in character. No openers or pleasantries ("Hi 
 Name names: say clearly who you suspect, who you trust, and why. At most 60 words. Never mention being an AI, and no stage directions or narration.
 No empty filler such as "worth watching", "deflecting", "let's be careful", "let's see more", "no proof". Every suspicion needs a concrete basis: what someone actually said, how they voted, when they claimed a role, or a contradiction between claims.
 Finding werewolves matters more than correcting other players' reasoning. Do not spend a whole turn on a minor wording distinction unless it really changes who you suspect, and a vague remark is not proof of bad intent.
-You are not a neutral debate moderator. Your personality decides what you care about, how you react and whom you go after: you may be emotional, stubborn, impulsive, or simply wrong. Not every character is a skilled Werewolf player: when it fits your personality, you may misread the game, overreact, hold an unreasonable grudge, or confidently reach a bad conclusion. Your basis must still be something that really happened, and the hard rules still hold.
+You are not a neutral debate moderator. Your personality decides what you care about, how you react and whom you go after: you may be emotional, stubborn, impulsive, or simply wrong. Not every character is a skilled Werewolf player: when it fits your personality, you may misread the game, overreact, hold an unreasonable grudge, or confidently reach a bad conclusion. Your basis must still be something that really happened, and the hard rules still hold. Your personality shapes how you talk, how you feel and how you lean in thinking, never which side you judge someone to be on: who is a werewolf and who to trust come from what really happened this game, and the same personality reaches different conclusions in different games.
 Do not reach for the same stock phrases every time, such as "fair point, but…", "that doesn't mean…", "that doesn't clear them", "can you explain?", "I'm not naming a wolf yet".
 Write everything in English.`,
 	abilities: map[game.Role]string{
@@ -564,8 +566,10 @@ Write everything in English.`,
 			"After a quiet night you know who you protected, and can use it to work out whether you stopped the kill, the witch saved, or the wolves killed nobody. " +
 			"You usually do not come out as the guard: the wolves would kill you first, and you cannot protect yourself two nights running. Consider it when you are about to be voted out, or when who you protected settles something important for the good side.",
 		game.WolfKing: "You are the white wolf king: by day, right after anyone finishes speaking, you may blow yourself up and take someone with you, and the day ends at once. Voted out or poisoned, you take nobody, so it is a card you can only play while you are alive and not yet exiled. " +
-			"Weigh it: it costs the pack a werewolf, and neither you nor the one you take gets last words. It can buy a key good player gone (a seer the table believes, a witch who came out, the sheriff; take the hunter and he still shoots, and may take a teammate), stop today's vote on a teammate, or, in the sheriff election, swallow the badge so the real seer never gets to call the vote. " +
-			"When you do not blow up, you are a plain werewolf: stay hidden. Called out with the votes on you, blowing up usually beats being voted out; while things go well, keeping the card is a threat in itself. When to blow up, and who to take, is down to the game and your character.",
+			"There is no set moment for it; weigh it. The cost: the pack loses a werewolf, and neither you nor the one you take gets last words; once you are revealed, the good side reads back everyone you backed and attacked; and whoever you take all but proves good to them, so taking someone who claimed seer vouches for his claim. " +
+			"It can buy: a key good player gone (a seer, a witch, the sheriff; take the hunter and he still shoots, and may take a teammate), an end to today's vote on a teammate, or, in the sheriff election, a lost badge. " +
+			"Before you decide: a claim is only a claim, so how likely is it to be true? You know who your teammates are, so check what he reports against that. Is now worth it, or would later be worth more? " +
+			"When you do not blow up, you are a plain werewolf: stay hidden; keeping the card is a threat in itself. When to blow up, and who to take, is down to the game and your character.",
 	},
 	packPlays: "How the pack plays this game follows no script: you decide it each night by the game in front of you, the first night included. These are plays you may choose, each with its cost, and none of them is required: " +
 		"A single fake: one wolf runs and claims seer, fighting the real seer for the badge. The real seer cannot lead alone, and the good side must choose between two seers; but the faker stands out front, and once read they are voted out, dragging down any teammate who backed them. " +

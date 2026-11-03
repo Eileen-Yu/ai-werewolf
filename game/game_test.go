@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -47,10 +48,10 @@ func TestBoards(t *testing.T) {
 	assert.Equal(t, Nine.Lineup(), Board("").Lineup(), "a game from before boards plays the nine")
 }
 
-func TestAChineseCastSeatsRivalsInPairsAndGivesEveryoneAChance(t *testing.T) {
+func TestAChineseCastSeatsRivalsTogetherAndGivesEveryoneAChance(t *testing.T) {
 	const games = 1400
 	for _, b := range Boards {
-		seated := map[string]int{}
+		seated, xiyou := map[string]int{}, map[string]bool{}
 		for seed := range uint64(games) {
 			cast := cast(t, Chinese, b, rand.New(rand.NewPCG(seed, 1)))
 			require.Len(t, cast, b.Seats())
@@ -60,9 +61,28 @@ func TestAChineseCastSeatsRivalsInPairsAndGivesEveryoneAChance(t *testing.T) {
 				seated[p.Name]++
 			}
 			assert.Len(t, names, b.Seats(), "nobody is seated twice")
-			for _, pair := range chineseRivals {
-				assert.Equal(t, names[pair[0].Name], names[pair[1].Name], "%s and %s sit down together or not at all", pair[0].Name, pair[1].Name)
+			for _, group := range chineseRivals {
+				var at []string
+				for _, r := range group {
+					if names[r.Name] {
+						at = append(at, r.Name)
+					}
+				}
+				assert.NotEqual(t, 1, len(at), "%v sits down without a rival", at)
+				if len(group) == 3 {
+					xiyou[strings.Join(at, "+")] = true
+				}
 			}
+			for _, p := range cast {
+				for _, other := range everyone(Chinese, b) {
+					if strings.Contains(p.Rivalry, other.Name) {
+						assert.True(t, names[other.Name], "%s's rivalry names %s, who is not at the table", p.Name, other.Name)
+					}
+				}
+			}
+		}
+		for _, at := range []string{"唐僧+孙悟空", "唐僧+猪八戒", "孙悟空+猪八戒", "唐僧+孙悟空+猪八戒"} {
+			assert.True(t, xiyou[at], "the group of three sits down as any two of them or all three: never %s at %s", at, b)
 		}
 		pool := Characters(Chinese, b)
 		for _, name := range pool {
@@ -89,10 +109,15 @@ func TestACharacterNamesOnlyRivalsSureToBeAtTheTable(t *testing.T) {
 			}
 		}
 	}
-	for _, pair := range chineseRivals {
-		everyone = append(everyone, pair[:]...)
-		seatedWith[pair[0].Name] = []string{pair[1].Name}
-		seatedWith[pair[1].Name] = []string{pair[0].Name}
+	for _, group := range chineseRivals {
+		for _, r := range group {
+			everyone = append(everyone, r.Player)
+			for _, other := range group {
+				if other.Name != r.Name {
+					seatedWith[r.Name] = append(seatedWith[r.Name], other.Name)
+				}
+			}
+		}
 	}
 	everyone = append(everyone, chineseLoners...)
 
@@ -111,9 +136,19 @@ func TestACharacterNamesOnlyRivalsSureToBeAtTheTable(t *testing.T) {
 	for _, p := range slices.Concat(englishCast, englishTwelve) {
 		assert.NotEmpty(t, p.Rivalry, "%s has a rival", p.Name)
 	}
-	for _, pair := range chineseRivals {
-		assert.Contains(t, pair[0].Rivalry, pair[1].Name, "rivals know each other")
-		assert.Contains(t, pair[1].Rivalry, pair[0].Name, "rivals know each other")
+	for _, group := range chineseRivals {
+		for _, r := range group {
+			assert.Empty(t, r.Rivalry, "%s's rivalry is made from their lines at the table", r.Name)
+			assert.Len(t, r.on, len(group)-1, "%s has a line on each of the others", r.Name)
+			for name, line := range r.on {
+				assert.Contains(t, seatedWith[r.Name], name)
+				for _, other := range everyone {
+					if other.Name != name {
+						assert.NotContains(t, line, other.Name, "%s's line on %s names %s, who may not be at the table", r.Name, name, other.Name)
+					}
+				}
+			}
+		}
 	}
 	for _, p := range chineseLoners {
 		assert.Empty(t, p.Rivalry, "%s has no rival sure to be at the table", p.Name)
@@ -366,11 +401,11 @@ func TestTheCharactersPeoplePickAreAlwaysSeated(t *testing.T) {
 			}
 		}
 	}
-	// At nine seats, two loners force the table with three pairs; one from
-	// each of four pairs forces the table with four.
+	// At nine seats, three loners leave six seats to the rivals; one from
+	// each of four pairs forces those four to the table.
 	loners, onePerPair := Names(chineseLoners)[:3], []string{}
-	for _, pair := range chineseRivals[:4] {
-		onePerPair = append(onePerPair, pair[1].Name)
+	for _, group := range chineseRivals[:4] {
+		onePerPair = append(onePerPair, group[1].Name)
 	}
 	for _, with := range [][]string{loners, onePerPair, append(slices.Clone(onePerPair), loners[0]), append(Characters(Chinese, Nine)[:8], loners[0])} {
 		for seed := range uint64(20) {
@@ -382,10 +417,40 @@ func TestTheCharactersPeoplePickAreAlwaysSeated(t *testing.T) {
 	}
 }
 
+func TestAPersonInTheGroupOfThreeLeavesTheOthersTheirLinesOnEachOther(t *testing.T) {
+	var table []Player
+	for seed := uint64(0); !slices.ContainsFunc(table, func(p Player) bool { return p.Name == "唐僧" }); seed++ {
+		table = cast(t, Chinese, Twelve, rand.New(rand.NewPCG(seed, 5)), "孙悟空", "猪八戒")
+	}
+	seated, err := SeatHumans(table, []Person{{Name: "Eileen", Replaces: "孙悟空"}}, Chinese, Twelve)
+	require.NoError(t, err)
+	for _, p := range seated {
+		switch p.Name {
+		case "唐僧":
+			assert.Equal(t, rivalLine("唐僧", "猪八戒"), p.Rivalry)
+		case "猪八戒":
+			assert.Equal(t, rivalLine("猪八戒", "唐僧"), p.Rivalry)
+		case "Eileen":
+			assert.Empty(t, p.Rivalry)
+		}
+	}
+}
+
+func rivalLine(name, on string) string {
+	for _, group := range chineseRivals {
+		for _, r := range group {
+			if r.Name == name {
+				return r.on[on]
+			}
+		}
+	}
+	return ""
+}
+
 func TestNoNineSeatTableSeatsTwoLonersAndSomeoneFromFourPairs(t *testing.T) {
 	var with []string
-	for _, pair := range chineseRivals[:4] {
-		with = append(with, pair[0].Name)
+	for _, group := range chineseRivals[:4] {
+		with = append(with, group[0].Name)
 	}
 	with = append(with, chineseLoners[0].Name, chineseLoners[1].Name)
 	_, err := Cast(Chinese, Nine, rand.New(rand.NewPCG(1, 2)), with)

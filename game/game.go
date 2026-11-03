@@ -8,6 +8,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"slices"
 	"strings"
@@ -103,80 +104,173 @@ type Player struct {
 
 // Cast picks the players for a game on board started without any, in a
 // random seat order, always seating the characters named in with. An English
-// game seats the whole English cast for the board. A Chinese game seats as
-// many pairs of rivals and loners as the board has seats, in one of two
-// splits: the most pairs that fit, or one pair fewer and two more loners.
-// Rivals sit down together or not at all, so nobody written to play off
-// someone is seated without them, and the odds between the splits give every
-// character the same chance of a seat when nobody is asked for. It fails if
-// with names characters neither split seats together.
+// game seats the whole English cast for the board. A Chinese game seats at
+// least two of a group of rivals or none of them, so nobody written to play
+// off someone is seated without them, and fills the other seats with loners.
+// When nobody is asked for, how many of each group to seat is drawn with odds
+// that give every character the same chance of a seat. It fails if no table
+// seats everyone in with.
 func Cast(l Lang, b Board, rng *rand.Rand, with []string) ([]Player, error) {
-	var cast []Player
 	if l == English {
-		cast = englishFor(b)
-	} else {
-		pairs, loners := slices.Clone(chineseRivals), slices.Clone(chineseLoners)
-		rng.Shuffle(len(pairs), func(i, j int) { pairs[i], pairs[j] = pairs[j], pairs[i] })
-		rng.Shuffle(len(loners), func(i, j int) { loners[i], loners[j] = loners[j], loners[i] })
+		cast := englishFor(b)
+		rng.Shuffle(len(cast), func(i, j int) { cast[i], cast[j] = cast[j], cast[i] })
+		return cast, nil
+	}
+	seats := b.Seats()
+	all, odds := castSplits[seats].all, castSplits[seats].odds
+	asked := func(ps []Player) int {
+		return len(slices.DeleteFunc(Names(ps), func(n string) bool { return !slices.Contains(with, n) }))
+	}
+	groups := make([][]Player, len(chineseRivals))
+	for g, group := range chineseRivals {
+		for _, r := range group {
+			groups[g] = append(groups[g], r.Player)
+		}
+	}
+	var fit []int
+	var total float64
+	for i, sp := range all {
+		ok := sp[len(groups)] >= asked(chineseLoners)
+		for g, group := range groups {
+			ok = ok && sp[g] >= asked(group)
+		}
+		if ok {
+			fit = append(fit, i)
+			total += odds[i]
+		}
+	}
+	if len(fit) == 0 {
+		return nil, fmt.Errorf("no table of %d seats %s together", seats, l.List(with))
+	}
+	pick, x := fit[len(fit)-1], rng.Float64()*total
+	for _, i := range fit {
+		if x -= odds[i]; x < 0 {
+			pick = i
+			break
+		}
+	}
+	draw := func(ps []Player, n int) []Player {
+		ps = slices.Clone(ps)
+		rng.Shuffle(len(ps), func(i, j int) { ps[i], ps[j] = ps[j], ps[i] })
 		// The asked-for go first, so cutting from the end keeps them.
-		slices.SortStableFunc(pairs, func(a, b [2]Player) int { return askedPair(b, with) - askedPair(a, with) })
-		slices.SortStableFunc(loners, func(a, b Player) int { return asked(b.Name, with) - asked(a.Name, with) })
-		var wantPairs, wantLoners int
-		for _, p := range pairs {
-			wantPairs += askedPair(p, with)
-		}
-		for _, p := range loners {
-			wantLoners += asked(p.Name, with)
-		}
-		seats := b.Seats()
-		most := min(len(pairs), seats/2)
-		fits := func(p int) bool {
-			l := seats - 2*p
-			return p >= 0 && l <= len(loners) && wantPairs <= p && wantLoners <= l
-		}
-		var nPairs int
-		switch {
-		case fits(most) && fits(most-1):
-			nPairs = most - 1
-			if rng.Float64() < mostPairsOdds(most, len(pairs), seats-2*most, len(loners)) {
-				nPairs = most
-			}
-		case fits(most):
-			nPairs = most
-		case fits(most - 1):
-			nPairs = most - 1
-		default:
-			return nil, fmt.Errorf("no table seats %s together: it seats %d pairs of rivals and %d of %s, or %d pairs and %d of them",
-				l.List(with), most, seats-2*most, l.List(Names(chineseLoners)), most-1, seats-2*most+2)
-		}
-		for _, pair := range pairs[:nPairs] {
-			cast = append(cast, pair[:]...)
-		}
-		cast = append(cast, loners[:seats-2*nPairs]...)
+		slices.SortStableFunc(ps, func(a, b Player) int {
+			return asked([]Player{b}) - asked([]Player{a})
+		})
+		return ps[:n]
+	}
+	var cast []Player
+	for g, group := range groups {
+		cast = append(cast, draw(group, all[pick][g])...)
+	}
+	cast = append(cast, draw(chineseLoners, all[pick][len(groups)])...)
+	for i := range cast {
+		cast[i].Rivalry = rivalryAt(cast[i].Name, cast)
 	}
 	rng.Shuffle(len(cast), func(i, j int) { cast[i], cast[j] = cast[j], cast[i] })
 	return cast, nil
 }
 
-// mostPairsOdds is how often to seat p of pairs pairs and l of loners
-// loners, rather than one pair fewer and two loners more, so that a rival
-// and a loner are as likely as each other to be seated.
-func mostPairsOdds(p, pairs, l, loners int) float64 {
-	fp1, fl1 := float64(p)/float64(pairs), float64(l)/float64(loners)
-	fp2, fl2 := float64(p-1)/float64(pairs), float64(l+2)/float64(loners)
-	w := (fl2 - fp2) / (fp1 - fp2 - fl1 + fl2)
-	return max(0, min(1, w))
-}
-
-func asked(name string, with []string) int {
-	if slices.Contains(with, name) {
-		return 1
+// castSplits are, for each board's seats, the splits and their odds.
+var castSplits = func() map[int]splitTable {
+	out := map[int]splitTable{}
+	for _, b := range Boards {
+		all := splits(b.Seats())
+		out[b.Seats()] = splitTable{all, splitOdds(b.Seats(), all)}
 	}
-	return 0
+	return out
+}()
+
+type splitTable struct {
+	all  [][]int
+	odds []float64
 }
 
-func askedPair(p [2]Player, with []string) int {
-	return max(asked(p[0].Name, with), asked(p[1].Name, with))
+// splits is every way to fill seats from the Chinese cast: how many of each
+// group of chineseRivals, none or at least two, then how many loners.
+func splits(seats int) [][]int {
+	out := [][]int{nil}
+	for _, group := range chineseRivals {
+		var next [][]int
+		for _, sp := range out {
+			for n := range len(group) + 1 {
+				if n != 1 {
+					next = append(next, append(slices.Clone(sp), n))
+				}
+			}
+		}
+		out = next
+	}
+	var fill [][]int
+	for _, sp := range out {
+		loners := seats
+		for _, n := range sp {
+			loners -= n
+		}
+		if loners >= 0 && loners <= len(chineseLoners) {
+			fill = append(fill, append(sp, loners))
+		}
+	}
+	return fill
+}
+
+// splitOdds weighs the splits so that every character has the same chance
+// of one of the seats. Every split seats the same
+// number, which is what generalized iterative scaling needs: it converges to
+// the most even odds that give each group and the loners their share.
+func splitOdds(seats int, all [][]int) []float64 {
+	sizes := make([]int, 0, len(chineseRivals)+1)
+	for _, group := range chineseRivals {
+		sizes = append(sizes, len(group))
+	}
+	sizes = append(sizes, len(chineseLoners))
+	share := float64(seats) / float64(len(everyone(Chinese, Twelve)))
+	odds := make([]float64, len(all))
+	for i := range odds {
+		odds[i] = 1 / float64(len(all))
+	}
+	for range 2000 {
+		seated := make([]float64, len(sizes))
+		for i, sp := range all {
+			for k, n := range sp {
+				seated[k] += odds[i] * float64(n)
+			}
+		}
+		var sum float64
+		for i, sp := range all {
+			for k, n := range sp {
+				if seated[k] > 0 {
+					odds[i] *= math.Pow(share*float64(sizes[k])/seated[k], float64(n)/float64(seats))
+				}
+			}
+			sum += odds[i]
+		}
+		for i := range odds {
+			odds[i] /= sum
+		}
+	}
+	return odds
+}
+
+// rivalryAt is the rivalry of the Chinese rival called name at a table of
+// players: their lines on the others in their group seated there and played
+// by an AI, so it names nobody who is not at the table.
+func rivalryAt(name string, table []Player) string {
+	for _, group := range chineseRivals {
+		i := slices.IndexFunc(group, func(r rival) bool { return r.Name == name })
+		if i < 0 {
+			continue
+		}
+		var lines []string
+		for _, other := range group {
+			if slices.ContainsFunc(table, func(p Player) bool { return !p.Human && p.Name == other.Name }) {
+				if line, ok := group[i].on[other.Name]; ok {
+					lines = append(lines, line)
+				}
+			}
+		}
+		return strings.Join(lines, "；")
+	}
+	return ""
 }
 
 // Names is the players' names, in order.
@@ -204,14 +298,16 @@ func Character(l Lang, name string) (Player, bool) {
 }
 
 // everyone is every character a game in l on board b may seat: for Chinese
-// the rivals pair by pair, then the loners.
+// the rivals group by group, then the loners.
 func everyone(l Lang, b Board) []Player {
 	if l == English {
 		return englishFor(b)
 	}
 	var pool []Player
-	for _, pair := range chineseRivals {
-		pool = append(pool, pair[:]...)
+	for _, group := range chineseRivals {
+		for _, r := range group {
+			pool = append(pool, r.Player)
+		}
 	}
 	return append(pool, chineseLoners...)
 }
@@ -248,8 +344,9 @@ type Person struct {
 }
 
 // SeatHumans puts each person in the seat of the character they replace, who
-// must be in cast: Cast seats them when asked. Rivalries that name a character
-// who left are dropped, since nobody by that name is at the table. If a person
+// must be in cast: Cast seats them when asked. Nothing at the table may still
+// be played off a character who left: a Chinese rival keeps only their lines
+// on the rest of their group, and an English rivalry naming one is dropped. If a person
 // times out, an AI plays their move with persona. Names must tell everyone at
 // the table apart, so no name may contain another.
 func SeatHumans(cast []Player, people []Person, l Lang, b Board) ([]Player, error) {
@@ -278,7 +375,12 @@ func SeatHumans(cast []Player, people []Person, l Lang, b Board) ([]Player, erro
 		}
 	}
 	for j := range out {
-		if slices.ContainsFunc(gone, func(g string) bool { return strings.Contains(out[j].Rivalry, g) }) {
+		if out[j].Human {
+			continue
+		}
+		if l == Chinese {
+			out[j].Rivalry = rivalryAt(out[j].Name, out)
+		} else if slices.ContainsFunc(gone, func(g string) bool { return strings.Contains(out[j].Rivalry, g) }) {
 			out[j].Rivalry = ""
 		}
 	}
@@ -373,79 +475,107 @@ var englishCast = []Player{
 	},
 }
 
-// chineseRivals are written in pairs that clash: the two are seated together
-// or not at all, so each may be the other's rival.
-var chineseRivals = [][2]Player{
+// chineseRivals are written in groups that clash: a game seats at least two
+// of a group or none of it. Each member has a line on every other member, and
+// their rivalry is the lines on the ones at the table.
+var chineseRivals = [][]rival{
 	{
-		{
+		{Player: Player{
 			Name: "华妃", Persona: "宫斗戏精，气场全开，阴阳怪气一流，口头禅\"贱人就是矫情\"",
-			Habit:   "记仇，报复心强：谁怀疑过你、投过你，你就把他当头号嫌疑，有机会就带头投他。除非有确凿的证据洗清他，否则不原谅",
-			Badge:   "本宫凭什么不上警？你几乎每次都上警",
-			Rivalry: "和安陵容互相看不顺眼，她一开口你就要阴阳两句",
-		},
-		{
+			Habit: "记仇，报复心强：谁怀疑过你、投过你，你就把他当头号嫌疑，有机会就带头投他。除非有确凿的证据洗清他，否则不原谅",
+			Badge: "本宫凭什么不上警？你几乎每次都上警",
+		}, on: map[string]string{
+			"安陵容": "和安陵容互相看不顺眼，她一开口你就要阴阳两句",
+		}},
+		{Player: Player{
 			Name: "安陵容", Persona: "表面温柔懂事，说话软软的，口头禅\"姐姐说这话，是在怀疑我吗？\"",
-			Habit:   "别人一句无心的话能记三轮：笔记里记下谁说过对你不利的话，几轮之后再翻出来。从不当面冲突，投票时悄悄投给记恨的人",
-			Badge:   "你一般不上警，在警下暗中观察谁对你不利；不过你记恨的人要是上警，你可能也上去跟她争",
-			Rivalry: "最记恨华妃，表面喊她姐姐，心里早给她记了一笔",
-		},
+			Habit: "别人一句无心的话能记三轮：笔记里记下谁说过对你不利的话，几轮之后再翻出来。从不当面冲突，投票时悄悄投给记恨的人",
+			Badge: "你一般不上警，在警下暗中观察谁对你不利；不过你记恨的人要是上警，你可能也上去跟她争",
+		}, on: map[string]string{
+			"华妃": "最记恨华妃，表面喊她姐姐，心里早给她记了一笔",
+		}},
 	},
 	{
-		{
+		{Player: Player{
 			Name: "柯南", Persona: "推理狂魔，口头禅\"真相只有一个\"，发言爱逐条复盘谁说了什么、投了谁",
-			Habit:   "只认证据：每个判断都要对得上具体的发言、投票或死亡。证据指向你之前信任的人，也立刻改判断并公开说明。没有证据时不跟风",
-			Badge:   "你想带队找出真相，经常上警",
-			Rivalry: "最受不了派大星凭感觉带节奏，会逐条反驳他",
-		},
-		{
+			Habit: "只认证据：每个判断都要对得上具体的发言、投票或死亡。证据指向你之前信任的人，也立刻改判断并公开说明。没有证据时不跟风",
+			Badge: "你想带队找出真相，经常上警",
+		}, on: map[string]string{
+			"派大星": "最受不了派大星凭感觉带节奏，会逐条反驳他",
+		}},
+		{Player: Player{
 			Name: "派大星", Persona: "脑回路清奇，经常没听懂大家在讨论什么，口头禅\"所以狼人是我们中间的一个人吗？\"",
-			Habit:   "不跟着逻辑走，全凭直觉：凭第一印象认定谁可疑，投票也凭感觉，别人的推理很难说服你。但你的秘密信息照样以它为准",
-			Badge:   "你常常没搞懂上警是干嘛的，凭心情决定，有时候稀里糊涂就上了",
-			Rivalry: "柯南的长篇推理你总是听岔，然后得出离谱的结论",
-		},
+			Habit: "不跟着逻辑走，全凭直觉：凭第一印象认定谁可疑，投票也凭感觉，别人的推理很难说服你。但你的秘密信息照样以它为准",
+			Badge: "你常常没搞懂上警是干嘛的，凭心情决定，有时候稀里糊涂就上了",
+		}, on: map[string]string{
+			"柯南": "柯南的长篇推理你总是听岔，然后得出离谱的结论",
+		}},
 	},
 	{
-		{
+		{Player: Player{
 			Name: "龙傲天", Persona: "自带主角光环，坚信全场都是来衬托自己的，说话霸气，总觉得早就看穿了一切",
-			Habit:   "极度自信：很早就认定一个人是狼，之后很难改口，别人反驳只会让你更坚定。喜欢号召全场跟你投",
-			Badge:   "主角当然要拿警徽，你通常会上警",
-			Rivalry: "觉得皇后的\"客观分析\"是在跟你抢主角，处处要压她一头",
-		},
-		{
+			Habit: "极度自信：很早就认定一个人是狼，之后很难改口，别人反驳只会让你更坚定。喜欢号召全场跟你投",
+			Badge: "主角当然要拿警徽，你通常会上警",
+		}, on: map[string]string{
+			"皇后": "觉得皇后的\"客观分析\"是在跟你抢主角，处处要压她一头",
+		}},
+		{Player: Player{
 			Name: "皇后", Persona: "端庄稳重，自称\"本宫\"，口头禅\"本宫只是觉得，此事未免太过巧合\"",
-			Habit:   "暗中操盘：从不直接喊人投谁，只摆出\"客观分析\"，用暗示把票引向你想放逐的人。不当第一个点名的人，等别人先冲，再顺势收票",
-			Badge:   "你更喜欢在警下收票操盘，一般不上警，除非你觉得这一次非你不可",
-			Rivalry: "乐见龙傲天冲在前面，嘴上捧他，心里把他当枪使",
-		},
+			Habit: "暗中操盘：从不直接喊人投谁，只摆出\"客观分析\"，用暗示把票引向你想放逐的人。不当第一个点名的人，等别人先冲，再顺势收票",
+			Badge: "你更喜欢在警下收票操盘，一般不上警，除非你觉得这一次非你不可",
+		}, on: map[string]string{
+			"龙傲天": "乐见龙傲天冲在前面，嘴上捧他，心里把他当枪使",
+		}},
 	},
 	{
-		{
+		{Player: Player{
 			Name: "摸鱼王", Persona: "资深打工人，满嘴职场黑话，什么对齐、拉通、颗粒度、闭环",
-			Habit:   "只想早点下班：谁发言最长、最绕就怀疑谁。下判断很快，投票倾向人多的一边，好赶紧结束",
-			Badge:   "当警长要最后发言还要归票，等于加班，你几乎从不上警",
-			Rivalry: "最受不了闪电慢吞吞，会催他快点说完",
-		},
-		{
+			Habit: "只想早点下班：谁发言最长、最绕就怀疑谁。下判断很快，投票倾向人多的一边，好赶紧结束",
+			Badge: "当警长要最后发言还要归票，等于加班，你几乎从不上警",
+		}, on: map[string]string{
+			"闪电": "最受不了闪电慢吞吞，会催他快点说完",
+		}},
+		{Player: Player{
 			Name: "闪电", Persona: "极致慢性子，说话一个字一个字往外蹦，比如\"我……觉……得……\"，但意思要说完整",
-			Habit:   "反应永远慢一拍：判断依据的总是上一轮的事，新情况要到下一轮才反应过来。认定的投票目标很少改",
-			Badge:   "竞选发言太……长……了，你很少上警",
-			Rivalry: "摸鱼王越催，你越慢",
-		},
+			Habit: "反应永远慢一拍：判断依据的总是上一轮的事，新情况要到下一轮才反应过来。认定的投票目标很少改",
+			Badge: "竞选发言太……长……了，你很少上警",
+		}, on: map[string]string{
+			"摸鱼王": "摸鱼王越催，你越慢",
+		}},
 	},
 	{
-		{
-			Name: "唐僧", Persona: "苦口婆心的话痨，开口就是\"阿弥陀佛\"，一件小事能讲成一段经，动不动就劝大家向善",
-			Habit:   "心软，宁信其善：只有发言、投票或死亡里有确凿的矛盾，你才肯怀疑一个人。被怀疑的人哭两句你就动摇，但证据面前你照样认",
-			Badge:   "你觉得带大家走正道是你的责任，常常上警",
-			Rivalry: "孙悟空一冲动你就念叨他，说他太急躁、不讲道理",
-		},
-		{
-			Name: "孙悟空", Persona: "急性子，说话冲，口头禅\"俺老孙一眼就看出来了\"，最烦别人啰嗦",
-			Habit:   "凭火眼金睛下判断：谁的发言让你觉得不对劲，你当场就点他，很少等第二天。认准了就打，被证据打脸也认，但认得很不情愿",
-			Badge:   "你想一棒子打出狼来，经常上警",
-			Rivalry: "唐僧一念叨你就头疼，嫌他太容易被人骗",
-		},
+		{Player: Player{
+			Name: "唐僧", Persona: "慈悲谨慎，重视公平，开口就是\"施主\"，语速平缓，偶尔引用佛理，一件简单的事能讲得很长",
+			Habit: "不轻易给人定狼，喜欢先听人解释，也容易被说得动听的话打动。可一旦认定了，就很固执，很难再改口",
+			Badge: "你觉得带大家走正道是你的责任，常常上警",
+		}, on: map[string]string{
+			"孙悟空": "管孙悟空叫\"悟空\"，他急着定人罪过，你就劝他莫要妄下断言，先听人把话说清楚",
+			"猪八戒": "管猪八戒叫\"八戒\"，嫌他偷懒耍滑、见风使舵，可他几句软话又常常让你心软",
+		}},
+		{Player: Player{
+			Name: "孙悟空", Persona: "自信、急性子、嫉恶如仇，不服权威，自称\"俺老孙\"，说话冲，认定目标时咄咄逼人",
+			Habit: "观察敏锐但容易冲动：谁的话前后打架，你当场就点出来，敢带票、敢质疑警长、敢跟主流对着干。发现自己判断错了，也能马上转向",
+			Badge: "你想一棒子打出狼来，经常上警",
+		}, on: map[string]string{
+			"唐僧":  "管唐僧叫\"师父\"，他一念叨你就头疼，嫌他太容易被花言巧语骗",
+			"猪八戒": "管猪八戒叫\"呆子\"，最烦他看风向、甩锅",
+		}},
+		{Player: Player{
+			Name: "猪八戒", Persona: "好吃懒做，胆小惜命，自称\"俺老猪\"，爱抱怨、爱甩锅，经常插科打诨，关键时候也能讲出道理",
+			Habit: "先保自己：危险时随大流、装糊涂，看风向再表态。看着糊涂，其实心里有小算盘，被逼急了会突然反击",
+			Badge: "当警长要带队还容易被刀，你一般不上警，除非上警能保住自己",
+		}, on: map[string]string{
+			"孙悟空": "管孙悟空叫\"猴哥\"，他喊打喊杀时你嘴上附和，又爱揪他前后说法不一样",
+			"唐僧":  "管唐僧叫\"师父\"，有事爱跟他告状、甩锅，知道他心软好说话",
+		}},
 	},
+}
+
+// rival is a character in one of chineseRivals, with their line on each of
+// the others in the group.
+type rival struct {
+	Player
+	on map[string]string
 }
 
 // chineseLoners play off the whole table rather than one rival; a game seats
@@ -462,10 +592,6 @@ var chineseLoners = []Player{
 	{
 		Name: "光头强", Persona: "暴脾气，一急就破防，口头禅\"我都说了我不是狼！你们是不是有病啊！\"",
 		Habit: "一被怀疑就急：谁怀疑你，你就立刻反咬他、投他。越被怀疑越激动，说话越像在狡辩", Badge: "你凭一口气：觉得有人会怀疑你，就上警先发制人",
-	},
-	{
-		Name: "祥林嫂", Persona: "逢人就讲自己的遭遇，口头禅\"我真傻，真的\"，每次发言都要先把前几天的事再讲一遍",
-		Habit: "认死理：哪个人第一次让你觉得吃了亏，你就一直记着，每天发言都翻出来讲。新证据能让你改判断，但你会先把旧事再念叨一遍", Badge: "你一般不上警，除非觉得只有你记得前几天发生过什么",
 	},
 }
 

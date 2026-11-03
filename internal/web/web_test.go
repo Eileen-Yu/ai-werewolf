@@ -145,7 +145,7 @@ func TestEveryCharacterHasAPortrait(t *testing.T) {
 	assert.Len(t, got, len(files))
 	// The characters added with the twelve-player board are drawn as their
 	// initial until their portraits come in.
-	awaiting := []string{"唐僧", "孙悟空", "祥林嫂", "Crypto Bro", "Reply Guy", "True Crime Podcaster"}
+	awaiting := []string{"唐僧", "孙悟空", "猪八戒", "Crypto Bro", "Reply Guy", "True Crime Podcaster"}
 	for _, c := range append(game.Characters(game.Chinese, game.Twelve), game.Characters(game.English, game.Twelve)...) {
 		if slices.Contains(awaiting, c) {
 			assert.NotContains(t, got, c, "%s has a portrait now: take them off the awaiting list", c)
