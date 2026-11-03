@@ -914,6 +914,7 @@ function renderSeats(v, t, roles = revealed) {
     if (me) tags.push(`<span class="tag you">${esc(t.you)}</span>`);
     else if (people.includes(s.name)) tags.push(`<span class="tag person">${esc(t.person)}</span>`);
     if (roles) tags.push(`<span class="tag revealed${isWolf(roles[s.name]) ? " wolf" : ""}">${esc(w(roles[s.name]))}</span>`);
+    else if (!me && s.name === v.king) tags.push(`<span class="tag wolf">👑 ${esc(w("white wolf king"))}</span>`);
     else if (!me && pack.includes(s.name)) tags.push(`<span class="tag wolf">${esc(t.packmate)}</span>`);
     if (s.death) tags.push(`<span class="tag out">${esc(t.out)}</span>`);
     const state = s.name === speaking ? "speaking" : !roles && s.name === thinking ? "thinking" : "";
