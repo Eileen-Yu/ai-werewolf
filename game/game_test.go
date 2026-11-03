@@ -103,7 +103,7 @@ func TestACharacterNamesOnlyRivalsSureToBeAtTheTable(t *testing.T) {
 		}
 	}
 	for _, p := range englishTwelve {
-		for _, other := range everyone {
+		for _, other := range englishCast {
 			if other.Name != p.Name {
 				seatedWith[p.Name] = append(seatedWith[p.Name], other.Name)
 			}
@@ -552,4 +552,31 @@ func TestAPlanIsEachWolfsOwnStance(t *testing.T) {
 	assert.False(t, ok, "only wolves have stances")
 	assert.Equal(t, FakeSeer, Read("悍跳"))
 	assert.Equal(t, PlayHook, Read("倒钩"))
+}
+
+func TestATwelveSeatEnglishTableDrawsItsLastSeats(t *testing.T) {
+	rng := rand.New(rand.NewPCG(3, 4))
+	seated := map[string]int{}
+	const games = 400
+	for range games {
+		names := Names(cast(t, English, Twelve, rng))
+		assert.Len(t, names, 12)
+		assert.Subset(t, names, Names(englishCast), "the nine sit at every table")
+		for _, p := range englishTwelve {
+			if slices.Contains(names, p.Name) {
+				seated[p.Name]++
+			}
+		}
+	}
+	for _, p := range englishTwelve {
+		assert.InDelta(t, games*3/4, seated[p.Name], games/10, "%s sits at about three tables in four", p.Name)
+	}
+	assert.ElementsMatch(t, Names(englishCast), Names(cast(t, English, Nine, rng)), "nobody is drawn at nine seats")
+
+	for range 20 {
+		names := Names(cast(t, English, Twelve, rng, "Wednesday Addams", "Karen"))
+		assert.Contains(t, names, "Wednesday Addams", "a character a person picked is always drawn")
+	}
+	_, err := Cast(English, Twelve, rng, Names(englishTwelve))
+	assert.Error(t, err, "only three of the four fit")
 }

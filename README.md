@@ -50,6 +50,13 @@ The game master's terminal is a god's-eye feed of the chaos: every public accusa
 - **NPC Steve**: "Okay." Votes with the table, unless you plainly said one thing and did another.
 - **Chronically Online Girl**: reads vibes, calls out red flags, roasts every LinkedIn post.
 
+On the twelve-player board, three of these four join them:
+
+- **Sherlock Holmes**: "Interesting. You've changed your story twice, yet somehow expect us to trust you more." Hunts the hole in every story, sometimes deduces too far.
+- **Captain Jack Sparrow**: never accuses, merely suggests. Backs whoever is winning and talks the votes off himself.
+- **Wednesday Addams**: "Seven people agree with you. How unfortunate." Trusts nobody the table agrees on too fast.
+- **SpongeBob SquarePants**: "Wait! If you're both the Seer, does that mean one of you is lying?!" Believes everyone, but asks the question nobody did.
+
 **中文**（一局坐四对冤家和一个独行侠）
 
 - **柯南**：真相只有一个。只认证据，可惜派大星不认。

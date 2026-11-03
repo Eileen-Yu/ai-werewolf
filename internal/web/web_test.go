@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"slices"
 	"testing"
 	"time"
 
@@ -40,7 +39,7 @@ func TestPeoplePlayAWholeGameFromThePage(t *testing.T) {
 	assert.Contains(t, chars.Characters, "Karen")
 	assert.Equal(t, 9, chars.Seats)
 	twelve := get[roster](t, srv.URL+"/api/characters?lang=en&board=twelve", http.StatusOK, true)
-	assert.Contains(t, twelve.Characters, "Reply Guy")
+	assert.Contains(t, twelve.Characters, "SpongeBob SquarePants")
 	assert.Equal(t, 12, twelve.Seats)
 	get[roster](t, srv.URL+"/api/characters?board=ten", http.StatusBadRequest, false)
 
@@ -143,14 +142,7 @@ func TestEveryCharacterHasAPortrait(t *testing.T) {
 	files, err := fs.Glob(pictures, "avatars/*")
 	require.NoError(t, err)
 	assert.Len(t, got, len(files))
-	// The characters added with the twelve-player board are drawn as their
-	// initial until their portraits come in.
-	awaiting := []string{"Crypto Bro", "Reply Guy", "True Crime Podcaster"}
 	for _, c := range append(game.Characters(game.Chinese, game.Twelve), game.Characters(game.English, game.Twelve)...) {
-		if slices.Contains(awaiting, c) {
-			assert.NotContains(t, got, c, "%s has a portrait now: take them off the awaiting list", c)
-			continue
-		}
 		url, ok := got[c]
 		if !assert.True(t, ok, "no portrait for %s", c) {
 			continue

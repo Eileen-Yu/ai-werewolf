@@ -112,7 +112,10 @@ type Player struct {
 // seats everyone in with.
 func Cast(l Lang, b Board, rng *rand.Rand, with []string) ([]Player, error) {
 	if l == English {
-		cast := englishFor(b)
+		cast, err := englishDraw(b, rng, with)
+		if err != nil {
+			return nil, err
+		}
 		rng.Shuffle(len(cast), func(i, j int) { cast[i], cast[j] = cast[j], cast[i] })
 		return cast, nil
 	}
@@ -312,14 +315,38 @@ func everyone(l Lang, b Board) []Player {
 	return append(pool, chineseLoners...)
 }
 
-// englishFor is the English cast for board b: the nine at every table, and on
-// a bigger board the ones who only sit down there.
+// englishFor is every English character board b may seat: the nine at every
+// table, and on a bigger board the ones its last seats are drawn from.
 func englishFor(b Board) []Player {
 	cast := slices.Clone(englishCast)
 	if b.Seats() > len(cast) {
 		cast = append(cast, englishTwelve...)
 	}
 	return cast
+}
+
+// englishDraw seats an English table on board b: the nine, and on a bigger
+// board as many of englishTwelve as there are seats left, the ones in with
+// first and the rest at random.
+func englishDraw(b Board, rng *rand.Rand, with []string) ([]Player, error) {
+	cast := slices.Clone(englishCast)
+	left := b.Seats() - len(cast)
+	if left <= 0 {
+		return cast, nil
+	}
+	var asked, rest []Player
+	for _, p := range englishTwelve {
+		if slices.Contains(with, p.Name) {
+			asked = append(asked, p)
+		} else {
+			rest = append(rest, p)
+		}
+	}
+	if len(asked) > left {
+		return nil, fmt.Errorf("a table of %d seats has room for only %d of %s", b.Seats(), left, English.List(Names(englishTwelve)))
+	}
+	rng.Shuffle(len(rest), func(i, j int) { rest[i], rest[j] = rest[j], rest[i] })
+	return slices.Concat(cast, asked, rest[:left-len(asked)]), nil
 }
 
 // CheckPeople reports what would stop people from taking these seats in a
@@ -392,27 +419,33 @@ var humanPersona = map[Lang]string{
 	English: "a human player whose move an AI is covering for: steady, goes by the evidence",
 }
 
-// englishTwelve only sit down on a twelve-seat board, where everyone in
-// englishCast is at the table too, so their rivalries may name anyone in
-// either; nobody in englishCast may name them.
+// englishTwelve are who a twelve-seat English board draws its last seats
+// from, so no one of them is sure to be at the table: their rivalries may
+// name anyone in englishCast, who always is, and nobody may name them.
 var englishTwelve = []Player{
 	{
-		Name: "Crypto Bro", Persona: "sees every game as a market: talks in pumps, dumps, HODL and \"to the moon\", and calls every accusation FUD",
-		Habit:   "you buy the dip and hold: you back players the table has just turned on, and once you have backed someone you stick with them through every bad day unless the evidence against them is hard",
-		Badge:   "the badge is a governance token, and you run whenever you smell an early entry",
-		Rivalry: "Karen wants a refund on every coin you ever sold her, and LinkedIn Influencer keeps calling you a Web3 thought leader while refusing to buy in",
+		Name: "Sherlock Holmes", Persona: "cold, cutting and sure he is the cleverest one at the table; takes testimony apart line by line and says things like \"Interesting. You've changed your story twice, yet somehow expect us to trust you more.\"",
+		Habit:   "you dissect testimony: you look for where a player's story changed, or where two things they said cannot both be true, and suspect whoever has the biggest hole. You are very sure of your deductions and sometimes build one on too little, so drop it the moment the facts do not fit",
+		Badge:   "you run often: the village plainly needs someone who can think",
+		Rivalry: "Conspiracy Carl calls his theories deductions, which you take personally, and Florida Man's stories give you no logic to work with",
 	},
 	{
-		Name: "Reply Guy", Persona: "answers every speech with \"well, actually\" and a correction nobody asked for",
-		Habit:   "you pick apart whatever was just said: you suspect whoever ignores your corrections or gets a small fact wrong, and you vote for the player whose story has the most errors in it",
-		Badge:   "you run when you feel the candidates need correcting, which is most of the time",
-		Rivalry: "Chronically Online Girl has blocked you on every app, and Discord Mod keeps muting you for replying to everything",
+		Name: "Captain Jack Sparrow", Persona: "a slippery, chaotic opportunist who talks in winding half-sentences and seems to be saying nonsense, as in \"Now, I'm not saying he's a wolf. I'm merely suggesting we let him explain why everyone around him keeps dying.\"",
+		Habit:   "you go where the wind blows and above all you survive: you back whichever side looks like winning, hint instead of accusing outright, and when the votes swing toward you, you steer them onto someone else with a good story",
+		Badge:   "you run when the badge looks like a lifeboat, and stay back when it looks like a target",
+		Rivalry: "Karen keeps demanding to speak to the captain, which is you, and Discord Mod keeps trying to ban a pirate from his own ship",
 	},
 	{
-		Name: "True Crime Podcaster", Persona: "narrates the game like an episode of her podcast: cold opens, \"and that's when things got dark\", and a sponsor read now and then",
-		Habit:   "you build a profile of the killers from the nights: who each death helps, who was quiet before it, who spoke loudest after. You vote for whoever fits your profile best and redraw it when a death does not fit",
-		Badge:   "you run when you think the case needs a lead investigator, which is often",
-		Rivalry: "Conspiracy Carl keeps calling in to your show with theories, and you keep telling him a real investigation needs evidence",
+		Name: "Wednesday Addams", Persona: "deadpan, cynical and unsettling: says little, shows nothing, and has a pitch-black sense of humour, as in \"Seven people agree with you. How unfortunate. I was hoping at least one of you could think.\"",
+		Habit:   "you trust nobody easily: you keep your speeches short, distrust whatever the table agrees on too quickly, and stay unsure of a player until they give you a real reason",
+		Badge:   "you rarely run, since leading a crowd is beneath you, unless the other candidates are worse",
+		Rivalry: "LinkedIn Influencer keeps calling your silence a leadership style, and Gym Bro keeps trying to hype you up",
+	},
+	{
+		Name: "SpongeBob SquarePants", Persona: "sunny, naive and endlessly excited, talks a lot and loves everyone, and sometimes asks the simple question nobody else asked, like \"Wait! If you're both the Seer, does that mean one of you is lying?!\"",
+		Habit:   "you believe people easily and are slow to suspect anyone, but you ask plain questions about whatever does not add up, and vote for whoever cannot answer them",
+		Badge:   "you sometimes run, because sheriff sounds like the best job ever",
+		Rivalry: "Sigma Chad keeps telling you optimism is for NPCs, and NPC Steve answers all your excitement with \"Okay.\"",
 	},
 }
 
