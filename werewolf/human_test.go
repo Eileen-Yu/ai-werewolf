@@ -73,10 +73,35 @@ func TestAPersonPlaysTheSeatTheyTook(t *testing.T) {
 	t.Fatal("in five games the person never got to speak")
 }
 
+func TestAMoveJustPastTheShownDeadlineIsStillThePersons(t *testing.T) {
+	oldTimeout, oldGrace := HumanTimeout, HumanGrace
+	HumanTimeout, HumanGrace = 10*time.Millisecond, time.Minute
+	t.Cleanup(func() { HumanTimeout, HumanGrace = oldTimeout, oldGrace })
+	b := &turnRecorder{}
+	SetBrain(b)
+	client := startEngine(t)
+	startWorker(t, client)
+
+	_, err := client.ScheduleWorkflow(t.Context(), "GameWorkflow", workflow.WithInstanceID("late"),
+		workflow.WithInput(Game{Lang: game.English, Humans: []Human{human("Eileen", "Karen", "")}}))
+	require.NoError(t, err)
+	answer(t, client, "late", "", func(p Pending, _ int) brain.Action {
+		time.Sleep(time.Until(p.Deadline) + 50*time.Millisecond)
+		a, err := brain.Random{}.Act(t.Context(), p.Turn)
+		require.NoError(t, err)
+		return a
+	})
+	waitForGame(t, client, "late")
+
+	for _, turn := range b.turns {
+		assert.NotEqual(t, "Eileen", turn.Me.Name, "the AI took a %s move that came in within the grace", turn.Kind)
+	}
+}
+
 func TestAnAIPlaysForAPersonWhoRunsOutOfTime(t *testing.T) {
-	old := HumanTimeout
-	HumanTimeout = 10 * time.Millisecond
-	t.Cleanup(func() { HumanTimeout = old })
+	oldTimeout, oldGrace := HumanTimeout, HumanGrace
+	HumanTimeout, HumanGrace = 10*time.Millisecond, 0
+	t.Cleanup(func() { HumanTimeout, HumanGrace = oldTimeout, oldGrace })
 	b := &turnRecorder{}
 	SetBrain(b)
 	client := startEngine(t)

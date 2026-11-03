@@ -103,7 +103,7 @@ func runGM(ctx context.Context, args []string) error {
 	brainName := fs.String("brain", "random", "how players think: random or llm")
 	component := fs.String("llm-component", "llm", "Dapr conversation component for -brain llm")
 	webAddr := fs.String("web", "", `address to serve the page a person plays from, e.g. ":8080"; empty serves none`)
-	timeout := fs.Duration("human-timeout", werewolf.HumanTimeout, "how long a person has for a move before an AI plays it")
+	timeout := fs.Duration("human-timeout", werewolf.HumanTimeout, "how long the page gives a person for a move; the game waits werewolf.HumanGrace more before an AI plays it")
 	_ = fs.Parse(args)
 	werewolf.HumanTimeout = *timeout
 

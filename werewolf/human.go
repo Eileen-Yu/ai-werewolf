@@ -29,6 +29,11 @@ const MaxHumans = 9
 // HumanTimeout is how long a person has for a move before an AI plays it.
 var HumanTimeout = 5 * time.Minute
 
+// HumanGrace is how much longer than the deadline the page shows the game
+// still waits, so a move sent in the last seconds is played as the person's
+// rather than lost to the AI on its way in.
+var HumanGrace = 30 * time.Second
+
 // View is the game as one person sees it, cut by ReadView from what the
 // workflow publishes for the web page. A spectator's view has no You, role
 // or pending move, and only what everyone at the table hears.
@@ -256,7 +261,7 @@ func (t *table) askHuman(turn brain.Turn) move {
 	p.Turn.Transcript, p.Turn.Notes, p.Turn.Ballots = nil, game.Notes{}, nil // the page has the log and votes already
 	t.pending[turn.Me.Name] = p
 	t.publish()
-	return &humanMove{t: t, turn: turn, wait: t.ctx.WaitForExternalEvent(p.Event, HumanTimeout)}
+	return &humanMove{t: t, turn: turn, wait: t.ctx.WaitForExternalEvent(p.Event, HumanTimeout+HumanGrace)}
 }
 
 func (m *humanMove) Await(v any) error {
