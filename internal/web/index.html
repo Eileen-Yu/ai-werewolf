@@ -294,7 +294,9 @@
   #deal .card { width:100%; margin:0; }
   #deal h4 { margin:10px 0 4px; font-size:14px; color:var(--accent); } #deal h4:first-child { margin-top:0; }
   #deal ul { padding-left:18px; margin:4px 0; } #deal li { font-size:13.5px; margin:3px 0; }
-  #deal .turn { color:#7fd1ff; font-weight:600; }
+  #deal .actions { width:100%; display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
+  #deal .actions button { margin:0; }
+  #deal .turn { flex-basis:100%; text-align:center; color:#7fd1ff; font-weight:600; }
   #deal .later, #deal .card { animation: fade .4s both; }
   #deal .flip.spin ~ .later, #deal .flip.spin ~ .card { animation-delay:2.1s; }
   @keyframes deal { 0% { transform:rotateY(0) scale(.6); } 60% { transform:rotateY(1260deg) scale(1.05); } 100% { transform:rotateY(1260deg) scale(1); } }
@@ -363,7 +365,7 @@
   <div class="flip" id="dealFlip"><div class="in"><div class="face back">🌙</div><div class="face front" id="dealFront"></div></div></div>
   <div class="later" id="dealMates"></div>
   <div class="card" id="dealGuide"></div>
-  <div class="later" style="width:100%"><div class="turn" id="dealTurn" hidden></div><button id="dealMore" class="secondary" type="button"></button><button id="dealClose" type="button"></button></div>
+  <div class="later actions"><div class="turn" id="dealTurn" hidden></div><button id="dealMore" class="secondary" type="button"></button><button id="dealClose" type="button"></button></div>
 </div></div>
 <button id="roleBtn" class="secondary" type="button" hidden></button>
 <button id="rulesBtn" class="secondary" type="button"></button>
