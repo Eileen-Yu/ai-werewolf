@@ -505,3 +505,51 @@ func TestAHumanSeatRefusesWhatCannotBeSeated(t *testing.T) {
 	_, err = SeatHumans(cast, []Person{{Name: "Karen", Replaces: "Gym Bro"}, {Name: "Bob", Replaces: "Karen"}}, English, Nine)
 	assert.NoError(t, err, "a person may take the name of a character another person replaces")
 }
+
+func TestTheWolvesKillWhoTheyVoteFor(t *testing.T) {
+	vote := func(pairs ...string) []Vote {
+		var votes []Vote
+		for i := 0; i < len(pairs); i += 2 {
+			votes = append(votes, Vote{Voter: pairs[i], Target: pairs[i+1]})
+		}
+		return votes
+	}
+	for _, tc := range []struct {
+		name   string
+		votes  []Vote
+		victim string
+		tied   []string
+	}{
+		{"agreed", vote("阿杰", "老王", "小宇", "老王"), "老王", nil},
+		{"the most votes win a disagreement", vote("阿杰", "老王", "小宇", "老王", "阿明", "小红"), "老王", nil},
+		{"a split is a tie", vote("阿杰", "老王", "小宇", "小红"), "", []string{"老王", "小红"}},
+		{"an abstention counts for nobody", vote("阿杰", "老王", "小宇", ""), "老王", nil},
+		{"no vote kills nobody", vote("阿杰", "", "小宇", ""), "", nil},
+		{"nobody voting kills nobody", nil, "", nil},
+		{"a wolf may be voted for", vote("阿杰", "小宇", "小宇", "小宇"), "小宇", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			victim, tied := KillVote(tc.votes)
+			assert.Equal(t, tc.victim, victim)
+			assert.ElementsMatch(t, tc.tied, tied)
+		})
+	}
+}
+
+func TestAPlanIsEachWolfsOwnStance(t *testing.T) {
+	p := Plan{Stances: []WolfStance{
+		{Wolf: "阿杰", Kill: "老王", Volunteer: FakeSeer},
+		{Wolf: "小宇", Kill: "小红", Volunteer: FakeSeer},
+		{Wolf: "阿明", Volunteer: PlayHook},
+	}}
+	assert.Equal(t, []string{"阿杰", "小宇"}, p.Volunteers(FakeSeer), "two wolves may both volunteer to fake")
+	assert.Equal(t, []string{"阿明"}, p.Volunteers(PlayHook))
+	assert.Equal(t, []Vote{{Voter: "阿杰", Target: "老王"}, {Voter: "小宇", Target: "小红"}, {Voter: "阿明"}}, p.KillVotes())
+	st, ok := p.StanceOf("小宇")
+	assert.True(t, ok)
+	assert.Equal(t, "小红", st.Kill)
+	_, ok = p.StanceOf("老王")
+	assert.False(t, ok, "only wolves have stances")
+	assert.Equal(t, FakeSeer, Read("悍跳"))
+	assert.Equal(t, PlayHook, Read("倒钩"))
+}

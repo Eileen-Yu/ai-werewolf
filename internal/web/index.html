@@ -388,12 +388,12 @@ const UI = {
     seatState: { thinking: "💭 思考中", speaking: "🔊 发言中" },
     line: { summary: "🔍 分析", summaryTip: "AI 主持人写的摘要，不是角色原话", sumAll: "展开全部分析", sumAuto: "恢复自动折叠", claims: r => `声称${r}`, checked: (x, r) => `查验 ${x}：${r}`, potion: x => `用药：${x}`,
       suspects: "怀疑", nobody: "暂不怀疑谁" },
-    kinds: { speech: "轮到你发言", wolf_chat: "狼队夜聊", wolf_plan: "你来定今晚的计划",
+    kinds: { speech: "轮到你发言", wolf_chat: "狼队夜聊", wolf_vote: "投票决定今晚杀谁", wolf_revote: "平票，在平票的人里重投",
       last_words: "留下遗言", vote: "投票放逐", protect: "今晚守护谁", inspect: "今晚查验谁", save: "要用解药救他吗", poison: "要用毒药吗", shoot: "开枪带走谁",
       run: "竞选警长：要上警吗", campaign: "警长竞选发言", withdraw: "竞选结束：要退水吗", sheriff_vote: "投票选警长", badge: "移交警徽",
       pk_speech: "PK 发言：说服大家别投你", pk_vote: "PK 投票：在 PK 的人里放逐一人" },
     run: "上警", noRun: "不上警", stay: "继续竞选", withdraw: "退水", tearBadge: "撕掉警徽", sheriff: "警长",
-    target: "选择", speech: "发言", planSpeech: "给队友的计划说明", suspect: "你怀疑谁（会记录在案）",
+    target: "选择", speech: "发言", suspect: "你怀疑谁（会记录在案）",
     claim: "声称身份（可选）", noClaim: "不声称", claimChecked: "查验了谁", claimResult: "查验结果", claimPotion: "救了/毒了谁",
     abstain: "弃票",
     vote: { locale: "zh", record: "已结束的投票", previous: "上一次结果", replay: "▶ 回放已结束的投票",
@@ -408,7 +408,7 @@ const UI = {
       electionTie: n => `${n} 平票，警徽流失，本局没有警长`, abstained: "所有人都弃票，今天无人出局", electionAbstained: "所有人都弃票，警徽流失，本局没有警长",
       unopposed: n => `警上只剩 ${n} 一人，不用投票，直接当选 🎖️`, no_runners: "没有人上警，本局没有警长",
       all_ran: "所有人都上警了，没有人投票，本局没有警长", all_withdrew: "上警的人都退水了，本局没有警长", blasted: "白狼王自爆，竞选中断，警徽流失，本局没有警长" },
-    faker: "谁来悍跳预言家", faker2: "第二只悍跳（可选，双狼悍跳）", hook: "谁来倒钩（白天踩队友）", focus: "白天集中投谁（可选）", edge: "先屠哪一边（可选）", none: "（不选）",
+    volunteer: "你自己报名（可选，只是打算，不是命令）", focus: "你提议明天投谁（可选）", edge: "你认为先屠哪一边（可选）", none: "（不选）",
     voiceOn: "🔊 语音朗读：开", voiceOff: "🔇 语音朗读：关", mic: "🎤 语音输入", micStop: "⏹ 停止录音", micErr: "语音输入出错：",
     micErrors: { "no-speech": "没听到声音。确认系统设置里选的输入设备是你在用的麦克风、没有静音，点 🎤 之后马上开始说。",
       "not-allowed": "浏览器没有麦克风权限：点地址栏左边的图标，允许使用麦克风后再试。",
@@ -492,12 +492,12 @@ ${b === "twelve" ? `<h4>白狼王自爆</h4><ul>
     seatState: { thinking: "💭 Thinking", speaking: "🔊 Speaking" },
     line: { summary: "🔍 Analysis", summaryTip: "The AI game master's summary, not the character's words", sumAll: "Expand all analysis", sumAuto: "Back to auto-fold", claims: r => `Claims ${r}`, checked: (x, r) => `checked ${x}: ${r}`, potion: x => `potion on ${x}`,
       suspects: "Suspects", nobody: "Suspects nobody yet" },
-    kinds: { speech: "Your turn to speak", wolf_chat: "Wolf chat", wolf_plan: "Set tonight's plan",
+    kinds: { speech: "Your turn to speak", wolf_chat: "Wolf chat", wolf_vote: "Vote on tonight's kill", wolf_revote: "A tie: vote again between the tied",
       last_words: "Your last words", vote: "Vote someone out", protect: "Who to guard tonight", inspect: "Who to check tonight", save: "Use the antidote on them?", poison: "Use the poison?", shoot: "Who to shoot",
       run: "Sheriff election: will you run?", campaign: "Your campaign speech", withdraw: "Campaign over: withdraw?", sheriff_vote: "Vote for sheriff", badge: "Pass on the badge",
       pk_speech: "Your PK speech: talk your way out", pk_vote: "PK vote: exile one of those in the PK" },
     run: "Run for sheriff", noRun: "Stay out", stay: "Stay in the race", withdraw: "Withdraw", tearBadge: "Tear up the badge", sheriff: "Sheriff",
-    target: "Pick", speech: "What you say", planSpeech: "The plan, for your pack", suspect: "Who you suspect (goes on the record)",
+    target: "Pick", speech: "What you say", suspect: "Who you suspect (goes on the record)",
     claim: "Claim a role (optional)", noClaim: "No claim", claimChecked: "Who you checked", claimResult: "What you saw", claimPotion: "Who you saved or poisoned",
     abstain: "Abstained",
     vote: { locale: "en", record: "Finished votes", previous: "Previous result", replay: "▶ Replay this finished vote",
@@ -514,7 +514,7 @@ ${b === "twelve" ? `<h4>白狼王自爆</h4><ul>
       electionAbstained: "Everyone abstained: the badge is lost and there is no sheriff this game",
       unopposed: n => `${n} is the only candidate left, so is sheriff without a vote 🎖️`, no_runners: "Nobody ran, so there is no sheriff this game",
       all_ran: "Everyone ran, so nobody was left to vote and there is no sheriff this game", all_withdrew: "Every candidate withdrew, so there is no sheriff this game", blasted: "The white wolf king blew up, so the election is over and there is no sheriff this game" },
-    faker: "Who fakes the seer", faker2: "A second faker (optional, a double claim)", hook: "Who plays the hook (turns on a packmate by day)", focus: "Who the pack votes tomorrow (optional)", edge: "Which side to wipe out first (optional)", none: "(none)",
+    volunteer: "Volunteer yourself (optional, an intention, not an order)", focus: "Who you propose voting out tomorrow (optional)", edge: "Which side you would wipe out first (optional)", none: "(none)",
     voiceOn: "🔊 Read aloud: on", voiceOff: "🔇 Read aloud: off", mic: "🎤 Speak", micStop: "⏹ Stop", micErr: "Voice input failed: ",
     micErrors: { "no-speech": "Heard nothing. Check that your system's input device is the microphone you are using and is not muted, and start talking right after clicking 🎤.",
       "not-allowed": "The browser has no microphone access: click the icon left of the address bar, allow the microphone, then try again.",
@@ -1211,19 +1211,19 @@ function showTurn(p, t, w) {
   $("turnCard").hidden = false; $("turnErr").textContent = "";
   $("turnTitle").textContent = t.kinds[k] || k;
   const opts = (xs, blank) => (blank ? `<option value="">${t.none}</option>` : "") + xs.map(x => `<option value="${esc(x)}">${esc(w(x))}</option>`).join("");
-  const choice = ["vote", "pk_vote", "wolf_plan", "protect", "inspect", "save", "poison", "shoot", "run", "withdraw", "sheriff_vote", "badge"].includes(k);
-  const speaks = !choice || k === "wolf_plan", declares = ["speech", "campaign", "pk_speech"].includes(k);
+  const choice = ["vote", "pk_vote", "wolf_vote", "wolf_revote", "protect", "inspect", "save", "poison", "shoot", "run", "withdraw", "sheriff_vote", "badge"].includes(k);
+  const speaks = !choice, declares = ["speech", "campaign", "pk_speech"].includes(k);
   let h = "";
   if (k === "run") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${x === "pass" ? t.noRun : t.run}</option>`).join("")}</select>`;
   else if (k === "withdraw") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${x === "pass" ? t.withdraw : t.stay}</option>`).join("")}</select>`;
   else if (k === "protect") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${esc(x === "pass" ? t.guardNobody : w(x))}</option>`).join("")}</select>`;
   else if (k === "badge") h += `<label>${t.target}</label><select name="target">${(turn.candidates || []).map(x => `<option value="${esc(x)}">${esc(x === "pass" ? t.tearBadge : w(x))}</option>`).join("")}</select>`;
   else if (choice) h += `<label>${t.target}</label><select name="target">${opts(turn.candidates || [])}</select>`;
-  if (k === "wolf_plan") h += `<label>${t.faker}</label><select name="faker">${opts([...(turn.pack || []), "nobody"])}</select>`;
-  if (k === "wolf_plan" && (turn.pack || []).length > 1) h += `<label>${t.faker2}</label><select name="faker2">${opts(turn.pack || [], true)}</select>`;
-  if (k === "wolf_plan" && (turn.pack || []).length > 1) h += `<label>${t.hook}</label><select name="hook">${opts([...(turn.pack || []), "nobody"])}</select>`;
-  if (k === "wolf_plan") h += `<label>${t.focus}</label><select name="focus">${opts(turn.suspects || [], true)}</select>`;
-  if (k === "wolf_plan") h += `<label>${t.edge}</label><select name="edge">${opts(["power role", "villager"], true)}</select>`;
+  if (k === "wolf_vote") {
+    h += `<label>${t.volunteer}</label><select name="volunteer">${opts((turn.pack || []).length > 1 ? ["fake seer", "hook"] : ["fake seer"], true)}</select>`;
+    h += `<label>${t.focus}</label><select name="focus">${opts(turn.suspects || [], true)}</select>`;
+    h += `<label>${t.edge}</label><select name="edge">${opts(["power role", "villager"], true)}</select>`;
+  }
   if (declares) {
     const others = turn.seats.map(s => s.name).filter(n => n !== turn.me.name);
     h += `<label>${t.suspect}</label><select name="suspect">${opts(turn.suspects || [])}</select>`;
@@ -1231,7 +1231,7 @@ function showTurn(p, t, w) {
     h += `<div class="row" id="claimDetail"><div><label id="claimTargetLabel"></label><select name="claimTarget">${opts(others, true)}</select></div>`;
     h += `<div id="claimResultBox"><label>${t.claimResult}</label><select name="claimResult">${opts(["good", "werewolf"], true)}</select></div></div>`;
   }
-  if (speaks) h += `<label>${k === "wolf_plan" ? t.planSpeech : t.speech}</label><textarea name="speech"></textarea>`;
+  if (speaks) h += `<label>${t.speech}</label><textarea name="speech"></textarea>`;
   h += `<button type="submit">${t.submit}</button>`;
   f.innerHTML = h;
   if (speaks) addMic(f, view.lang, t);
@@ -1251,8 +1251,7 @@ function showTurn(p, t, w) {
   f.onsubmit = async e => {
     e.preventDefault();
     const d = Object.fromEntries(new FormData(f)), a = {};
-    for (const key of ["target", "speech", "suspect", "hook", "focus", "edge"]) if (d[key]) a[key] = d[key].trim();
-    if (k === "wolf_plan") a.fakers = [...new Set([d.faker, d.faker2].filter(x => x && x !== "nobody"))];
+    for (const key of ["target", "speech", "suspect", "volunteer", "focus", "edge"]) if (d[key]) a[key] = d[key].trim();
     if (d.claimRole) a.claim = { role: d.claimRole, target: named(d.claimRole) ? d.claimTarget || "" : "", result: d.claimRole === "seer" ? d.claimResult || "" : "" };
     stopMic();
     f.querySelector("button[type=submit]").disabled = true;

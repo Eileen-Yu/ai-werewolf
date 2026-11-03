@@ -18,7 +18,7 @@ func TestStatsReadHowTheGameWent(t *testing.T) {
 			{Name: "阿杰", Role: game.Werewolf, Alive: true}, {Name: "小宇", Role: game.Werewolf, Alive: true}, {Name: "阿明", Role: game.Werewolf, Alive: true},
 			{Name: "老王", Role: game.Seer}, {Name: "阿芳", Role: game.Witch}, {Name: "大刘", Role: game.Villager, Alive: true},
 		},
-		Plans: []game.Plan{{Round: 1, Fakers: []string{"阿杰", "小宇"}, Hook: "阿明"}, {Round: 2}},
+		Plans: []game.Plan{{Round: 1, Stances: []game.WolfStance{{Wolf: "阿杰", Volunteer: game.FakeSeer}, {Wolf: "小宇", Volunteer: game.FakeSeer}, {Wolf: "阿明", Volunteer: game.PlayHook}}}, {Round: 2}},
 		Log: []game.Event{
 			{Round: 1, Phase: game.Day, Speaker: "老王", Claim: &game.Claim{Role: game.Seer, Target: "阿杰", Result: string(game.Werewolf)}},
 			{Round: 1, Phase: game.Day, Speaker: "阿杰", Claim: &game.Claim{Role: game.Seer, Target: "老王", Result: string(game.Werewolf)}},

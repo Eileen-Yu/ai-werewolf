@@ -120,7 +120,7 @@ type Activity struct {
 // publicActivity is what everyone at the table can tell about a turn.
 func publicActivity(turn brain.Turn) (kind, name string) {
 	switch turn.Kind {
-	case brain.WolfChat, brain.WolfPlan:
+	case brain.WolfChat, brain.WolfVote, brain.WolfRevote:
 		return "wolves", ""
 	case brain.Inspect, brain.Save, brain.Poison:
 		return "night", ""

@@ -2,6 +2,7 @@ package werewolf
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/Eileen-Yu/ai-werewolf/brain"
@@ -123,7 +124,7 @@ func twoFakers() twoFakerGame {
 	b.s.Add("", fmt.Sprintf(b.h.nightFalls, b.s.Lang.When(2, game.Night)))
 	b.s.Add("光头强", "今晚刀华妃吧，真预言家活着明天还要报查验，太危险。", "安陵容", "光头强")
 	targets := b.s.Living()
-	out.planKill = b.turn(brain.WolfPlan, "安陵容", targets)
+	out.planKill = b.turn(brain.WolfVote, "安陵容", targets)
 	out.planKill.Suspects = game.Without(targets, b.s.Living(game.Werewolf)...)
 	return out
 }
@@ -240,15 +241,24 @@ func (t *table) replayNight(round int, victim, edge string, fakers []string, foc
 	t.replayPlan(round, victim, edge, fakers, focus, notes)
 }
 
-// replayPlan writes down the pack's plan, as wolvesHunt does, for the wolves alive.
+// replayPlan writes down the night as wolvesHunt does, for the wolves alive:
+// the first says how to play it in the chat, then they all vote the same
+// victim and stance, the fakers volunteering to fake the seer.
 func (t *table) replayPlan(round int, victim, edge string, fakers []string, focus, notes string) {
 	wolves := t.s.Living(game.Werewolf)
-	day := t.h.noFaker
-	if len(fakers) > 0 {
-		day = fmt.Sprintf(t.h.faker, t.list(fakers))
+	t.s.Add(wolves[0], notes, wolves...)
+	plan := game.Plan{Round: round, Victim: victim}
+	for _, w := range wolves {
+		st := game.WolfStance{Wolf: w, Kill: victim, Focus: focus, Edge: edge}
+		if slices.Contains(fakers, w) {
+			st.Volunteer = game.FakeSeer
+		}
+		plan.Stances = append(plan.Stances, st)
 	}
-	t.s.Plans = append(t.s.Plans, game.Plan{Round: round, Victim: victim, Fakers: fakers, Focus: focus, Edge: edge, Notes: notes})
-	t.s.Add("", fmt.Sprintf(t.h.plan, wolves[0], victim, t.h.edges[edge], day, focus, notes), wolves...)
+	t.s.Plans = append(t.s.Plans, plan)
+	t.s.Add("", fmt.Sprintf(t.h.packVotes, t.packTally(plan.KillVotes())), wolves...)
+	t.s.Add("", fmt.Sprintf(t.h.packStances, t.packStances(plan.Stances)), wolves...)
+	t.s.Add("", fmt.Sprintf(t.h.packKill, victim), wolves...)
 }
 
 // replayDawn announces the night's dead and starts the day.

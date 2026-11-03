@@ -16,18 +16,21 @@ import (
 type TurnKind string
 
 const (
-	Speech    TurnKind = "speech"     // daytime speech, once round the table before the vote
-	WolfChat  TurnKind = "wolf_chat"  // night, wolves only
-	WolfPlan  TurnKind = "wolf_plan"  // one wolf sets tonight's victim and the pack's plan for the day
-	LastWords TurnKind = "last_words" // after being voted out
-	Vote      TurnKind = "vote"       // daytime vote
-	PKSpeech  TurnKind = "pk_speech"  // after a tied vote: each tied player speaks again
-	PKVote    TurnKind = "pk_vote"    // after the PK speeches: everyone else votes between the tied
-	Inspect   TurnKind = "inspect"    // seer picks who to check
-	Save      TurnKind = "save"       // witch decides whether to save tonight's victim
-	Poison    TurnKind = "poison"     // witch decides whether to poison someone
-	Shoot     TurnKind = "shoot"      // hunter, on the way out, decides whether to shoot
-	Aftermath TurnKind = "aftermath"  // once the game is over: looking back on it, roles known
+	Speech   TurnKind = "speech"    // daytime speech, once round the table before the vote
+	WolfChat TurnKind = "wolf_chat" // night, wolves only
+	WolfVote TurnKind = "wolf_vote" // night, after the chat: each wolf's own kill vote and stance on the day
+	// WolfRevote is the wolves voting again between the tied, when their kill
+	// vote tied.
+	WolfRevote TurnKind = "wolf_revote"
+	LastWords  TurnKind = "last_words" // after being voted out
+	Vote       TurnKind = "vote"       // daytime vote
+	PKSpeech   TurnKind = "pk_speech"  // after a tied vote: each tied player speaks again
+	PKVote     TurnKind = "pk_vote"    // after the PK speeches: everyone else votes between the tied
+	Inspect    TurnKind = "inspect"    // seer picks who to check
+	Save       TurnKind = "save"       // witch decides whether to save tonight's victim
+	Poison     TurnKind = "poison"     // witch decides whether to poison someone
+	Shoot      TurnKind = "shoot"      // hunter, on the way out, decides whether to shoot
+	Aftermath  TurnKind = "aftermath"  // once the game is over: looking back on it, roles known
 
 	Run         TurnKind = "run"          // first day: pick yourself to run for sheriff, or pass
 	Campaign    TurnKind = "campaign"     // a candidate's speech for the badge
@@ -46,16 +49,15 @@ const (
 // IsChoice reports whether the turn asks for a Target.
 func (k TurnKind) IsChoice() bool {
 	switch k {
-	case Vote, PKVote, WolfPlan, Inspect, Save, Poison, Shoot, Run, Withdraw, SheriffVote, Badge, Protect, Explode:
+	case Vote, PKVote, WolfVote, WolfRevote, Inspect, Save, Poison, Shoot, Run, Withdraw, SheriffVote, Badge, Protect, Explode:
 		return true
 	}
 	return false
 }
 
-// Speaks reports whether the turn asks for a Speech. A wolf plan asks for
-// both a victim and, as its speech, the plan for the day.
+// Speaks reports whether the turn asks for a Speech.
 func (k TurnKind) Speaks() bool {
-	return (!k.IsChoice() && k != Prepare) || k == WolfPlan
+	return !k.IsChoice() && k != Prepare
 }
 
 // Declares reports whether a speech must also state, on the record, who the
@@ -86,7 +88,7 @@ type Turn struct {
 	Notes      game.Notes   `json:"notes"`
 	Candidates []string     `json:"candidates,omitempty"`
 	// Suspects is who may be named as the suspect on a declaring turn, game.Nobody
-	// included, or as the focus of a wolf plan.
+	// included, or as the focus of a wolf's vote.
 	Suspects []string `json:"suspects,omitempty"`
 	// Spoken and Waiting are, for a speaking turn, who has already spoken in
 	// this go round the table and who is still to.
@@ -96,7 +98,7 @@ type Turn struct {
 	// every wolf in the game, the dead included.
 	Pack   []string `json:"pack,omitempty"`
 	Wolves []string `json:"wolves,omitempty"`
-	// Plan is, for a wolf, the pack's plan for this round, if there is one.
+	// Plan is, for a wolf, what the pack settled on this round, if anything.
 	Plan *game.Plan `json:"plan,omitempty"`
 	// Ballots is every vote so far, which everyone saw.
 	Ballots []game.Ballot `json:"ballots,omitempty"`
@@ -115,9 +117,10 @@ type Turn struct {
 //
 // Speech is said aloud and Target is the pick on a choice turn. Suspect and
 // Claim are a declaring speech's stance, put on the record so others can hold
-// the player to it; a wolf's Claim may be a lie. Fakers, Hook, Focus and Edge
-// are a wolf plan's seer claimants, the wolf who sides with the good players,
-// vote target, and which side of the good players it wipes out first.
+// the player to it; a wolf's Claim may be a lie. Focus, Edge and Volunteer
+// are a wolf's own stance on the day, with their kill vote: who they propose
+// the vote goes to, which side of the good players to wipe out first, and
+// whether they volunteer to fake the seer or play the hook.
 // Summary is a line on a public speech for the page, written apart from
 // the player (see LLM.summarize); a player never sets it.
 type Action struct {
@@ -128,10 +131,9 @@ type Action struct {
 	Target       string      `json:"target,omitempty"`
 	Suspect      string      `json:"suspect,omitempty"`
 	Claim        *game.Claim `json:"claim,omitempty"`
-	Fakers       []string    `json:"fakers,omitempty"`
-	Hook         string      `json:"hook,omitempty"`
 	Focus        string      `json:"focus,omitempty"`
 	Edge         string      `json:"edge,omitempty"`
+	Volunteer    string      `json:"volunteer,omitempty"`
 	Summary      string      `json:"summary,omitempty"`
 }
 
@@ -161,16 +163,13 @@ func (t Turn) Check(a Action) error {
 	if t.Kind.Declares() && a.Claim != nil {
 		problems = append(problems, t.ClaimProblems(*a.Claim)...)
 	}
-	if t.Kind == WolfPlan {
-		problems = append(problems, t.planProblems(a)...)
-	}
-	if t.Kind.Declares() && t.MustFakeSeer() && (a.Claim == nil || a.Claim.Role != game.Seer) {
-		problems = append(problems, tx.mustFake)
+	if t.Kind == WolfVote {
+		problems = append(problems, t.stanceProblems(a)...)
 	}
 	if t.Kind.Speaks() {
 		problems = append(problems, t.unspokenProblems(a.Speech)...)
 	}
-	if t.Kind.Speaks() && t.Kind != WolfPlan && t.Me.Name != "" && strings.Contains(a.Speech, t.Me.Name) {
+	if t.Kind.Speaks() && t.Me.Name != "" && strings.Contains(a.Speech, t.Me.Name) {
 		problems = append(problems, fmt.Sprintf(tx.ownName, t.Me.Name))
 	}
 	if t.Kind.Declares() || t.Kind == LastWords {
@@ -224,19 +223,15 @@ func (t Turn) ClaimProblems(c game.Claim) []string {
 	return problems
 }
 
-// planProblems checks a wolf plan against the game: the seer claimants, if
-// any, must be wolves, at most two; a hook, if any, must be another wolf; and
-// the pack cannot push tomorrow's vote onto a teammate, or onto tonight's
-// victim, who will be dead by then.
-func (t Turn) planProblems(a Action) []string {
+// stanceProblems checks a wolf's own stance against the game: what they
+// volunteer for must be one they may, they cannot push tomorrow's vote onto a
+// teammate or onto the one they vote to kill tonight, and the edge must be
+// one of the two.
+func (t Turn) stanceProblems(a Action) []string {
 	tx, l := t.text(), t.Lang
 	var problems []string
-	least, most := t.FakerCount()
-	if n := len(a.Fakers); n < least || n > most || len(game.Without(a.Fakers, t.Pack...)) > 0 || hasDuplicates(a.Fakers) {
-		problems = append(problems, fmt.Sprintf(tx.badFakers, least, most, l.List(t.Pack), l.List(a.Fakers)))
-	}
-	if hooks := t.HookNames(a.Fakers); t.NamesHook() && a.Hook != "" && !slices.Contains(hooks, a.Hook) {
-		problems = append(problems, fmt.Sprintf(tx.badHook, l.List(l.SayAll(hooks)), a.Hook))
+	if a.Volunteer != "" && !slices.Contains(t.Volunteers(), a.Volunteer) {
+		problems = append(problems, fmt.Sprintf(tx.badVolunteer, l.List(l.SayAll(t.Volunteers())), a.Volunteer))
 	}
 	if !slices.Contains(t.Suspects, a.Focus) {
 		problems = append(problems, fmt.Sprintf(tx.badFocus, l.List(l.SayAll(t.Suspects)), a.Focus))
@@ -247,26 +242,31 @@ func (t Turn) planProblems(a Action) []string {
 	if !slices.Contains(game.Edges, a.Edge) {
 		problems = append(problems, fmt.Sprintf(tx.badEdge, l.List(l.SayAll(game.Edges)), a.Edge))
 	}
-	if faker := t.fakerBeside(a); faker != "" {
-		problems = append(problems, fmt.Sprintf(tx.besideFaker, a.Target, faker))
+	if t.besideMe(a) {
+		problems = append(problems, fmt.Sprintf(tx.besideFaker, a.Target))
 	}
 	return problems
 }
 
-// fakerBeside is, on Night 1, the faker a good victim sits next to, the
-// table going round so the last seat sits next to the first; "" if none.
-func (t Turn) fakerBeside(a Action) string {
+// besideMe reports whether, on Night 1, a wolf volunteering to fake the seer
+// votes to kill a good player sitting next to them, the table going round so
+// the last seat sits next to the first.
+func (t Turn) besideMe(a Action) bool {
 	n := len(t.Seats)
 	i := slices.IndexFunc(t.Seats, func(s Seat) bool { return s.Name == a.Target })
-	if t.Round != 1 || i < 0 || n < 3 || slices.Contains(t.Pack, a.Target) {
-		return ""
+	if t.Round != 1 || a.Volunteer != game.FakeSeer || i < 0 || n < 3 || slices.Contains(t.Pack, a.Target) {
+		return false
 	}
-	for _, j := range []int{(i + n - 1) % n, (i + 1) % n} {
-		if name := t.Seats[j].Name; slices.Contains(a.Fakers, name) {
-			return name
-		}
+	return slices.Contains([]string{t.Seats[(i+n-1)%n].Name, t.Seats[(i+1)%n].Name}, t.Me.Name)
+}
+
+// Volunteers is what a wolf may volunteer for on their vote, besides
+// nothing: to fake the seer, or, with a teammate alive to play off, the hook.
+func (t Turn) Volunteers() []string {
+	if len(t.Pack) > 1 {
+		return []string{game.FakeSeer, game.PlayHook}
 	}
-	return ""
+	return []string{game.FakeSeer}
 }
 
 // PitProblems checks a good player's guesses at the pack: each names only
@@ -309,32 +309,14 @@ func (t Turn) sides() []string {
 	return game.Sides
 }
 
-// MustFakeSeer reports whether the pack's plan has this wolf claim to be the
-// seer today.
-func (t Turn) MustFakeSeer() bool {
-	return t.Plan != nil && slices.Contains(t.Plan.Fakers, t.Me.Name)
-}
-
-// FakerCount is how many seer claimants a wolf plan may name: none, which
-// the pack decides as freely as any other number, up to two, or the pack.
-func (t Turn) FakerCount() (least, most int) {
-	return 0, min(2, len(t.Pack))
-}
-
-// NamesHook reports whether this wolf plan names a hook, or nobody: only when
-// the pack has more than one wolf.
-func (t Turn) NamesHook() bool {
-	return t.Kind == WolfPlan && len(t.Pack) > 1
-}
-
-// HookNames is who a wolf plan may name as the hook, given its fakers: any
-// other wolf, or nobody.
-func (t Turn) HookNames(fakers []string) []string {
-	return append(game.Without(t.Pack, fakers...), game.Nobody)
-}
-
-func hasDuplicates(names []string) bool {
-	return len(slices.Compact(slices.Sorted(slices.Values(names)))) != len(names)
+// Volunteered is what this wolf volunteered for at night, "" for nothing:
+// a stance they may keep or drop by day, never an order.
+func (t Turn) Volunteered() string {
+	if t.Plan == nil {
+		return ""
+	}
+	st, _ := t.Plan.StanceOf(t.Me.Name)
+	return st.Volunteer
 }
 
 // SuspectsSomeone reports whether this is a good player's turn to suspect,
@@ -354,12 +336,6 @@ func (t Turn) SuspectsSomeone() bool {
 // IsSheriff reports whether this player holds the sheriff's badge.
 func (t Turn) IsSheriff() bool {
 	return slices.ContainsFunc(t.Seats, func(s Seat) bool { return s.Sheriff && s.Name == t.Me.Name })
-}
-
-// IsHook reports whether the pack's plan has this wolf side with the good
-// players today.
-func (t Turn) IsHook() bool {
-	return t.Plan != nil && t.Plan.Hook == t.Me.Name
 }
 
 // unspokenProblems catches a speech quoting someone who has not spoken: anyone
@@ -437,17 +413,12 @@ func (t Turn) Normalize(a Action) Action {
 	if t.Kind.Declares() {
 		a.Suspect = closest(a.Suspect, t.Suspects)
 	}
-	if t.Kind == WolfPlan {
+	if t.Kind == WolfVote {
 		a.Focus = closest(a.Focus, t.Suspects)
-		var fakers []string
-		for _, f := range a.Fakers {
-			if f = closest(f, append(slices.Clone(t.Pack), game.Nobody)); f != game.Nobody && f != "" {
-				fakers = append(fakers, f)
-			}
-		}
-		a.Fakers = fakers
-		a.Hook = closest(a.Hook, append(slices.Clone(t.Pack), game.Nobody))
 		a.Edge = game.Read(a.Edge)
+		if a.Volunteer = game.Read(a.Volunteer); isDecline(a.Volunteer) {
+			a.Volunteer = ""
+		}
 	}
 	if a.Claim != nil {
 		c := *a.Claim

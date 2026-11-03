@@ -297,12 +297,12 @@ func Check(t brain.Turn, a brain.Action) error {
 			problems = append(problems, t.ClaimProblems(*a.Claim)...)
 		}
 	}
-	if t.Kind == brain.WolfPlan {
-		if len(a.Fakers) > 2 || len(game.Without(a.Fakers, t.Pack...)) > 0 || len(slices.Compact(slices.Sorted(slices.Values(a.Fakers)))) != len(a.Fakers) {
-			problems = append(problems, "at most two different packmates may fake the seer")
+	if t.Kind == brain.WolfVote {
+		if a.Volunteer != "" && !slices.Contains(t.Volunteers(), a.Volunteer) {
+			problems = append(problems, fmt.Sprintf("volunteer for one of %v, or nothing", t.Volunteers()))
 		}
-		if a.Hook != "" && a.Hook != game.Nobody && (!t.NamesHook() || !slices.Contains(t.HookNames(a.Fakers), a.Hook)) {
-			problems = append(problems, "only a packmate other than the fakers may be the hook")
+		if a.Focus != "" && (!slices.Contains(t.Suspects, a.Focus) || a.Focus == a.Target) {
+			problems = append(problems, fmt.Sprintf("propose voting out one of %v other than the kill, or nobody", t.Suspects))
 		}
 		if a.Edge != "" && !slices.Contains(game.Edges, a.Edge) {
 			problems = append(problems, fmt.Sprintf("edge is one of %v, or left out", game.Edges))

@@ -81,7 +81,7 @@ func TestBenchesStopAtTheirDecision(t *testing.T) {
 		{"day2-vote", brain.Vote, "懒羊羊", 6, 2, "最新表态"},
 		{"hook-speech", brain.Speech, "光头强", 7, 2, "今晚小心"},
 		{"hook-aftermath", brain.Aftermath, "光头强", 3, 4, "还在吵"},
-		{"plan-kill", brain.WolfPlan, "安陵容", 8, 2, "太危险"},
+		{"plan-kill", brain.WolfVote, "安陵容", 8, 2, "太危险"},
 	}
 	for _, c := range cases {
 		b, ok := benches[c.name]

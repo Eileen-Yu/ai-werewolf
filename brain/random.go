@@ -16,16 +16,12 @@ type Random struct{}
 func (Random) Act(_ context.Context, t Turn) (Action, error) {
 	tx := t.text()
 	switch t.Kind {
-	case WolfPlan:
+	case WolfVote:
 		victim := pick(t.Candidates)
 		focus := pick(slices.DeleteFunc(slices.Clone(t.Suspects), func(s string) bool { return s == victim }))
-		a := Action{Target: victim, Focus: focus, Edge: pick(game.Edges), Speech: fmt.Sprintf(tx.randomPlan, victim, focus)}
-		least, most := t.FakerCount()
-		for _, i := range rand.Perm(len(t.Pack))[:least+rand.IntN(most-least+1)] {
-			a.Fakers = append(a.Fakers, t.Pack[i])
-		}
-		if hooks := t.HookNames(a.Fakers); t.NamesHook() && len(hooks) > 0 {
-			a.Hook = pick(hooks)
+		a := Action{Target: victim, Focus: focus, Edge: pick(game.Edges), Volunteer: pick(append(t.Volunteers(), ""))}
+		if t.besideMe(a) {
+			a.Volunteer = ""
 		}
 		return a, nil
 	case LastWords:
@@ -52,9 +48,10 @@ func (Random) Act(_ context.Context, t Turn) (Action, error) {
 	}
 	suspect := pick(spare(t, slices.DeleteFunc(slices.Clone(t.Suspects), func(s string) bool { return s == game.Nobody })))
 	a := Action{Speech: fmt.Sprintf(pick(tx.speechLines), suspect), Suspect: suspect}
-	// A faker claims seer once, so the claim is on the record as the plan has it.
+	// A wolf who volunteered to fake the seer claims it once, so the claim is
+	// on the record.
 	claimed := slices.ContainsFunc(t.Transcript, func(e game.Event) bool { return e.Speaker == t.Me.Name && e.Claim != nil })
-	if t.Kind.Declares() && t.MustFakeSeer() && !claimed && suspect != "" {
+	if t.Kind.Declares() && t.Volunteered() == game.FakeSeer && !claimed && suspect != "" {
 		a.Claim = &game.Claim{Role: game.Seer, Target: suspect, Result: pick([]string{game.Good, string(game.Werewolf)})}
 	}
 	return a, nil

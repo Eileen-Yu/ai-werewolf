@@ -85,6 +85,7 @@ func Register(r *workflow.Registry) error {
 		r.AddActivity(AssignRolesActivity),
 		r.AddActivity(ActActivity),
 		r.AddActivity(JudgeActivity),
+		r.AddActivity(DrawActivity),
 	)
 }
 
@@ -316,52 +317,121 @@ func (t *table) aftermath() error {
 	return nil
 }
 
-// wolvesHunt has the wolves plot, then the first of them settles the plan:
-// tonight's victim and how the pack plays the day. The plan is written down
-// for every wolf, so tomorrow's speeches and votes have one thing to follow.
-// Wolves may pick one of their own, to fool the witch into spending her
-// antidote. It returns "" if the wolves pick nobody.
+// wolvesHunt has the pack talk it over, then each living wolf submit their
+// own kill vote and stance on the day; a lone wolf has nobody to talk to and
+// just submits. Nobody leads: the chat starts from a different wolf each
+// night, and only the votes settle anything. The one with strictly the most
+// votes is killed. A tie gets one more go round the chat and a revote
+// between the tied; if that ties too, the victim is drawn among them (see
+// settleKill). Everything else each wolf submitted is written down for the
+// pack as their own intention, which binds nobody by day. Wolves may vote
+// for one of their own, to fool the witch into spending her antidote. It
+// returns "" if no wolf votes.
 func (t *table) wolvesHunt() (string, error) {
 	s := t.s
 	wolves := s.LivingWolves()
 	targets := s.Living()
-	if len(wolves) > 1 { // a lone wolf has nobody to plot with
-		if _, err := t.goRound(brain.WolfChat, wolves, targets, wolves...); err != nil {
+	if len(wolves) > 1 {
+		if _, err := t.goRound(brain.WolfChat, game.Rotate(wolves, s.Round-1), targets, wolves...); err != nil {
 			return "", err
 		}
 	}
-	leader := wolves[0]
-	turn := t.turn(brain.WolfPlan, leader, targets)
-	turn.Suspects = game.Without(targets, wolves...)
-	var a brain.Action
-	if err := t.act(turn).Await(&a); err != nil {
+	tasks := make([]move, len(wolves))
+	for i, w := range wolves {
+		turn := t.turn(brain.WolfVote, w, targets)
+		turn.Suspects = game.Without(targets, wolves...)
+		tasks[i] = t.act(turn)
+	}
+	plan := game.Plan{Round: s.Round}
+	for i, task := range tasks {
+		var a brain.Action
+		if err := task.Await(&a); err != nil {
+			return "", err
+		}
+		t.remember(wolves[i], a)
+		plan.Stances = append(plan.Stances, game.WolfStance{Wolf: wolves[i], Kill: a.Target, Focus: a.Focus, Edge: a.Edge, Volunteer: a.Volunteer})
+	}
+	t.add("", fmt.Sprintf(t.h.packVotes, t.packTally(plan.KillVotes())), wolves...)
+	t.add("", fmt.Sprintf(t.h.packStances, t.packStances(plan.Stances)), wolves...)
+	victim, err := t.settleKill(&plan, wolves)
+	if err != nil {
 		return "", err
 	}
-	t.remember(leader, a)
-	if a.Target == "" {
+	plan.Victim = victim
+	s.Plans = append(s.Plans, plan)
+	return victim, nil
+}
+
+// settleKill decides the kill from the wolves' votes, by the count every
+// vote in the game uses, nobody's vote counting extra: strictly the most
+// votes kills, and nobody voting kills nobody. A tie goes round the chat once
+// more and to one revote between the tied, the same shape as a day's PK but
+// only once, so the night cannot go on: a revote that ties again, or in
+// which nobody votes, has the victim drawn at random among those it tied
+// between, since the pack must kill once it has voted to. The draw is an
+// activity, so a replay draws the same one.
+func (t *table) settleKill(plan *game.Plan, wolves []string) (string, error) {
+	victim, tied := game.KillVote(plan.KillVotes())
+	switch {
+	case victim != "":
+		t.add("", fmt.Sprintf(t.h.packKill, victim), wolves...)
+		return victim, nil
+	case len(tied) == 0:
+		t.add("", t.h.packNoKill, wolves...)
 		return "", nil
 	}
-	plan := &game.Plan{Round: s.Round, Victim: a.Target, Focus: a.Focus, Edge: a.Edge, Notes: a.Speech}
-	day := t.h.noFaker
-	if len(a.Fakers) > 0 {
-		plan.Fakers = a.Fakers
-		day = fmt.Sprintf(t.h.faker, t.list(a.Fakers))
+	t.add("", fmt.Sprintf(t.h.packTie, t.list(tied)), wolves...)
+	if len(wolves) > 1 {
+		if _, err := t.goRound(brain.WolfChat, game.Rotate(wolves, t.s.Round), tied, wolves...); err != nil {
+			return "", err
+		}
 	}
-	if a.Hook != "" && a.Hook != game.Nobody {
-		plan.Hook = a.Hook
-		day += fmt.Sprintf(t.h.hook, a.Hook)
+	revote, err := t.chooseAll(brain.WolfRevote, wolves, func(string) []string { return tied })
+	if err != nil {
+		return "", err
 	}
-	s.Plans = append(s.Plans, *plan)
-	focus := plan.Focus
-	if focus == "" {
-		focus = t.h.undecided
+	plan.Revote = revote
+	t.add("", fmt.Sprintf(t.h.packRevote, t.packTally(revote)), wolves...)
+	victim, again := game.KillVote(revote)
+	if victim != "" {
+		t.add("", fmt.Sprintf(t.h.packKill, victim), wolves...)
+		return victim, nil
 	}
-	edge, ok := t.h.edges[plan.Edge]
-	if !ok {
-		edge = t.h.undecided
+	if len(again) == 0 {
+		again = tied
 	}
-	t.add("", fmt.Sprintf(t.h.plan, leader, plan.Victim, edge, day, focus, plan.Notes), wolves...)
-	return plan.Victim, nil
+	if err := t.ctx.CallActivity(DrawActivity, workflow.WithActivityInput(again), retry).Await(&victim); err != nil {
+		return "", err
+	}
+	plan.Drawn = true
+	t.add("", fmt.Sprintf(t.h.packDraw, t.list(again), victim), wolves...)
+	return victim, nil
+}
+
+// packTally lists how each wolf voted on the kill.
+func (t *table) packTally(votes []game.Vote) string {
+	out := make([]string, len(votes))
+	for i, v := range votes {
+		out[i] = fmt.Sprintf(t.h.vote, v.Voter, cmp.Or(v.Target, t.h.abstain))
+	}
+	return strings.Join(out, t.h.comma)
+}
+
+// packStances lists what each wolf said they mean to do by day.
+func (t *table) packStances(stances []game.WolfStance) string {
+	out := make([]string, len(stances))
+	for i, st := range stances {
+		edge, ok := t.h.edges[st.Edge]
+		if !ok {
+			edge = t.h.undecided
+		}
+		v := ""
+		if st.Volunteer != "" {
+			v = fmt.Sprintf(t.h.volunteers, t.s.Lang.Say(st.Volunteer))
+		}
+		out[i] = fmt.Sprintf(t.h.wolfStance, st.Wolf, edge, cmp.Or(st.Focus, t.h.undecided), v)
+	}
+	return strings.Join(out, t.h.semicolon)
 }
 
 // witchActs lets the witch, told tonight's victim, use at most one potion.
@@ -542,22 +612,15 @@ func (t *table) election() error {
 	alive := s.Living()
 	s.Stage = game.StageElection
 	t.add("", t.h.election)
-	// A wolf the pack's plan has fake the seer runs, unless a person plays
-	// them: the claim is made in the campaign. Everyone else, the seer
-	// included, decides.
-	mustRun := t.planRuns
-	runs, err := t.chooseAll(brain.Run, alive, func(v string) []string {
-		if mustRun(v) {
-			return []string{v}
-		}
-		return []string{v, game.Pass}
-	})
+	// Everyone decides for themselves, a wolf who volunteered to fake the
+	// seer included.
+	runs, err := t.chooseAll(brain.Run, alive, func(v string) []string { return []string{v, game.Pass} })
 	if err != nil {
 		return err
 	}
 	var runners []string
 	for _, r := range runs {
-		if r.Target == r.Voter || mustRun(r.Voter) {
+		if r.Target == r.Voter {
 			runners = append(runners, r.Voter)
 		}
 	}
@@ -679,13 +742,6 @@ func (t *table) withdraw(runners []string) ([]string, error) {
 		t.add("", fmt.Sprintf(t.h.withdrew, t.list(withdrew)))
 	}
 	return game.Without(runners, withdrew...), nil
-}
-
-// planRuns reports whether the pack's plan sends this AI wolf to run for
-// sheriff: a faker, who claims seer in the campaign.
-func (t *table) planRuns(name string) bool {
-	p := t.s.PlanFor(t.s.Round)
-	return p != nil && !t.s.Player(name).Human && slices.Contains(p.Fakers, name)
 }
 
 // abstained reports whether every voter abstained.
@@ -1192,11 +1248,11 @@ func ActActivity(ctx workflow.ActivityContext) (any, error) {
 // after the brain's own re-asking, or a person's move the page let through,
 // is not allowed to stall the game: a bad pick counts as abstaining, an empty
 // speech as silence, a bad suspect as suspecting nobody; a bad claim is
-// dropped, and so are bad beliefs, and bad pits keep the old ones. A wolf
-// plan keeps at most two seer claimants from the pack, a bad hook means
-// nobody plays it, and a bad focus or edge means none. The rest is let through: a
-// speech that quotes someone yet to speak, or a faker who does not claim, is
-// a slip, not a broken move.
+// dropped, and so are bad beliefs, and bad pits keep the old ones. On a
+// wolf's vote, a bad kill vote is an abstention, and volunteering for
+// something they may not, a bad focus or a bad edge means none. The rest is
+// let through: a speech that quotes someone yet to speak is a slip, not a
+// broken move.
 func settle(t brain.Turn, a brain.Action) brain.Action {
 	if t.Kind.IsChoice() && !slices.Contains(t.Candidates, a.Target) {
 		a.Target = ""
@@ -1218,16 +1274,9 @@ func settle(t brain.Turn, a brain.Action) brain.Action {
 		n.Pits = nil
 		a.Notes = &n
 	}
-	if t.Kind == brain.WolfPlan {
-		var fakers []string
-		for _, name := range a.Fakers {
-			if len(fakers) < 2 && slices.Contains(t.Pack, name) && !slices.Contains(fakers, name) {
-				fakers = append(fakers, name)
-			}
-		}
-		a.Fakers = fakers
-		if !t.NamesHook() || !slices.Contains(t.HookNames(a.Fakers), a.Hook) {
-			a.Hook = ""
+	if t.Kind == brain.WolfVote {
+		if !slices.Contains(t.Volunteers(), a.Volunteer) {
+			a.Volunteer = ""
 		}
 		if !slices.Contains(t.Suspects, a.Focus) || a.Focus == a.Target {
 			a.Focus = ""
@@ -1237,6 +1286,19 @@ func settle(t brain.Turn, a brain.Action) brain.Action {
 		}
 	}
 	return a
+}
+
+// DrawActivity draws one of the names it is given at random. As an activity
+// its result is recorded, so a replay draws the same one.
+func DrawActivity(ctx workflow.ActivityContext) (any, error) {
+	var names []string
+	if err := ctx.GetInput(&names); err != nil {
+		return nil, err
+	}
+	if len(names) == 0 {
+		return "", nil
+	}
+	return names[rand.IntN(len(names))], nil
 }
 
 // JudgeActivity names the finished game's MVP. A brain that cannot judge, or

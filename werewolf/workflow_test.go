@@ -76,8 +76,9 @@ func TestAWolfWhoKillsHimselfAndIsSavedLivesOn(t *testing.T) {
 	assert.False(t, b.toldSurvived, "the pack reads its victim's survival from the peaceful night; nobody tells it")
 }
 
-// selfKillingPack plays randomly except that on the first night the pack
-// kills whoever writes the plan, and the witch saves whoever she is told of.
+// selfKillingPack plays randomly except that on the first night every wolf
+// votes to kill the same one of them, and the witch saves whoever she is told
+// of.
 type selfKillingPack struct {
 	mu                      sync.Mutex
 	victim, saved           string
@@ -88,10 +89,10 @@ func (b *selfKillingPack) Act(ctx context.Context, t brain.Turn) (brain.Action, 
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	switch {
-	case t.Kind == brain.WolfPlan && t.Round == 1:
+	case t.Kind == brain.WolfVote && t.Round == 1:
 		a, err := brain.Random{}.Act(ctx, t)
-		a.Target, b.victim = t.Me.Name, t.Me.Name
-		if a.Focus == t.Me.Name {
+		a.Target, b.victim = t.Pack[0], t.Pack[0]
+		if a.Focus == a.Target {
 			a.Focus = ""
 		}
 		return a, err
@@ -111,10 +112,10 @@ func TestTheSeerIsAskedWhileTheWolvesAreStillPlotting(t *testing.T) {
 	b := &plotWaitsForSeer{asked: make(chan struct{})}
 	SetBrain(b)
 	playGame(t, client, "seer-alongside-wolves")
-	assert.True(t, b.overlapped, "the wolves settled their first plan before the seer was asked")
+	assert.True(t, b.overlapped, "the wolves voted on their first kill before the seer was asked")
 }
 
-// plotWaitsForSeer holds the pack's first plan until the seer has been asked,
+// plotWaitsForSeer holds the pack's first votes until the seer has been asked,
 // which only happens in time if the two are asked at once.
 type plotWaitsForSeer struct {
 	asked      chan struct{}
@@ -126,7 +127,7 @@ func (b *plotWaitsForSeer) Act(ctx context.Context, t brain.Turn) (brain.Action,
 	switch {
 	case t.Kind == brain.Inspect:
 		b.once.Do(func() { close(b.asked) })
-	case t.Kind == brain.WolfPlan && t.Round == 1:
+	case t.Kind == brain.WolfVote && t.Round == 1:
 		select {
 		case <-b.asked:
 			b.overlapped = true
@@ -397,9 +398,11 @@ func TestVotersSeeStancesAndOnlyWolvesSeeThePlan(t *testing.T) {
 	for name, events := range b.heard {
 		var plan, stances, summary bool
 		for _, e := range events {
-			if strings.HasPrefix(e.Text, "狼队计划") {
+			if strings.HasPrefix(e.Text, "狼人刀人投票") || strings.HasPrefix(e.Text, "各自的打算") {
 				plan = true
-				assert.Regexp(t, `今晚杀[^，]+，先屠(神职|村民)；`, e.Text, "the plan says which side the pack wipes out first")
+			}
+			if strings.HasPrefix(e.Text, "各自的打算") {
+				assert.Regexp(t, `先屠(神职|村民|未定)，提议明天票投`, e.Text, "each wolf's stance says which side they would wipe out first")
 			}
 			stances = stances || (e.Phase == game.Day && e.Speaker != "" && strings.Contains(e.Said(game.Chinese), "【怀疑"))
 			summary = summary || strings.HasPrefix(e.Text, "投票前，各人的最新表态")
@@ -657,8 +660,8 @@ func holder(seats []brain.Seat) string {
 func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T) {
 	client := startEngine(t)
 	startWorker(t, client)
-	passed, torn, withdrewOnce, deadRan, doubled, none := false, false, false, false, false, false
-	for i := 0; i < 30 && !(passed && torn && deadRan && withdrewOnce && doubled && none); i++ {
+	passed, torn, withdrewOnce, deadRan := false, false, false, false
+	for i := 0; i < 30 && !(passed && torn && deadRan && withdrewOnce); i++ {
 		b := &campaigner{tear: i%2 == 1}
 		SetBrain(b)
 		res := play(t, client, fmt.Sprintf("sheriff-%d", i), newGame())
@@ -667,7 +670,7 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 			diedNight1[p.Name] = p.Death == "第1夜死亡"
 		}
 
-		var runners, left, sent []string
+		var runners, left []string
 		withdrawn := false
 		sheriff, elected := "", false
 		var lastDay1Speaker, day1Sheriff string
@@ -692,12 +695,7 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 					assert.Empty(t, s.Death, "%s's death is announced before the election", s.Name)
 				}
 				deadRan = deadRan || diedNight1[turn.Me.Name]
-				if turn.Plan != nil && slices.Contains(turn.Plan.Fakers, turn.Me.Name) {
-					sent = append(sent, turn.Me.Name)
-					assert.Equal(t, []string{turn.Me.Name}, turn.Candidates, "the faker always runs")
-				} else {
-					assert.Equal(t, []string{turn.Me.Name, game.Pass}, turn.Candidates)
-				}
+				assert.Equal(t, []string{turn.Me.Name, game.Pass}, turn.Candidates, "everyone decides whether to run, a wolf who volunteered to fake included")
 				runners = nil
 				for _, s := range turn.Seats {
 					if slices.Contains(b.ran, s.Name) {
@@ -749,14 +747,8 @@ func TestTheFirstDayElectsASheriffWhoSpeaksLastAndPassesTheBadgeOn(t *testing.T)
 		if day1Sheriff != "" {
 			assert.Equal(t, day1Sheriff, lastDay1Speaker, "the sheriff speaks last")
 		}
-		assert.LessOrEqual(t, len(sent), 2, "never more than two fake the seer")
-		doubled = doubled || len(sent) == 2
-		none = none || len(sent) == 0
-		assert.Subset(t, runners, sent, "the faker did not run")
 	}
 	assert.True(t, withdrewOnce, "no candidate withdrew in any game")
-	assert.True(t, doubled, "no pack sent two wolves to claim seer in thirty games")
-	assert.True(t, none, "every pack sent a wolf to claim seer in thirty games")
 	assert.True(t, passed, "no sheriff passed the badge on in thirty games")
 	assert.True(t, torn, "no sheriff tore up the badge in thirty games")
 	assert.True(t, deadRan, "nobody who died on the first night was asked to run in thirty games")
@@ -1078,15 +1070,11 @@ func TestALoneCandidateIsElectedWithoutAVote(t *testing.T) {
 	t.Fatal("no seer held the badge on Day 1 in ten games")
 }
 
-// loneRunner plays randomly, except that only the seer, who must, runs for
-// sheriff: the wolf plan names no faker, which only a person may choose.
+// loneRunner plays randomly, except that only the seer runs for sheriff.
 type loneRunner struct{ rec turnRecorder }
 
 func (b *loneRunner) Act(ctx context.Context, t brain.Turn) (brain.Action, error) {
 	a, err := b.rec.Act(ctx, t)
-	if t.Kind == brain.WolfPlan {
-		a.Fakers = nil
-	}
 	if t.Kind == brain.Run {
 		a.Target = game.Pass
 		if t.Me.Role == game.Seer {
@@ -1103,7 +1091,10 @@ func TestSettleKeepsTheOldPitsAndNoEdgeOverABadOne(t *testing.T) {
 	a = settle(vote, brain.Action{Target: "老王", Notes: &game.Notes{Pits: []game.Pit{{Wolves: []string{"老王"}}}}})
 	assert.Len(t, a.Notes.Pits, 1)
 
-	plan := brain.Turn{Kind: brain.WolfPlan, Me: game.Player{Name: "阿杰", Role: game.Werewolf}, Pack: []string{"阿杰"}, Candidates: []string{"老王"}}
-	assert.Empty(t, settle(plan, brain.Action{Target: "老王", Edge: "seer"}).Edge)
-	assert.Equal(t, game.God, settle(plan, brain.Action{Target: "老王", Edge: game.God}).Edge)
+	wolf := brain.Turn{Kind: brain.WolfVote, Me: game.Player{Name: "阿杰", Role: game.Werewolf}, Pack: []string{"阿杰"}, Candidates: []string{"老王"}}
+	assert.Empty(t, settle(wolf, brain.Action{Target: "老王", Edge: "seer"}).Edge)
+	assert.Equal(t, game.God, settle(wolf, brain.Action{Target: "老王", Edge: game.God}).Edge)
+	assert.Empty(t, settle(wolf, brain.Action{Target: "老王", Volunteer: game.PlayHook}).Volunteer, "a lone wolf has nobody to play the hook off")
+	assert.Equal(t, game.FakeSeer, settle(wolf, brain.Action{Target: "老王", Volunteer: game.FakeSeer}).Volunteer)
+	assert.Empty(t, settle(wolf, brain.Action{Target: "小红"}).Target, "a kill vote for nobody at the table is an abstention")
 }

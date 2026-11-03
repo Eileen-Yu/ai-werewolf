@@ -749,20 +749,67 @@ type Belief struct {
 	Evidence []string `json:"evidence,omitempty"`
 }
 
-// Plan is the wolves' plan for a night and the day after it.
+// Plan is what the pack settled on one night: the victim their votes chose,
+// and each wolf's own stance on the day after. Only the victim is binding;
+// by day every wolf decides for themselves.
 type Plan struct {
-	Round  int    `json:"round"`
+	Round int `json:"round"`
+	// Victim is who the wolves' votes chose to kill, "" for nobody.
 	Victim string `json:"victim"`
-	// Fakers are the wolves who claim to be the seer tomorrow: none, one or two.
-	Fakers []string `json:"fakers,omitempty"`
-	// Hook is the wolf who plays a staunch good player tomorrow, "" for nobody.
-	Hook string `json:"hook,omitempty"`
-	// Focus is who the pack pushes the vote onto tomorrow.
-	Focus string `json:"focus,omitempty"`
-	// Edge is which side of the good players the pack is wiping out first,
-	// one of Edges, or "" if the plan did not say.
-	Edge  string `json:"edge,omitempty"`
-	Notes string `json:"notes,omitempty"`
+	// Stances is each living wolf's own submission, in seat order.
+	Stances []WolfStance `json:"stances,omitempty"`
+	// Revote is the vote between the tied, when the first one tied, and Drawn
+	// whether that one tied too, so the victim was drawn among them.
+	Revote []Vote `json:"revote,omitempty"`
+	Drawn  bool   `json:"drawn,omitempty"`
+}
+
+// WolfStance is what one wolf submitted at night, for nobody but themselves: who
+// they voted to kill ("" for abstaining), who they propose the vote goes to
+// tomorrow, which side to wipe out first (one of Edges), and whether they
+// volunteer to fake the seer or to play the hook.
+type WolfStance struct {
+	Wolf      string `json:"wolf"`
+	Kill      string `json:"kill,omitempty"`
+	Focus     string `json:"focus,omitempty"`
+	Edge      string `json:"edge,omitempty"`
+	Volunteer string `json:"volunteer,omitempty"`
+}
+
+// What a wolf may volunteer for: to claim seer tomorrow, or to side with the
+// good players against the pack.
+const (
+	FakeSeer = "fake seer"
+	PlayHook = "hook"
+)
+
+// Volunteers is the wolves who volunteered for v, in seat order.
+func (p *Plan) Volunteers(v string) []string {
+	var out []string
+	for _, s := range p.Stances {
+		if s.Volunteer == v {
+			out = append(out, s.Wolf)
+		}
+	}
+	return out
+}
+
+// StanceOf is the stance wolf submitted, if they did.
+func (p *Plan) StanceOf(wolf string) (WolfStance, bool) {
+	i := slices.IndexFunc(p.Stances, func(s WolfStance) bool { return s.Wolf == wolf })
+	if i < 0 {
+		return WolfStance{}, false
+	}
+	return p.Stances[i], true
+}
+
+// KillVotes is the wolves' first vote on the kill.
+func (p *Plan) KillVotes() []Vote {
+	votes := make([]Vote, len(p.Stances))
+	for i, s := range p.Stances {
+		votes[i] = Vote{Voter: s.Wolf, Target: s.Kill}
+	}
+	return votes
 }
 
 type State struct {
@@ -1055,6 +1102,20 @@ func Leaders(totals []Total) []string {
 		}
 	}
 	return out
+}
+
+// KillVote settles a wolves' vote on the kill, counted like any vote but
+// with nobody's counting extra: the target with strictly the most votes is
+// the victim. Otherwise tied is everyone with the most, to vote again
+// between; nobody voting at all leaves both empty.
+func KillVote(votes []Vote) (victim string, tied []string) {
+	if v, ok := Tally(votes, ""); ok {
+		return v, nil
+	}
+	if totals := Totals(votes, ""); len(totals) > 0 {
+		return "", Leaders(totals)
+	}
+	return "", nil
 }
 
 // Rotate returns names starting from index n, wrapping around, so the

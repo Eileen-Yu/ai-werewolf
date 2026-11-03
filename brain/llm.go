@@ -78,7 +78,6 @@ func parseAction(tx *text, reply string) (Action, error) {
 		Observations json.RawMessage `json:"observations"`
 		Claim        json.RawMessage `json:"claim"`
 		Notes        json.RawMessage `json:"notes"`
-		Fakers       json.RawMessage `json:"fakers"`
 	}
 	err := decodeObject(reply[start:], &raw)
 	if err != nil && decodeObject(repairCommas(reply[start:]), &raw) != nil {
@@ -88,8 +87,7 @@ func parseAction(tx *text, reply string) (Action, error) {
 	a.Observations = lines(raw.Observations)
 	a.Claim = parseClaim(raw.Claim)
 	a.Notes = parseNotes(raw.Notes)
-	a.Fakers = lines(raw.Fakers)
-	for _, f := range []*string{&a.Target, &a.Speech, &a.Suspect, &a.Hook, &a.Focus, &a.Edge} {
+	for _, f := range []*string{&a.Target, &a.Speech, &a.Suspect, &a.Volunteer, &a.Focus, &a.Edge} {
 		*f = strings.TrimSpace(*f)
 	}
 	return a, nil
@@ -300,25 +298,24 @@ func prompt(t Turn) (system, user string) {
 		b.WriteString(tx.sheriffLine)
 	}
 	if p := t.Plan; p != nil && t.Phase == game.Day && t.Kind != Aftermath {
-		day := tx.noFaker
-		if len(p.Fakers) > 0 {
-			day = fmt.Sprintf(tx.faker, l.List(p.Fakers))
+		stances := make([]string, len(p.Stances))
+		for i, st := range p.Stances {
+			say := func(s string) string { return cmp.Or(l.Say(s), tx.undecided) }
+			var v string
+			if st.Volunteer != "" {
+				v = fmt.Sprintf(tx.volunteeredAs, l.Say(st.Volunteer))
+			}
+			stances[i] = fmt.Sprintf(tx.stanceLine, st.Wolf, say(st.Kill), say(st.Focus), say(st.Edge), v)
 		}
-		if p.Hook != "" {
-			day += fmt.Sprintf(tx.hook, p.Hook)
-		}
-		fmt.Fprintf(&b, tx.planLine, day, p.Focus)
-		if p.Edge != "" {
-			fmt.Fprintf(&b, tx.edgeNow, l.Say(p.Edge))
-		}
-		if t.MustFakeSeer() && t.Kind.Declares() {
-			b.WriteString(tx.mustFakeLine)
-		}
-		if t.IsHook() {
+		fmt.Fprintf(&b, tx.packLine, strings.Join(stances, tx.sep))
+		switch {
+		case t.Volunteered() == game.FakeSeer && t.Kind.Declares():
+			b.WriteString(tx.fakeSeerLine)
+		case t.Volunteered() == game.PlayHook:
 			b.WriteString(tx.hookLine)
 		}
 	}
-	if t.Kind == WolfChat || t.Kind == WolfPlan {
+	if t.Kind == WolfChat || t.Kind == WolfVote {
 		b.WriteString(edges(t))
 	}
 	if t.Kind == Shoot && len(dead) > 0 {
@@ -354,12 +351,8 @@ func prompt(t Turn) (system, user string) {
 	fields := []string{f.observations, notesField, f.thinking}
 	switch {
 	case t.Kind == Prepare:
-	case t.Kind == WolfPlan:
-		fields = append(fields, f.victim, f.edge, f.fakers)
-		if t.NamesHook() {
-			fields = append(fields, f.hook)
-		}
-		fields = append(fields, f.focus, f.plan)
+	case t.Kind == WolfVote:
+		fields = append(fields, f.kill, f.edge, f.focus, f.volunteer)
 	case t.Kind.IsChoice():
 		fields = append(fields, f.target)
 	case t.Kind.Declares():
@@ -371,12 +364,8 @@ func prompt(t Turn) (system, user string) {
 	if t.Kind.IsChoice() {
 		fmt.Fprintf(&b, tx.targetOnly, l.List(l.SayAll(unordered(t, t.Candidates))))
 	}
-	if t.Kind == WolfPlan {
-		least, most := t.FakerCount()
-		fmt.Fprintf(&b, tx.fakersOnly, l.List(t.Pack), least, most)
-		if t.NamesHook() {
-			fmt.Fprintf(&b, tx.hookOnly, l.List(l.SayAll(t.HookNames(nil))))
-		}
+	if t.Kind == WolfVote {
+		fmt.Fprintf(&b, tx.volunteerOnly, l.List(l.SayAll(t.Volunteers())))
 		fmt.Fprintf(&b, tx.focusOnly, l.List(l.SayAll(t.Suspects)))
 		fmt.Fprintf(&b, tx.edgeOnly, l.List(l.SayAll(game.Edges)))
 	}

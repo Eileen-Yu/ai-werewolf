@@ -4,12 +4,16 @@ import "github.com/Eileen-Yu/ai-werewolf/game"
 
 // host is everything the game master says, in one language.
 type host struct {
-	welcome, yourRole, pack, nightFalls, noKill, victim, potionsLeft  string
-	antidote, poison, noPotions, selfVictim, saved, poisoned          string
-	inspected, peaceful, died, dawnDead, shot, shotDeath, order       string
-	stance, stances, vote, votes, abstain, tie, allAbstained          string
-	pk, pkVotes, pkNoVoters                                           string
-	votedOut, exiled, plan, noFaker, faker, hook, undecided, gameOver string
+	welcome, yourRole, pack, nightFalls, noKill, victim, potionsLeft string
+	antidote, poison, noPotions, selfVictim, saved, poisoned         string
+	inspected, peaceful, died, dawnDead, shot, shotDeath, order      string
+	stance, stances, vote, votes, abstain, tie, allAbstained         string
+	pk, pkVotes, pkNoVoters                                          string
+	votedOut, exiled, undecided, gameOver                            string
+	// What the wolves alone hear at night: how they voted on the kill and
+	// what each means to do by day, and how the kill was settled.
+	packVotes, packStances, wolfStance, volunteers      string
+	packKill, packNoKill, packTie, packRevote, packDraw string
 	// edges is how a plan names the side it wipes out first.
 	edges                                       map[string]string
 	revealed, comma, semicolon, result, silence string
@@ -73,11 +77,16 @@ var chineseHost = host{
 	allAbstained: "所有人都弃票，今天无人出局。",
 	votedOut:     "被投票放逐",
 	exiled:       "%s被放逐了。",
-	plan:         "狼队计划（%s定）：今晚杀%s，先屠%s；明天%s，票投%s。打法：%s",
+	packVotes:    "狼人刀人投票：%s",
+	packStances:  "各自的打算（只代表自己，不约束任何人）：%s",
+	wolfStance:   "%s先屠%s，提议明天票投%s%s",
+	volunteers:   "，报名%s",
+	packKill:     "今晚杀%s。",
+	packNoKill:   "没有狼投票，今晚不杀人。",
+	packTie:      "%s平票：再商量一轮，然后在他们中间重投一次。",
+	packRevote:   "重投结果：%s",
+	packDraw:     "重投仍然没有结果，按规则在%s中随机，今晚杀%s。",
 	edges:        map[string]string{game.God: "神职", string(game.Villager): "村民"},
-	noFaker:      "没人悍跳",
-	faker:        "%s悍跳预言家",
-	hook:         "，%s倒钩",
 	undecided:    "未定",
 	gameOver:     "游戏结束，%s胜利！身份公开：%s",
 	revealed:     "%s=%s",
@@ -164,11 +173,16 @@ var englishHost = host{
 	allAbstained: "Everyone abstained: nobody is voted out today.",
 	votedOut:     "voted out",
 	exiled:       "%s is voted out.",
-	plan:         "Pack plan (set by %s): kill %s tonight, wiping out the %s first; tomorrow %s, and vote out %s. How: %s",
+	packVotes:    "The werewolves' kill vote: %s",
+	packStances:  "What each means to do (for themselves alone, binding nobody): %s",
+	wolfStance:   "%s would wipe out the %s first and proposes voting out %s tomorrow%s",
+	volunteers:   ", volunteering for %s",
+	packKill:     "Tonight's kill: %s.",
+	packNoKill:   "No werewolf voted, so nobody is killed tonight.",
+	packTie:      "%s tied: one more round of talk, then a revote between them.",
+	packRevote:   "The revote: %s",
+	packDraw:     "The revote settled nothing, so by the rules one of %s was drawn at random: tonight's kill is %s.",
 	edges:        map[string]string{game.God: "power roles", string(game.Villager): "villagers"},
-	noFaker:      "nobody claims seer",
-	faker:        "%s claims seer",
-	hook:         ", %s plays the hook",
 	undecided:    "undecided",
 	gameOver:     "Game over: the %s side wins! Roles: %s",
 	revealed:     "%s=%s",

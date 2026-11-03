@@ -13,7 +13,7 @@ import (
 type Stats struct {
 	// Fakers is how many wolves claimed seer on Day 1.
 	Fakers int `json:"fakers"`
-	// Hook is whether the first night's plan named a wolf to play the hook.
+	// Hook is whether a wolf volunteered to play the hook on the first night.
 	Hook bool `json:"hook"`
 	// Reports is the first check each of those wolves reported.
 	Reports []Report `json:"reports,omitempty"`
@@ -50,7 +50,7 @@ type Report struct {
 func StatsOf(s *game.State) Stats {
 	st := Stats{Winner: s.Winner()}
 	if p := s.PlanFor(1); p != nil {
-		st.Hook = p.Hook != ""
+		st.Hook = len(p.Volunteers(game.PlayHook)) > 0
 	}
 	var fakers []string
 	for _, e := range s.Log {

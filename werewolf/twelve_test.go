@@ -107,7 +107,7 @@ func (b *firstSeatNight) Act(ctx context.Context, t brain.Turn) (brain.Action, e
 		return brain.Action{Target: game.Pass}, nil
 	}
 	switch t.Kind {
-	case brain.WolfPlan:
+	case brain.WolfVote:
 		a, err := brain.Random{}.Act(ctx, t)
 		a.Target = first
 		if a.Focus == first {
