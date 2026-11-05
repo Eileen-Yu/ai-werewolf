@@ -111,6 +111,27 @@ func TestEveryGoodRoleIsToldToTurnSuspicionIntoAVote(t *testing.T) {
 	}
 }
 
+// Both sides are told how evidence weighs, and that an explanation drops one
+// doubt without clearing anyone: good players to reason with it, wolves to
+// know what they play against.
+func TestEveryPlayerIsToldHowToWeighEvidence(t *testing.T) {
+	for _, c := range []struct {
+		lang  game.Lang
+		weigh string
+	}{
+		{game.Chinese, "一个说得通的解释，只说明这件事解释得通"},
+		{game.English, "An explanation that holds up only shows the thing can be explained"},
+	} {
+		for _, role := range []game.Role{game.Werewolf, game.Villager} {
+			turn := Turn{Lang: c.lang, Kind: Vote, Round: 2, Phase: game.Day, Me: game.Player{Name: "小红", Role: role}, Candidates: []string{"老王", game.Pass}}
+			system, user := prompt(turn)
+			assert.Contains(t, system, c.weigh, "%s %s", c.lang, role)
+			assert.NotContains(t, system, "%!", "the rules still fill in cleanly")
+			assert.Contains(t, user, turn.text().instructions[Vote], "a vote may differ from the stated suspicion, with a reason")
+		}
+	}
+}
+
 func TestOnlyAGoodPlayerWhoSuspectsSomeoneIsToldToReadItBothWays(t *testing.T) {
 	for _, tc := range []struct {
 		role game.Role

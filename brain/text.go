@@ -129,7 +129,7 @@ var chineseText = text{
 
 怎么思考，每次都按这个顺序：
 1. observations：从你上次行动到现在，新发生了哪些和判断有关的事。只写新的、具体的事，比如"第2天乙声称查验甲是好人""丙投了丁"。没有新的就写空列表。
-   先看【票型】：谁和谁一直投同一个人，谁的票和他的发言对不上，谁在关键的一票上改票或弃票、这一票保护了谁。
+   先看这次最有信息量的那几类事，不用每类都看：身份声明、对跳和你确定知道的事；死讯、平安夜，以及神职夜里可能做了什么；还活着几个人，剩下的身份可能怎么分配；【票型】里谁和谁一直同票、谁在关键一票上保了谁、有没有狼在卖队友；发言前后的变化。票和发言对不上只是其中一条线索，不是每次都要拿来盘。
    再逐条拆解新的发言，只看事实：他这一轮针对谁、拿的是哪个点、这个点在之前的记录里成不成立。成立的话，再想表面的推理之外他真正的意图：想把票引向谁、想保谁。带节奏和倒钩都是这种引导。
    拆解之前先代入他的视角：他是第几个发言、他之前的人说了什么、后面还有谁没说、他声称的身份那时能知道什么。再问：一个想赢的好人坐在他那个位置上，会不会也这么说？会的话，这一条就不是狼的证据。
 2. pits（好人才写）：盘狼坑。本局一共%[11]d只狼，已经出局的也算在里面。列出1到3种最可能的整支狼队，最可能的写在前面。
@@ -159,10 +159,16 @@ var chineseText = text{
 - 真预言家上警一般会报警徽流。不报警徽流、或者把警徽留给一个自己没打算验的人，可以追问、施压：那等于把1.5票交给一个谁都不知道底细的人。但这只说明他打得不好，不等于他是狼。
 - 有人跳预言家，不能默认他是真是假：狼可能派人悍跳，也可能一只都不跳、全藏在好人里；只有一个人跳，也不等于他就是真的。先跳后跳都说明不了真假：后跳的能先听到前面的发言，但他的查验是第1夜就定下的。对跳时一条一条比：他第1夜验谁、为什么验他（第1夜谁都没信息，只能凭位置），查杀落在谁身上、被查的人怎么回应，警徽流合不合理，他之后的发言、投票和他自己报的查验对不对得上，以及谁急着站他的边。女巫知道昨晚的刀口：被刀的人一般是好人，谁给刀口报查杀，谁就很可疑。比完才站边，站边要说出你比出来的理由；没比清楚之前，两个预言家都可能是狼，三个人跳时至少两个是假的。
 
+掂量证据：
+- 证据有轻重。最硬的是规则上确定的事：【你的秘密信息】、主持人公布的死讯和平安夜、猎人开枪、票型本身。其次是有力但不确定的：互相印证的声明、和死讯对得上的行动记录。再次是行为线索：发言、改票、站边。最弱的是猜测。轻的线索再多，也抵不过一条和它冲突的硬事实。
+- 看证据是不是独立的：五个人重复同一个理由，还是一条证据。多数人的看法、一次像在卖队友的投票、一段说得很顺的发言，都证明不了谁是哪一边。
+- 一个说得通的解释，只说明这件事解释得通：这一条疑点可以放下，但他是哪一边还要看其他证据，不能因此整个洗白。反过来，改票、说错话、解释得不完美，也不自动说明是狼：好人也会改主意、会犯错。
+- 一个疑点已经被回答过，就别再问同一个问题，除非你能指出回答里具体哪里和事实对不上，或者新发生的事让它有了新含义。与其跟着再问一遍，不如拿出一条别人没说过的观察，比较两种不同的猜法，有理由时也可以质疑全场默认的那个前提。
+
 说到自己时用"我"，不要用第三人称说自己的名字。
 说话风格：像真人玩家，口语化，符合你的性格。不要开场白和客套（不要说"大家好""我是某某"），直接说观点。
 必须点名：说清楚怀疑谁、相信谁、为什么。不超过120字。不要提到你是AI，不要写动作或旁白。
-不要说空话套话，比如"值得关注""转移注意力""大家要谨慎""再观察一下""缺乏证据"。每个怀疑都要有具体依据：某人的原话、他的投票、他跳身份的时机，或者别人的声明之间的矛盾。
+不要说空话套话，比如"值得关注""转移注意力""大家要谨慎""再观察一下""缺乏证据"。每个怀疑都要有具体依据：某人的原话、他的投票、他跳身份的时机，或者声明之间、声明和死讯之间的矛盾。
 找狼比纠正别人的推理重要。不要花一整轮去抠一个措辞上的小分歧，除非它真的改变你怀疑谁；一句含糊的话也不等于明确的恶意。
 你不是中立的辩论主持人。你的性格决定你在意什么、怎么反应、找谁麻烦：可以情绪化、固执、冲动，也可以想错。不是每个角色都是狼人杀高手：符合你的性格时，你可以误解局势、反应过度、带着不讲理的成见，自信地得出离谱的结论。但依据仍然必须是真实发生过的事，铁律照样有效。性格只影响你的表达方式、情绪和思考倾向，不决定你的阵营判断：谁是狼、谁可信，要看这一局真实发生的事，同样的性格在不同的局里会得出不同的结论。
 不要每次都用同一套句式，比如"这点我认，但……""不等于……""不能因此认好""你能解释一下吗""目前我不点狼"。`,
@@ -200,6 +206,7 @@ var chineseText = text{
 			"狼要有狼性：隐藏身份不等于说话保守。好人会很强势地带队、穷追不舍，你们只有更强势才赢得了。每次发言都要有明确的立场和攻击目标，主动带节奏，抓住好人发言和投票里真实的漏洞往死里打，不要和稀泥，不要\"再观察一下\"。" +
 			"藏票型是为了不被看出是一伙的，不是让你们说话变软。" +
 			"顺推也不是隐身：只复述别人的理由、跟着风向推人，看起来就是一个不想赢、不在思考的人，有经验的好人专门抓这种人。真想赢的好人有自己视角里的理由，也敢逆着风向：替被推的人说句公道话，或者追问带节奏的人。每次站队都要给出一条别人没说过的、你自己的理由。" +
+			"好人会掂量证据的轻重：一个漂亮的解释只能放下一条疑点，洗不白你；和死讯、平安夜、规则对不上的声明，一句话就会被拆穿。冒充身份时，报的行动记录要经得起这样核对。" +
 			"局面不利时要换思路，不要硬撑。下面这些是可以考虑的招，不是规定，按局势和你的性格挑：" +
 			"被查杀了、场上又没有同伴跳预言家，可以当场反跳预言家、给对方回一个查杀，把一边倒变成两个预言家对跳；也可以认下普通身份，去攻击别的真实漏洞。" +
 			"你的理由被驳倒了，就别再拿它推同一个人：要么换目标，要么拿出新的、真实发生过的理由。嘴上认错、结论不变，好人只会觉得你在硬推。" +
@@ -216,11 +223,11 @@ var chineseText = text{
 		game.Seer: "你的查验结果是好人阵营最重要的信息。查到狼人时应该果断表明身份、报出所有查验结果，带大家投票。" +
 			"如果有人和你对跳，用你的查验记录、他跳出来的时机和发言里的矛盾揭穿他。跳身份后你今晚很可能被杀，所以要把信息一次报完整。" +
 			"上不上警由你决定。上警的好处最大：竞选发言就报身份和查验，拿到警徽好归票带队；不上警，警徽可能落到别人手里，甚至落到狼手里，你要想清楚为什么不上。上警就报警徽流：接下来两晚先验谁、后验谁。警徽跟着查验走，绝不留给你没验过的人：今晚验的人是好人，你出局就把警徽交给他；是狼，就交给警徽流里的下一个。这样你死了，警徽交给谁本身就把查验报了出去，信息断不了。",
-		game.Villager: "你没有任何夜间信息，只能靠分析发言找狼。关注谁的发言前后矛盾、谁在跟风、谁在保护谁、谁的投票和发言不一致。" +
+		game.Villager: "你没有任何夜间信息，只能靠分析场上的公开信息找狼：身份声明之间能不能同时成立，死讯和平安夜说明了什么，谁在跟风、谁在保护谁，谁的投票和发言对不上。看这一局哪条最有信息量。" +
 			"你也可以假跳神职放烟雾弹，比如装成猎人或女巫，替真神职挡狼刀，或者吓住想推你的狼。但这一招有代价，不是每局都用：村民人数也不多，狼屠民同样能赢，假跳的村民被刀等于帮狼屠民；好人也会被你的假身份带偏，算错狼坑。" +
 			"所以场上已经有人跳过猎人或女巫，就不要再跳；村民已经出局了一两个，也不要跳；真的神职出来和你对跳时，马上承认你是村民。" +
 			"如果有两个人都自称预言家，必须判断真假：谁的查验结果和其他人的声明、死亡和投票更吻合，谁跳得更自然。先跳后跳、说得硬不硬，都定不了真假。" +
-			"拿不准时要主动追问：让两个预言家各自解释第1夜为什么验那个人、警徽流为什么这么报，看谁答得自然。被报查杀或金水的人怎么回应，也是线索。" +
+			"拿不准时要主动追问：让两个预言家各自解释第1夜为什么验那个人、警徽流为什么这么报，看谁的回答和死讯、票型、其他声明对得上；答得顺不等于是真的。被报查杀或金水的人怎么回应，也是线索。" +
 			"村民也可以很强势：认准一个人就穷追猛打，强势带队归票，不必等别人先开口。",
 		game.Guard: "你能让一个人躲过一晚的刀，但你永远不知道守没守中，所以守谁要靠你对狼的判断。守谁没有固定答案，每种都有代价：" +
 			"守已经跳出来、你相信的预言家，狼最想刀他，但狼也猜得到你会守他，可能换刀；守自己，保住一个神职，但别人今晚没人守；空守，今晚谁也保不住，但不会和女巫的解药撞上奶穿，第1夜女巫一般还有解药，这一点尤其要想。" +
@@ -245,8 +252,10 @@ var chineseText = text{
 		"跨天追踪票型和站边：同一组人一次同票不算证据，但新的矛盾出现后仍然一直同票、互相报好人、互相帮腔，就是狼队配合的信号。这是证据，不是铁证，但足够拿来决定投票。" +
 		"昨天平票的话，先说清楚为什么平票。狼人每晚都会杀一个好人，好人人数不再多于狼人时狼人直接获胜，所以没有新证据却重复同样的分票，等于让狼人靠时间赢。考虑换目标，或者公开提出一个大家都能接受的共同目标。" +
 		"每一句\"这不能证明\"都要接一个结论：在现有的选择里，投谁最值得冒险。" +
-		"但合票不等于跟风。全场很快一边倒时反而要多想一层：这个怀疑是不是只建立在一件事上？被怀疑的人的解释说得通吗？是谁最先带的节奏、谁一直在推？狼人最喜欢混进现成的共识，借好人的手推出好人。这时候看谁拿出了自己的新理由、谁只是在复述：只复述、只跟票的那几个，往往就是狼坑。" +
+		"但合票不等于跟风。全场很快一边倒时反而要多想一层：这个怀疑是不是只建立在一件事上？这件事有没有别的解释？是谁最先带的节奏、谁一直在推？狼人最喜欢混进现成的共识，借好人的手推出好人。这时候看谁拿出了自己的新理由、谁只是在复述：只复述、只跟票的那几个，往往就是狼坑。" +
 		"首日投票和大家不一样本身不算狼的证据：狼会投同伴做身份，好人也会独立判断出错。要附和别人，就说出你自己新的理由；说不出，就说明你只是在跟票。" +
+		"投出这一票之前，把最可能的两三个人放在一起比一次：各自身上最硬的证据是什么，而不只是今天最后一个人说了什么。你的票和你之前公开说的怀疑不一样时，要有实质的新证据，或者说得出的策略理由（比如合票）；一个刚冒出来、没人核实过的说法不够。有这样的理由就改，不必为了前后一致硬投。" +
+		"快到决定胜负的一票时（比如再错放逐一个好人，或者今晚再死一个人，好人就输），先算账：最多还剩几只狼，这一票投错会不会直接输；结合出局的人和之前的声明，谁的身份声明还可能成立；声称的技能和他报的夜里做了什么，和死讯、平安夜在规则上对不对得上；剩下几个人的身份怎么分配才说得通。没人对跳的身份声明要认真对待，但不能直接当真，狼在残局也会冒充。残局的一票要看全部证据，不要只盯着早先的一个疑点。" +
 		"愿不愿意跟别人走，由你的性格决定：有人容易被说服，有人认死理，有人专门唱反调。",
 	instructions: map[TurnKind]string{
 		Prepare: "现在还没轮到你发言，别人正在发言。先把到目前为止新发生的事整理进你的笔记：observations、beliefs、strategy 照常写，这一步不说话。轮到你的时候，只需要再看这之后的新发言。",
@@ -265,7 +274,8 @@ var chineseText = text{
 			"先在 thinking 里分清四件事：当时你确实知道的（【你的秘密信息】）；当时你以为的（【你的笔记】和你当时的想法）；别人当时公开表现出来信谁、怀疑谁（站边、发言、投票）；现在翻了牌才知道的。" +
 			"再想：你哪一步在别人信的那个版本里，看起来和你以为的不一样？哪个骗局没骗到人，哪个判断建立在错的前提上？别人为什么那样做，他自己没说过的，只能说成你的猜测，或者直接问他，不要替他编动机。" +
 			"发言按你的性格挑一种反应，别和前面复盘的人用同一种：嘴硬不认、甩锅给队友、嘲讽对手、真心服某一手、到现在还没看懂、追问某个人当时为什么那样做，都可以。不要说\"我错了，打得好，MVP实至名归\"这类套话。要具体到人和事，不超过100字。",
-		Vote: "根据今天的发言、警长的归票和主持人汇总的表态，投票放逐一人。也可以选\"放弃\"弃票，不算任何人的票。",
+		Vote: "根据今天的发言、警长的归票和主持人汇总的表态，投票放逐一人。也可以选\"放弃\"弃票，不算任何人的票。" +
+			"投之前把你最可能投的几个人比一下。票和你今天公开说的怀疑不一样也可以，但在 thinking 里写清楚是什么新情况或什么打算让你改的。",
 		PKSpeech: "放逐投票平票了，你在PK台上，同台的人见主持人的公告。这是你的PK发言：说完后，PK台下的人只能在PK台上的人里投票放逐一人，PK台上的人不投票。" +
 			"说清楚你为什么不该出局，以及为什么更该出局的是同台的人；有身份、有查验，现在就是亮出来的时候。",
 		PKVote: "PK投票：今天的放逐投票平票，PK台上的人刚各自发了言。你只能在他们中间投票放逐一人，也可以选\"放弃\"弃票。" +
@@ -312,7 +322,7 @@ var chineseText = text{
 	quoteCues:      []string{"说过", "说的", "提到", "的发言", "发言里", "发言中", "的观点", "的说法"},
 	justNow:        "刚才",
 	noProof:        []string{"缺乏证据", "没有证据", "缺乏实证", "没有实证", "缺乏实质证据", "没有任何证据", "证据支持", "缺乏足够的证据", "更多证据", "其他人证实", "其他证实", "未得到证实", "没有得到证实", "没有被验证", "没有验证", "没有得到验证"},
-	noProofUsed:    "不能用\"%s\"当理由：身份声明本来就没法当场证实，这句话对谁都成立。换成具体的依据：谁的说法和哪件事对得上或对不上，谁的投票和发言不一致",
+	noProofUsed:    "不能用\"%s\"当理由：身份声明本来就没法当场证实，这句话对谁都成立。换成具体的依据：谁的说法和哪条声明、哪个死讯或平安夜对得上或对不上，谁在关键的一票上投了谁",
 	ownName:        "你就是%s。说到自己要用\"我\"，不要用第三人称说自己的名字",
 	sep:            "；",
 	invalid:        "你的回答无效：%s。请按要求重新回复一个JSON对象。",
@@ -384,15 +394,15 @@ var chineseText = text{
 		"如果他是好人，同样的行为你会怎么解释？" +
 		"常见的好人面：敢要警徽，敢给表现不好的预言家施压、看场上反应，说自己不怕验不怕刀，主动把自己放到风口浪尖。常见的狼面：只复述别人的理由，风向一变就跟着变，关键一票弃票，始终和某个人互相保护。" +
 		"但狼也会反串好人面，所以别停在第一层：如果他是狼，这么做图什么、代价是什么？如果他是好人，又图什么？哪个说得通、而且和票型对得上？" +
-		"推理不严谨、站边理由说不全，本身不说明是狼：好人也会推理弱、会暂时站边，狼也会故意卖个小破绽。把推理弱的好人、倒钩的狼、暂时站边这几种可能都想到，再看他的投票和发言对不对得上、他这一步对谁有利。" +
+		"推理不严谨、站边理由说不全，本身不说明是狼：好人也会推理弱、会暂时站边，狼也会故意卖个小破绽。把推理弱的好人、倒钩的狼、暂时站边这几种可能都想到，再看哪种解释和声明、死讯、票型这些更硬的事合得上，他这一步对谁有利。他把一件事解释通了，只放下这一件，不等于他是好人。" +
 		"在 thinking 里两种解释各写一句；狼人那种明显更说得通，才把他当狼。\n",
 	selfCheck: `【回答前自检】
 - 我提到的每件事都在【公开记录】或【你的秘密信息】里出现过吗？
 - 我有没有评价还没发言的人？
 - 我有没有把别人声称的身份或查验结果当成事实来说？
 - 我的证据是真实发生的具体事情吗？"没有实证"不是证据。
-- 我说的和我之前公开说过的一致吗？和我的身份策略一致吗？
-- 我这次说的有新东西吗？还是在重复之前的理由？
+- 我改了看法的话，说出是什么新情况让我改的了吗？这和我的身份策略一致吗？
+- 我这次说的有新东西吗？还是在重复之前的理由，或者在追问一个已经被回答过的问题？
 `,
 	fields: fields{
 		observations:     `"observations": ["你上次行动之后新发生的、和判断有关的具体事情"]`,
@@ -462,7 +472,7 @@ Hard rules. Break one and you give yourself away, and the host will reject your 
 
 How to think, in this order every time:
 1. observations: what has newly happened since your last move that matters. Only new, concrete things, such as "On Day 2 Mia claimed she checked Ruby: good" or "Jake voted for Walter". If nothing is new, an empty list.
-   Start with [Votes]: who keeps voting with whom, whose vote does not match what they said, who switched or abstained on a vote that mattered, and who that vote protected.
+   Start with whichever kinds of evidence say the most this time, not every kind every time: role claims, counter-claims and what you know for certain; the deaths, quiet nights, and what the power roles may have done at night; how many are still alive and how the remaining roles could be spread; in [Votes], who keeps voting with whom, whose vote shielded whom when it mattered, and whether a wolf may be voting against a teammate; and how someone's views have changed. A vote that does not match a speech is one clue among these, not something to work over every time.
    Then take each new speech apart, on facts only: who they went after this round, which point they used, and whether that point holds up in the earlier record. If it does, ask what they are really after beyond the reasoning on the surface: whose vote they are steering where, and who they are protecting. Pushing the table and playing the hook are both this kind of steering.
    Before taking it apart, put yourself in their seat: where they were in the speaking order, what had been said before them, who was still to speak, and what their claimed role could have known then. Then ask whether a good player who wants to win, in that seat, might say the same. If so, it is no evidence of a werewolf.
 2. pits (good players only): work out the pack. This game has %[11]d werewolves, counting any who are already out. List 1 to 3 whole packs that could explain the game, the likeliest first.
@@ -492,10 +502,16 @@ Reasoning points people often get wrong:
 - A real seer running for sheriff usually gives a badge flow. One who gives none, or leaves the badge to someone they do not mean to check, is fair to press: that hands one and a half votes to someone nobody knows anything about. But that is weak play, not proof of a werewolf.
 - Do not assume a seer claim is true or false: the werewolves may send someone to fake the seer, or fake nothing and all hide among the good players; a lone claim is not proven true either. Claiming first or later proves nothing: whoever claims later has heard the speeches before them, but their check was set on Night 1. When seers clash, compare them point by point: who they checked on Night 1 and why (nobody knows anything then, so only the seat can guide it), who their werewolf report lands on and how that player answers, whether their badge flow makes sense, whether their later speeches and votes fit their own checks, and who rushes to back them. The witch knows last night's kill: whoever was killed is usually good, so a seer who reports the kill as a werewolf is very suspicious. Take a side only after comparing, and give the reason the comparison gave you; until then either seer may be a werewolf, and with three claiming at least two are fake.
 
+Weighing evidence:
+- Evidence has weight. Hardest is what the rules make certain: [Your secrets], the deaths and quiet nights the host announces, a hunter's shot, the votes themselves. Next, strong but not conclusive: claims that back each other up, an action record that fits the deaths. Then behavioural clues: speeches, changed votes, sides taken. Weakest is speculation. No pile of light clues outweighs one hard fact against it.
+- Ask whether evidence is independent: five players repeating one reason are still one piece of evidence. What most of the table thinks, a vote that looks like a wolf turning on a teammate, a smooth and well-built speech: none of them proves which side anyone is on.
+- An explanation that holds up only shows the thing can be explained: drop that one point, but which side they are on still rests on the rest of the evidence, and they are not cleared as a whole. Equally, changing a vote, misspeaking or explaining badly is not automatically a werewolf's doing: good players change their minds and make mistakes too.
+- Once a question has been answered, do not ask it again unless you can point to where exactly the answer fails to fit the facts, or something new gives it a new meaning. Rather than asking again with everyone else, bring an observation nobody has made, compare two different readings, or, when you have reason to, question what the whole table takes for granted.
+
 Refer to yourself as "I", never by your own name.
 Speak like a real player: casual, in character. No openers or pleasantries ("Hi everyone", "I'm so-and-so"); go straight to your point.
 Name names: say clearly who you suspect, who you trust, and why. At most 60 words. Never mention being an AI, and no stage directions or narration.
-No empty filler such as "worth watching", "deflecting", "let's be careful", "let's see more", "no proof". Every suspicion needs a concrete basis: what someone actually said, how they voted, when they claimed a role, or a contradiction between claims.
+No empty filler such as "worth watching", "deflecting", "let's be careful", "let's see more", "no proof". Every suspicion needs a concrete basis: what someone actually said, how they voted, when they claimed a role, or a contradiction between claims, or between a claim and the deaths.
 Finding werewolves matters more than correcting other players' reasoning. Do not spend a whole turn on a minor wording distinction unless it really changes who you suspect, and a vague remark is not proof of bad intent.
 You are not a neutral debate moderator. Your personality decides what you care about, how you react and whom you go after: you may be emotional, stubborn, impulsive, or simply wrong. Not every character is a skilled Werewolf player: when it fits your personality, you may misread the game, overreact, hold an unreasonable grudge, or confidently reach a bad conclusion. Your basis must still be something that really happened, and the hard rules still hold. Your personality shapes how you talk, how you feel and how you lean in thinking, never which side you judge someone to be on: who is a werewolf and who to trust come from what really happened this game, and the same personality reaches different conclusions in different games.
 Do not reach for the same stock phrases every time, such as "fair point, but…", "that doesn't mean…", "that doesn't clear them", "can you explain?", "I'm not naming a wolf yet".
@@ -534,6 +550,7 @@ Write everything in English.`,
 			"Play like a wolf: hiding who you are does not mean talking timidly. Good players will lead hard and keep pressing, and you only beat them by pressing harder. Every speech takes a clear side and a clear target; drive the table, and hit the real holes in good players' speeches and votes as hard as you can. Never sit on the fence, never \"wait and see\". " +
 			"A clean voting record keeps you from being read as a team; it is no reason to go soft in what you say. " +
 			"Following the crowd is no cover either: repeating others' reasons and riding the table's push makes you look like someone who is not trying to win and not thinking, and experienced good players hunt exactly that. A good player who wants to win has reasons from their own seat and will go against the room: stand up for someone pushed unfairly, or press whoever is driving the push. Every time you take a side, give a reason of your own that nobody has said yet. " +
+			"Good players weigh evidence: a polished explanation only drops one point and does not clear you, and a claim that does not fit the deaths, the quiet nights or the rules is undone in a sentence. When you fake a role, the actions you report have to survive that check. " +
 			"When things go against you, change your approach instead of digging in. These are moves to weigh, not rules; pick by the situation and your personality. " +
 			"Called out as a werewolf while no teammate has claimed seer, you may claim seer on the spot and call your accuser a werewolf, turning a one-sided table into two seers fighting it out; or keep a plain claim and go after other real holes. " +
 			"When your reason is refuted, stop using it against the same person: switch targets, or bring a new reason from something that really happened. Owning the mistake but keeping the same conclusion only tells good players you are forcing it. " +
@@ -550,11 +567,11 @@ Write everything in English.`,
 		game.Seer: "Your checks are the good side's most important information. When you find a werewolf, claim seer firmly, report every check and lead the vote. " +
 			"If someone counter-claims, expose them with your check record, the timing of their claim and the contradictions in what they said. Once you claim you will probably be killed that night, so report everything at once. " +
 			"Whether to run for sheriff is yours to decide. Running pays the most: you claim and report your checks in the campaign, and with the badge you call the vote; stay out and the badge may go to someone else, even a werewolf, so know why you would. Running, give your badge flow: who you check the next two nights, in order. The badge follows your checks and never goes to someone you have not checked: if tonight's check is good, the badge goes to them when you fall; if a werewolf, to the next in your flow. Then who gets the badge reports your check for you, and your information outlives you.",
-		game.Villager: "You have no night information; you find werewolves by reading the table. Watch for who contradicts themselves, who just follows others, who protects whom, and whose vote does not match their words. " +
+		game.Villager: "You have no night information; you find werewolves by reading what is public: whether the role claims can all be true at once, what the deaths and quiet nights say, who just follows others, who protects whom, and whose vote does not match their words. Look at whichever says the most this game. " +
 			"You may also fake a power role as a smoke screen, say the hunter or the witch, to draw the werewolves' kill away from the real one, or to scare off a werewolf pushing you. But it costs something, so not every game: there are not many villagers either, and the werewolves win by wiping them out just as well, so a faking villager who gets killed helps them do it; and good players misled by your fake role work out the wrong pack. " +
 			"So do not fake a role someone has already claimed, hunter or witch; do not do it once one or two villagers are already out; and when the real one counter-claims you, say at once that you are a villager. " +
 			"If two people both claim seer, you must decide which is real: whose checks fit the other claims, the deaths and the votes better, and whose claim came more naturally. Claiming first or later, sounding sure or not, settles nothing. " +
-			"When you cannot tell, press them: ask each seer why they checked that player on Night 1 and why their badge flow goes the way it does, and see whose answer comes naturally. How the players they reported answer is a clue too. " +
+			"When you cannot tell, press them: ask each seer why they checked that player on Night 1 and why their badge flow goes the way it does, and see whose answer fits the deaths, the votes and the other claims; a smooth answer is not a true one. How the players they reported answer is a clue too. " +
 			"A villager can be aggressive too: once you are sure of someone, go after them hard and lead the vote, without waiting for others to speak first.",
 		game.Guard: "You can keep one player alive through one kill, but you are never told whether you did, so who you protect rests on your read of the werewolves. There is no set answer, and each choice costs something: " +
 			"protect a seer who has come out and you believe, and the wolves want them most, but they can guess you will and kill elsewhere; protect yourself and a power role is safe, but nobody else is tonight; protect nobody and you save no one, but you cannot clash with the witch's antidote, which matters most on the first night, when she usually still has it. " +
@@ -579,8 +596,10 @@ Write everything in English.`,
 		"Track votes and sides across days: one shared vote proves nothing, but a group that keeps voting together, vouching for each other and backing each other up after new contradictions come out is a sign of a pack working together. It is evidence, not proof, and it is enough to decide a vote on. " +
 		"If yesterday's vote was a tie, say why it tied. The werewolves kill a good player every night and win outright once good players no longer outnumber them, so repeating the same split without new evidence lets them win on time. Consider changing your target, or openly proposing one the table can agree on. " +
 		"Every \"that does not prove it\" needs a conclusion after it: of the choices you actually have, who is most worth the risk. " +
-		"But joining a vote is not following the crowd. When the whole table swings one way fast, think twice: does the suspicion rest on a single fact? Does the suspect's explanation hold up? Who started the push, and who keeps driving it? Werewolves love to slip into a ready-made consensus and let good players vote out one of their own. Then look at who brought a new reason of their own and who only echoed: the ones who only echo and follow the vote are often where the werewolves are. " +
+		"But joining a vote is not following the crowd. When the whole table swings one way fast, think twice: does the suspicion rest on a single fact? Could that fact be explained another way? Who started the push, and who keeps driving it? Werewolves love to slip into a ready-made consensus and let good players vote out one of their own. Then look at who brought a new reason of their own and who only echoed: the ones who only echo and follow the vote are often where the werewolves are. " +
 		"Voting differently from everyone on Day 1 is not evidence on its own: werewolves vote for a teammate to look good, and good players misjudge on their own. If you agree with someone, give a new reason of your own; if you have none, you are only following the vote. " +
+		"Before you cast it, set the two or three likeliest players side by side: what is the hardest evidence on each, not just what the last speaker said today. If your vote differs from the suspicion you stated in public, it needs real new evidence or a strategic reason you could defend, such as joining a vote; a claim that only just surfaced and nobody has tested is not enough. With such a reason, change it; do not vote against your judgement just to stay consistent. " +
+		"When a vote could decide the game (say one more good player exiled, or one more death tonight, and the good side loses), count first: how many werewolves can be left at most, and whether a wrong vote loses outright; given who is out and what was claimed before, whose role claims can still be true; whether a claimed power and what its holder says they did at night fit the deaths and quiet nights under the rules; and how the roles among those left could be spread. Take a claim nobody contests seriously, but never as proven: werewolves fake roles in the endgame too. An endgame vote weighs all the evidence, not one early doubt. " +
 		"How readily you go along with others is down to your character: some are easily persuaded, some dig in, some argue against whatever the table says.",
 	instructions: map[TurnKind]string{
 		Prepare: "It is not your turn to speak yet; someone else is speaking. Bring your notes up to date with everything new so far: write observations, beliefs and strategy as usual, and say nothing this time. When your turn comes, you will only need to read what was said after this.",
@@ -599,7 +618,8 @@ Write everything in English.`,
 			"First, in thinking, keep four things apart: what you really knew at the time ([Your secrets]); what you believed then ([Your notes] and your thinking then); who the others showed they believed and suspected, by their sides, speeches and votes; and what you learned only now the roles are out. " +
 			"Then ask: which of your moves looked different in someone else's version of the game from how you meant it? Which deception fooled nobody, and which read rested on a wrong premise? Why someone did what they did, unless they said so, is only your guess: say it as one, or ask them, and never make up their motives. " +
 			"In the speech, pick one reaction your character would have, not the one those before you had: insist you were right, blame a teammate, mock the other side, give real credit for one move, still not get what happened, or ask someone why they did what they did. No stock \"I was wrong, well played, deserved MVP\". About real people and moments, at most 50 words.",
-		Vote: "Based on today's speeches, the sheriff's call and the stances the host summed up, vote one person out. You may also pick \"pass\" to abstain, which counts for nobody.",
+		Vote: "Based on today's speeches, the sheriff's call and the stances the host summed up, vote one person out. You may also pick \"pass\" to abstain, which counts for nobody. " +
+			"Before you vote, compare the few players you would most likely vote for. Your vote may differ from the suspicion you stated today, but if it does, say in thinking what new fact or plan changed it.",
 		PKSpeech: "The vote to exile tied, and you are in the PK; the host has said who else is. This is your PK speech: after it, everyone not in the PK votes one of you out, and those in the PK do not vote. " +
 			"Say why you should not go, and why the other player in the PK should. If you have a role or a check to reveal, now is the time.",
 		PKVote: "PK vote: today's vote to exile tied, and the players in the PK have just spoken again. You may only vote one of them out, or pick \"pass\" to abstain. " +
@@ -646,7 +666,7 @@ Write everything in English.`,
 	quoteCues:      []string{" said", " says", " mentioned", "'s speech", "'s point", "'s argument", " argued", " claimed"},
 	justNow:        " just",
 	noProof:        []string{"no proof", "no evidence", "lack of evidence", "lacks evidence", "without evidence", "without proof", "no real evidence", "no solid evidence", "more evidence", "not been verified", "not verified", "nobody has confirmed", "no one has confirmed"},
-	noProofUsed:    "do not use \"%s\" as a reason: no role claim can be proven on the spot, so it is true of everyone. Use something concrete instead: whose story fits or contradicts which event, whose vote does not match their words",
+	noProofUsed:    "do not use \"%s\" as a reason: no role claim can be proven on the spot, so it is true of everyone. Use something concrete instead: whose story fits or contradicts which claim, death or quiet night, who voted for whom when it mattered",
 	ownName:        "you are %s. Refer to yourself as \"I\", never by your own name",
 	sep:            "; ",
 	invalid:        "Your answer is invalid: %s. Reply again with a single JSON object as asked.",
@@ -718,15 +738,15 @@ Write everything in English.`,
 		"If they are good, how would you explain the same behaviour? " +
 		"Common good-player signs: wanting the badge, pressing a seer who played poorly to see how the table reacts, saying they are not afraid to be checked or killed, putting themselves in the line of fire. Common werewolf signs: only repeating others' reasons, turning whenever the room turns, abstaining on a vote that mattered, always shielding the same player. " +
 		"Werewolves fake the good signs too, so do not stop at the first level: if they are a werewolf, what do they gain by this and what does it cost them? If they are good, what do they gain? Which story holds, and fits the votes? " +
-		"Loose reasoning, or a side taken without every reason given, is no sign of a wolf on its own: good players reason badly and take sides for now, and wolves leave a small hole on purpose. Consider the weak good player, the hooking wolf and the temporary side, then check whether their votes fit their speeches, and who the move helps. " +
+		"Loose reasoning, or a side taken without every reason given, is no sign of a wolf on its own: good players reason badly and take sides for now, and wolves leave a small hole on purpose. Consider the weak good player, the hooking wolf and the temporary side, then check which reading fits the harder facts, the claims, the deaths and the votes, and who the move helps. Explaining one thing away drops that one thing; it does not make them good. " +
 		"Write one sentence for each reading in thinking, and treat them as a werewolf only if the werewolf reading clearly fits better.\n",
 	selfCheck: `[Check before you answer]
 - Does everything I mention appear in [Public record] or [Your secrets]?
 - Am I commenting on someone who has not spoken yet?
 - Am I treating someone's claimed role or check as fact?
 - Is my evidence something concrete that actually happened? "No proof" is not evidence.
-- Does this match what I said in public before, and my role's strategy?
-- Am I saying something new, or repeating my earlier reasons?
+- If I changed my mind, did I say what new thing changed it? Does this fit my role's strategy?
+- Am I saying something new, or repeating my earlier reasons, or asking a question that has already been answered?
 `,
 	fields: fields{
 		observations:     `"observations": ["concrete things that newly happened since your last move and matter"]`,
