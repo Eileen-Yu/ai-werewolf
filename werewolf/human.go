@@ -122,7 +122,7 @@ func publicActivity(turn brain.Turn) (kind, name string) {
 	switch turn.Kind {
 	case brain.WolfChat, brain.WolfVote, brain.WolfRevote:
 		return "wolves", ""
-	case brain.Inspect, brain.Save, brain.Poison:
+	case brain.Protect, brain.Inspect, brain.Save, brain.Poison:
 		return "night", ""
 	case brain.Shoot:
 		return "wait", ""
@@ -295,6 +295,21 @@ func (m *humanMove) Await(v any) error {
 	return nil
 }
 
+// PageWords are the game words the page shows, in the table's language: the
+// board's roles and every option its forms offer.
+func PageWords(l game.Lang, b game.Board) map[string]string {
+	words := map[string]string{}
+	for _, r := range game.Roles {
+		if b.Has(r) {
+			words[string(r)] = l.Say(string(r))
+		}
+	}
+	for _, w := range []string{game.Pass, game.Nobody, game.Good, game.God, game.FakeSeer, game.PlayHook} {
+		words[w] = l.Say(w)
+	}
+	return words
+}
+
 // publish puts the table, with every person's seat, in the custom status,
 // for the people playing and anyone watching. It runs on replay too, since
 // the status is rebuilt with each run of the workflow.
@@ -307,7 +322,7 @@ func (t *table) publish() {
 		Stage: t.s.Stage,
 		When:  l.When(t.s.Round, t.s.Phase),
 		Now:   t.doing(),
-		Words: map[string]string{game.Pass: t.say(game.Pass), game.Nobody: t.say(game.Nobody)},
+		Words: PageWords(l, t.s.Board),
 	}}
 	for _, p := range t.s.Players {
 		if !p.Human {
@@ -332,14 +347,6 @@ func (t *table) publish() {
 		b.Seats = append(b.Seats, brain.Seat{Name: p.Name, Death: p.Death, Sheriff: p.Name == t.s.Sheriff})
 	}
 	b.Board = t.s.Board
-	for _, r := range game.Roles {
-		if t.s.Board.Has(r) {
-			b.Words[string(r)] = t.say(string(r))
-		}
-	}
-	for _, w := range []string{game.Good, game.God} {
-		b.Words[w] = t.say(w)
-	}
 	for _, e := range t.s.Log {
 		if !e.Thought {
 			b.Record = append(b.Record, e)

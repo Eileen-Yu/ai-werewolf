@@ -283,7 +283,7 @@ func TestASpectatorFollowsTheGameStageByStage(t *testing.T) {
 func TestThePageIsToldOnlyWhatTheTableCanSee(t *testing.T) {
 	for kind, want := range map[brain.TurnKind]string{
 		brain.WolfChat: "wolves", brain.WolfVote: "wolves", brain.WolfRevote: "wolves",
-		brain.Inspect: "night", brain.Save: "night", brain.Poison: "night",
+		brain.Protect: "night", brain.Inspect: "night", brain.Save: "night", brain.Poison: "night",
 		brain.Shoot: "wait", brain.Vote: "vote", brain.Run: "run",
 	} {
 		got, name := publicActivity(brain.Turn{Kind: kind, Me: game.Player{Name: "小红"}})

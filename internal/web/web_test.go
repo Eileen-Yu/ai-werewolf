@@ -8,6 +8,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -162,6 +164,27 @@ func TestEveryCharacterHasAVoice(t *testing.T) {
 		for _, c := range game.Characters(l, game.Twelve) {
 			assert.Contains(t, string(page), fmt.Sprintf("%q: { sex:", c), "no voice for %s", c)
 		}
+	}
+}
+
+// Every word a form offers as an option is shown in Chinese on a Chinese
+// table, not as the English it is sent back as.
+func TestEveryOptionIsTranslated(t *testing.T) {
+	words := werewolf.PageWords(game.Chinese, game.Twelve)
+	var offered []string
+	for _, line := range strings.Split(string(page), "\n") {
+		if !strings.Contains(line, "opts(") {
+			continue
+		}
+		for _, list := range regexp.MustCompile(`\[("[^"]+"(?:, "[^"]+")*)\]`).FindAllStringSubmatch(line, -1) {
+			for _, q := range regexp.MustCompile(`"([^"]+)"`).FindAllStringSubmatch(list[1], -1) {
+				offered = append(offered, q[1])
+			}
+		}
+	}
+	require.Subset(t, offered, []string{game.FakeSeer, game.PlayHook, game.God, game.Good, "guard"}, "the option lists are read off the page")
+	for _, o := range offered {
+		assert.Regexp(t, `\p{Han}`, words[o], "%q shows untranslated", o)
 	}
 }
 
