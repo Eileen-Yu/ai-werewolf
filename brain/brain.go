@@ -338,6 +338,19 @@ func (t Turn) IsSheriff() bool {
 	return slices.ContainsFunc(t.Seats, func(s Seat) bool { return s.Sheriff && s.Name == t.Me.Name })
 }
 
+// sheriffTie is, on a campaign speech or sheriff vote in a sheriff PK, the
+// election vote that tied just before it; nil outside a PK. An election vote
+// that did not tie ends the election, so one on the record this round tied.
+func (t Turn) sheriffTie() *game.Ballot {
+	if (t.Kind != Campaign && t.Kind != SheriffVote) || len(t.Ballots) == 0 {
+		return nil
+	}
+	if b := t.Ballots[len(t.Ballots)-1]; b.Election && b.Round == t.Round {
+		return &b
+	}
+	return nil
+}
+
 // unspokenProblems catches a speech quoting someone who has not spoken: anyone
 // who has never said anything in public, and, during the day's speeches,
 // anyone still waiting for their turn today.

@@ -176,6 +176,38 @@ func TestThePromptListsEveryVoteByVoteAndByPlayer(t *testing.T) {
 	assert.Less(t, strings.Index(user, "【票型】"), strings.Index(user, "【公开记录】"), "the votes come before the speeches")
 }
 
+// In a sheriff PK the candidates are told to answer the tie rather than
+// repeat their campaign, and each voter is reminded how they voted in it and
+// asked to decide again, with the PK speeches in front of them.
+func TestASheriffPKIsToldItIsOne(t *testing.T) {
+	tie := game.Ballot{Round: 1, Election: true, Votes: []game.Vote{{Voter: "小红", Target: "老王"}, {Voter: "美玲", Target: "阿杰"}, {Voter: "大壮", Target: ""}}}
+	pk := game.Event{Round: 1, Phase: game.Day, Speaker: "阿杰", Text: "老王的警徽流前后对不上。"}
+	vote := func(me string, ballots ...game.Ballot) string {
+		_, user := prompt(Turn{
+			Kind: SheriffVote, Round: 1, Phase: game.Day, Me: game.Player{Name: me},
+			Candidates: []string{"老王", "阿杰", game.Pass}, Ballots: ballots, Transcript: []game.Event{pk},
+		})
+		return user
+	}
+
+	user := vote("小红", tie)
+	assert.Contains(t, user, fmt.Sprintf(chineseText.sheriffPKVote, 1, "老王、阿杰", "投了老王"))
+	assert.Contains(t, user, "老王的警徽流前后对不上。", "the voter hears the PK speeches")
+	assert.Contains(t, vote("大壮", tie), "上一轮你弃了票")
+	assert.NotContains(t, vote("小红"), "警长PK投票，只能在", "the first vote is no PK")
+
+	again := game.Ballot{Round: 1, Election: true, PK: 1, Votes: []game.Vote{{Voter: "小红", Target: "阿杰"}, {Voter: "美玲", Target: "老王"}}}
+	assert.Contains(t, vote("小红", tie, again), fmt.Sprintf(chineseText.sheriffPKVote, 2, "老王、阿杰", "投了阿杰"), "the vote just before counts")
+	yesterday := game.Ballot{Round: 1, Votes: tie.Votes}
+	_, user = prompt(Turn{Kind: SheriffVote, Round: 2, Phase: game.Day, Me: game.Player{Name: "小红"}, Candidates: []string{"老王", game.Pass}, Ballots: []game.Ballot{tie, yesterday}})
+	assert.NotContains(t, user, "警长PK投票，只能在", "an old tie is no PK")
+
+	_, user = prompt(Turn{Kind: Campaign, Round: 1, Phase: game.Day, Me: game.Player{Name: "老王"}, Ballots: []game.Ballot{tie}})
+	assert.Contains(t, user, fmt.Sprintf(chineseText.campaignPK, 1, "阿杰"))
+	_, user = prompt(Turn{Kind: Campaign, Round: 1, Phase: game.Day, Me: game.Player{Name: "老王"}})
+	assert.NotContains(t, user, "警长PK的发言", "a first campaign speech is no PK")
+}
+
 func TestTheSheriffIsMarkedAndToldToCallTheVote(t *testing.T) {
 	seats := []Seat{{Name: "小红", Sheriff: true}, {Name: "老王"}}
 	speech := Turn{Kind: Speech, Round: 2, Phase: game.Day, Me: game.Player{Name: "小红"}, Seats: seats}

@@ -282,6 +282,17 @@ func prompt(t Turn) (system, user string) {
 	b.WriteString(tx.public + orNone(tx, public.String()))
 
 	fmt.Fprintf(&b, tx.now, l.When(t.Round, t.Phase), tx.instructions[t.Kind])
+	if tie := t.sheriffTie(); tie != nil {
+		if t.Kind == Campaign {
+			fmt.Fprintf(&b, tx.campaignPK, tie.PK+1, l.List(game.Without(game.Leaders(game.Totals(tie.Votes, "")), t.Me.Name)))
+		} else {
+			last := tx.lastAbstained
+			if i := slices.IndexFunc(tie.Votes, func(v game.Vote) bool { return v.Voter == t.Me.Name }); i >= 0 && tie.Votes[i].Target != "" {
+				last = fmt.Sprintf(tx.lastVoted, tie.Votes[i].Target)
+			}
+			fmt.Fprintf(&b, tx.sheriffPKVote, tie.PK+1, l.List(game.Without(t.Candidates, game.Pass)), last)
+		}
+	}
 	if t.Me.Habit != "" {
 		fmt.Fprintf(&b, tx.habitNow, t.Me.Habit)
 	}

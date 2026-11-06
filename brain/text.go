@@ -75,10 +75,13 @@ type text struct {
 	pkBallot, pkShort, electionPKBallot, electionPKShort                       string
 	abstainStep, sheriffVoter, voteStep, ballotSep, stepSep, ballotLine        string
 	sheriffMark, sheriffLine                                                   string
-	line                                                                       string
-	fields                                                                     fields
-	targetOnly, volunteerOnly, focusOnly, edgeOnly                             string
-	declareOnly, notesLine                                                     string
+	// campaignPK and sheriffPKVote are for a sheriff PK's speeches and vote;
+	// lastVoted and lastAbstained say how the voter voted in the tie.
+	campaignPK, sheriffPKVote, lastVoted, lastAbstained string
+	line                                                string
+	fields                                              fields
+	targetOnly, volunteerOnly, focusOnly, edgeOnly      string
+	declareOnly, notesLine                              string
 	// preparedLine and changedNotesLine are for a turn after a Prepare turn.
 	preparedLine, changedNotesLine string
 
@@ -288,7 +291,7 @@ var chineseText = text{
 		Shoot:   "你出局了，作为猎人可以开枪带走一个人：选一个名字表示开枪，选\"放弃\"表示不开枪。",
 		Run: "竞选警长：选你自己的名字表示上警，选\"放弃\"表示不上警。所有人同时决定，看不到别人的选择。" +
 			"警长的1.5票和归票权很有用。上警不是神职专属：想带队、想抢话语权、想在台上看清谁在说谎的人都可以上警。但上警的人越多，警下能投票的人越少，上警的人不能投票选警长。按你的身份、性格和打算决定。",
-		Campaign: "你上警了，这是你的竞选发言：说清楚为什么大家该把警徽给你：预言家报身份和查验；其他人一般不报身份，说你会怎么带队找狼。如果主持人刚宣布了警长PK，你在PK台上：这是你的PK发言，针对刚才的票型和同台的对手，说清楚为什么这一轮该投你，别把竞选发言重说一遍。不超过80字。",
+		Campaign: "你上警了，这是你的竞选发言：说清楚为什么大家该把警徽给你：预言家报身份和查验；其他人一般不报身份，说你会怎么带队找狼。不超过80字。",
 		Withdraw: "竞选发言都结束了，正式投票前你可以退水：选你自己的名字表示继续竞选，选\"放弃\"表示退水。所有还在竞选的人同时决定。" +
 			"退水的人不能当警长，也不能投票选警长。看清楚其他人的竞选发言：如果你信任的人更适合拿警徽，或者你的发言被打穿了，可以退水；还想要警徽就留下。" +
 			"跳了预言家又退水，大家一般会觉得他是假的。",
@@ -420,10 +423,18 @@ var chineseText = text{
 		suspect:          `"suspect": "你现在最怀疑的人"`,
 		claim:            `"claim": {"role": "你声称的身份：配置里的一个好人身份", "target": "和这个身份相关的人，没有就留空", "result": "查验结果（好人或狼人），或者救了、毒了，没有就留空"}`,
 	},
-	onlyJSON:         "只回复一个JSON对象，不要任何其他内容：",
-	seatLine:         "- %s：%s\n",
-	sheriffMark:      "，警长",
-	sheriffLine:      "你是警长：你最后一个发言，你说完就直接投票，没有人再发言，你的放逐票算1.5票。回应今天所有人的发言，然后归票：明确告诉大家今天投谁、为什么。\n",
+	onlyJSON:    "只回复一个JSON对象，不要任何其他内容：",
+	seatLine:    "- %s：%s\n",
+	sheriffMark: "，警长",
+	sheriffLine: "你是警长：你最后一个发言，你说完就直接投票，没有人再发言，你的放逐票算1.5票。回应今天所有人的发言，然后归票：明确告诉大家今天投谁、为什么。\n",
+	campaignPK: "警长投票平票了，这是你第%d轮警长PK的发言，同台的是%s。不要把竞选发言重说一遍：大家已经听过了。" +
+		"看刚才的票型，谁投了你、谁投了对手、谁弃了票，你要说服的是没投你的那些人。回应对手的说法和别人对你的质疑，有对跳就当面一条一条比，说清楚为什么这一轮该投你。\n",
+	sheriffPKVote: "这是第%d轮警长PK投票，只能在%s中间投，也可以弃票。上一轮你%s。" +
+		"上一轮的票只是记录，不约束你：听完刚才的PK发言，重新决定，不要想都不想就照上一轮投。" +
+		"把他们直接放在一起比：谁的说法更可信，谁回应质疑更有说服力，谁的说法有矛盾，谁拿警徽对你这一边更有利。PK发言里的新东西和竞选时的证据一起看。" +
+		"改票要有说得出的理由，比完还是觉得原来那个更好，就照样投他。证据还是分不出高下，再平票也是正常的结果。在 thinking 里写清楚你是怎么比的。\n",
+	lastVoted:        "投了%s",
+	lastAbstained:    "弃了票",
 	line:             "[%s] %s：%s\n",
 	targetOnly:       "target 只能是这些名字之一：%s。\n",
 	volunteerOnly:    "volunteer 只能是：%s，或者写无。\n",
@@ -632,7 +643,7 @@ Write everything in English.`,
 		Shoot:   "You are out. As the hunter you may shoot one person and take them with you: pick a name to shoot, or \"pass\" not to.",
 		Run: "Sheriff election: pick your own name to run for sheriff, or \"pass\" not to. Everyone decides at once, without seeing anyone else's choice. " +
 			"The sheriff's one and a half votes and the right to call the vote are worth a lot. Running is not just for power roles: anyone who wants to lead, to be heard, or to watch the liars up close may run. But the more who run, the fewer are left to vote, and those who run do not vote for sheriff. Decide by your role, your character and what you mean to do.",
-		Campaign: "You are running for sheriff. This is your campaign speech: say why the table should give you the badge: the seer gives their role and checks; anyone else usually claims no role, and says how they will lead the hunt. If the host has just announced a sheriff PK and you are in it, this is your PK speech: answer the vote that tied and the others in the PK, and say why this round should go to you, rather than repeating your campaign speech. At most 40 words.",
+		Campaign: "You are running for sheriff. This is your campaign speech: say why the table should give you the badge: the seer gives their role and checks; anyone else usually claims no role, and says how they will lead the hunt. At most 40 words.",
 		Withdraw: "The campaign speeches are over. Before the vote you may withdraw: pick your own name to stay in the race, or \"pass\" to withdraw. Everyone still running decides at once. " +
 			"Whoever withdraws cannot be sheriff and cannot vote for sheriff either. Weigh the other campaigns: if someone you trust is better placed to take the badge, or your own campaign was taken apart, you may withdraw; if you still want the badge, stay. " +
 			"Someone who claimed seer and then withdraws usually looks fake.",
@@ -764,10 +775,18 @@ Write everything in English.`,
 		suspect:          `"suspect": "who you suspect most right now"`,
 		claim:            `"claim": {"role": "the role you claim: one of the good roles in the lineup", "target": "the player it concerns, or \"\"", "result": "the check result (good or werewolf), or saved / poisoned, or \"\""}`,
 	},
-	onlyJSON:         "Reply with a single JSON object and nothing else: ",
-	seatLine:         "- %s: %s\n",
-	sheriffMark:      ", sheriff",
-	sheriffLine:      "You are the sheriff: you speak last, the vote follows straight after you with no more speeches, and your vote to exile counts one and a half. Answer today's speeches, then call the vote: tell the table plainly who to vote out today and why.\n",
+	onlyJSON:    "Reply with a single JSON object and nothing else: ",
+	seatLine:    "- %s: %s\n",
+	sheriffMark: ", sheriff",
+	sheriffLine: "You are the sheriff: you speak last, the vote follows straight after you with no more speeches, and your vote to exile counts one and a half. Answer today's speeches, then call the vote: tell the table plainly who to vote out today and why.\n",
+	campaignPK: "The sheriff vote tied. This is your speech in sheriff PK %d, against %s. Do not repeat your campaign speech: the table has heard it. " +
+		"Look at the vote that tied, who voted for you, who for your rival and who abstained: the ones to win over are those who did not vote for you. Answer your rival's case and the doubts raised about you, compare claims point by point if you clash, and say why this round should go to you.\n",
+	sheriffPKVote: "This is the vote in sheriff PK %d: only between %s, or abstain. Last round you %s. " +
+		"That vote is on the record but binds you to nothing: having heard the PK speeches, decide again rather than repeating it by reflex. " +
+		"Compare them side by side: whose story is more believable, who answered the doubts better, whose story contradicts itself, and whose holding the badge helps your side more. Weigh anything new in the PK speeches together with the evidence from the campaign. " +
+		"Changing your vote needs a reason you could give; if after comparing you still prefer the one you chose, vote for them again. If the evidence still cannot separate them, another tie is a fair outcome. Say in thinking how you compared them.\n",
+	lastVoted:        "voted for %s",
+	lastAbstained:    "abstained",
 	line:             "[%s] %s: %s\n",
 	targetOnly:       "target must be one of: %s.\n",
 	volunteerOnly:    "volunteer must be one of: %s, or nobody.\n",
